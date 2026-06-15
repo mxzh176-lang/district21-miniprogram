@@ -10,6 +10,8 @@ project.private.config.json
 node_modules/
 cloudfunctions/*/node_modules/
 miniprogram_npm/
+__pycache__/
+*.py[cod]
 *.log
 *.tmp
 *.temp
