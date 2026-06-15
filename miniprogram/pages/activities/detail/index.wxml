@@ -1,0 +1,38 @@
+<view class="page" wx:if="{{activity._id}}">
+  <view class="detail-hero tone-{{activity.tone}}">
+    <view class="detail-top">
+      <view class="type">{{activity.type}}</view>
+      <view>{{activity.photoCount}} 张照片</view>
+    </view>
+    <view class="detail-mark">{{activity.mark}}</view>
+    <view class="detail-date">{{activity.dateLabel}}</view>
+    <view class="detail-title">{{activity.title}}</view>
+    <view class="detail-team">{{activity.team}} · {{activity.location}}</view>
+  </view>
+
+  <view class="card info-card">
+    <view class="info-row"><text class="label">负责人</text><text>{{activity.owner}}</text></view>
+    <view class="info-row"><text class="label">参与人员</text><text>{{activity.participants}}</text></view>
+    <view class="divider"></view>
+    <view class="content-title">事件记录</view>
+    <view class="content">{{activity.description}}</view>
+    <view class="content-title">服务成果</view>
+    <view class="content">{{activity.summary}}</view>
+  </view>
+
+  <view class="section-row">
+    <view class="section-title">活动影像</view>
+    <view class="muted">演示照片墙</view>
+  </view>
+  <view class="photo-grid">
+    <view class="photo tone-{{item.tone}}" wx:for="{{photos}}" wx:key="_id">
+      <view class="photo-symbol">21</view>
+      <view class="photo-label">{{item.label}}</view>
+      <view class="watermark">内部资料</view>
+    </view>
+  </view>
+
+  <view class="archive-note">
+    正式版照片将上传至阿里云OSS，并按活动、年份和服务队长期保存。
+  </view>
+</view>

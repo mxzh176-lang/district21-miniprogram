@@ -1,0 +1,9 @@
+{
+  "desc": "内部小程序不允许微信索引",
+  "rules": [
+    {
+      "action": "disallow",
+      "page": "*"
+    }
+  ]
+}

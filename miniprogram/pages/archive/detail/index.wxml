@@ -1,0 +1,38 @@
+<view class="page" wx:if="{{entry._id}}">
+  <view class="detail-hero tone-{{entry.tone}}">
+    <view class="detail-status">
+      {{entry.status === 'draft' ? '待人工确认草稿' : '已发布档案'}}
+    </view>
+    <view class="detail-date">{{entry.dateLabel}}</view>
+    <view class="detail-title">{{entry.title}}</view>
+    <view class="detail-team">{{entry.team}}</view>
+  </view>
+
+  <view class="card">
+    <view class="info-row"><text class="label">上传人</text><text>{{entry.uploadedBy}}</text></view>
+    <view class="info-row"><text class="label">负责角色</text><text>{{entry.uploaderRole}}</text></view>
+    <view class="info-row"><text class="label">关键词</text><text>{{entry.keywordText}}</text></view>
+    <view class="divider"></view>
+    <view class="content-title">事件摘要</view>
+    <view class="content">{{entry.summary}}</view>
+    <view class="content-title">事件记录</view>
+    <view class="content">{{entry.content}}</view>
+  </view>
+
+  <view wx:if="{{photos.length}}" class="section-title">事件照片</view>
+  <view class="photo-grid">
+    <view class="photo" wx:for="{{photos}}" wx:key="id"
+      data-url="{{item.url}}" bindtap="previewPhoto">
+      <image class="photo-image" src="{{item.url}}" mode="aspectFill" />
+      <view class="photo-label">{{item.label}}</view>
+    </view>
+  </view>
+
+  <view wx:if="{{entry.status === 'draft'}}" class="draft-note">
+    本内容由 Word 或 AI 生成，目前仅为草稿。管理员检查文字与照片后才能正式发布。
+  </view>
+  <view class="detail-actions" wx:if="{{canEdit}}">
+    <button bindtap="editEntry">编辑档案</button>
+    <button class="delete-button" bindtap="deleteEntry">删除档案</button>
+  </view>
+</view>

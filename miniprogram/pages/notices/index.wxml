@@ -1,0 +1,19 @@
+<view class="page">
+  <view class="list-hero">
+    <view class="hero-title">通知公告</view>
+    <view class="hero-desc">二十一协作区及四个服务队内部通知。</view>
+  </view>
+  <view wx:if="{{items.length}}">
+    <view class="card notice" wx:for="{{items}}" wx:key="_id">
+      <view class="row">
+        <view wx:if="{{item.pinned}}" class="tag">置顶</view>
+        <view class="date">{{item.dateLabel}}</view>
+      </view>
+      <view class="title">{{item.title}}</view>
+      <view class="body">{{item.content}}</view>
+      <view wx:if="{{canEdit}}" class="edit" data-id="{{item._id}}" bindtap="editItem">编辑</view>
+    </view>
+  </view>
+  <view wx:else class="empty">暂无公告，管理员可后续补充</view>
+  <button wx:if="{{canEdit}}" class="primary-button add" bindtap="createItem">发布公告</button>
+</view>

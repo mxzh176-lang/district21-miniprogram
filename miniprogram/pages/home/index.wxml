@@ -1,0 +1,122 @@
+<view class="page">
+  <view class="hero">
+    <view class="hero-top">
+      <view>
+        <view class="eyebrow">LIONS DISTRICT 21 · SUIHUA</view>
+        <view class="hero-title">二十一协作区</view>
+        <view class="hero-subtitle">二一聚力 · 再创佳绩</view>
+      </view>
+      <view class="hero-seal">21</view>
+    </view>
+    <view class="term-row">
+      <view>2026—2027年度</view>
+      <view class="demo-tag">DEMO 演示版</view>
+    </view>
+  </view>
+
+  <swiper class="hero-swiper" autoplay circular indicator-dots interval="3500">
+    <swiper-item wx:for="{{banners}}" wx:key="*this">
+      <image src="{{item}}" mode="aspectFill" />
+    </swiper-item>
+  </swiper>
+
+  <view class="team-strip">
+    <view class="team-item {{selectedTeamId === item.id ? 'active' : ''}}" wx:for="{{teams}}" wx:key="id" data-id="{{item.id}}" bindtap="selectTeam">
+      <view class="team-dot" style="background: {{item.color}}"></view>
+      <view class="team-name">{{item.shortName}}</view>
+      <view class="team-count">{{item.members}}人</view>
+    </view>
+  </view>
+
+  <view class="structure-entry" bindtap="goStructure">
+    <view class="structure-icon">构</view>
+    <view class="structure-copy">
+      <view class="structure-title">组织架构</view>
+      <view class="structure-desc">二十一协作区 · 四个服务队 · 队长团队 · 各委员会</view>
+    </view>
+    <view class="arrow">›</view>
+  </view>
+
+  <view class="section-row">
+    <view>
+      <view class="section-kicker">JUNE PLAN</view>
+      <view class="section-title compact">六月重点待办</view>
+    </view>
+    <view class="more" bindtap="goTasks">全部 {{summary.pendingCount}} 项 ›</view>
+  </view>
+
+  <view class="task-focus" wx:for="{{tasks}}" wx:key="_id" data-id="{{item._id}}" bindtap="goTasks">
+    <view class="date-box">
+      <view class="date-month">6月</view>
+      <view class="date-day">{{item.day}}</view>
+    </view>
+    <view class="task-main">
+      <view class="task-top">
+        <view class="type-pill type-{{index}}">{{item.category}}</view>
+        <view wx:if="{{item.priority === 'urgent'}}" class="urgent">重要</view>
+      </view>
+      <view class="task-title">{{item.title}}</view>
+      <view class="task-meta">{{item.team}} · {{item.owner}}</view>
+    </view>
+    <view class="arrow">›</view>
+  </view>
+
+  <view class="care-row">
+    <view class="care-card birthday" bindtap="goBirthdays">
+      <view class="care-icon">生</view>
+      <view>
+        <view class="care-label">本月生日</view>
+        <view class="care-value">{{careOverview.birthdayCount}}位狮友</view>
+      </view>
+      <view class="care-arrow">›</view>
+    </view>
+    <view class="care-card concern" bindtap="goMonthlyService">
+      <view class="care-icon">爱</view>
+      <view>
+        <view class="care-label">本月服务</view>
+        <view class="care-value">查看服务事件</view>
+      </view>
+      <view class="care-arrow">›</view>
+    </view>
+  </view>
+
+  <view class="stats">
+    <view class="stat" bindtap="goContacts">
+      <view class="stat-number">{{summary.memberCount}}</view>
+      <view class="stat-label">在册狮友</view>
+    </view>
+    <view class="stat">
+      <view class="stat-number">5</view>
+      <view class="stat-label">协作组织</view>
+    </view>
+    <view class="stat">
+      <view class="stat-number">{{summary.photoCount}}</view>
+      <view class="stat-label">年度照片</view>
+    </view>
+  </view>
+
+  <view class="section-row">
+    <view class="section-title compact">最近服务足迹</view>
+    <view class="more" bindtap="goActivities">查看历史 ›</view>
+  </view>
+  <scroll-view scroll-x class="event-scroll">
+    <view class="event-row">
+      <view class="event-card tone-{{item.tone}}" wx:for="{{activities}}" wx:key="_id" data-id="{{item._id}}" bindtap="openActivity">
+        <view class="event-mark">{{item.mark}}</view>
+        <view class="event-date">{{item.dateLabel}}</view>
+        <view class="event-title">{{item.title}}</view>
+        <view class="event-team">{{item.team}} · {{item.photoCount}}张照片</view>
+      </view>
+    </view>
+  </scroll-view>
+
+  <view class="notice-bar" wx:if="{{notices.length}}" bindtap="goNotices">
+    <view class="notice-icon">告</view>
+    <view class="notice-copy">
+      <view class="notice-title">{{notices[0].title}}</view>
+      <view class="notice-content">{{notices[0].content}}</view>
+    </view>
+    <view class="arrow">›</view>
+  </view>
+
+</view>

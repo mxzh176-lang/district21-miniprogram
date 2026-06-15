@@ -1,0 +1,21 @@
+<view class="page">
+  <view class="notice" wx:if="{{canManage}}">联系方式仅管理员可见；企业、行业和资源信息对审核成员展示。</view>
+  <view class="notice denied" wx:else>当前账号没有录入权限。</view>
+  <view class="form-card" wx:if="{{canManage}}">
+    <view class="avatar-editor" bindtap="chooseAvatar">
+      <image wx:if="{{form.avatarUrl}}" src="{{form.avatarUrl}}" mode="aspectFill" />
+      <view wx:else>上传头像</view>
+      <text>点击修改头像</text>
+    </view>
+    <view class="field"><text class="label">姓名</text><input value="{{form.name}}" data-field="name" bindinput="onInput" placeholder="狮友姓名" /></view>
+    <view class="field"><text class="label">所属服务队</text><picker range="{{teams}}" range-key="name" value="{{teamIndex}}" bindchange="onTeamChange"><view class="picker">{{teams[teamIndex].name}}</view></picker></view>
+    <view class="field"><text class="label">岗位</text><input value="{{form.position}}" data-field="position" bindinput="onInput" placeholder="例如：新闻宣传主席" /></view>
+    <view class="field"><text class="label">企业名称</text><input value="{{form.company}}" data-field="company" bindinput="onInput" placeholder="企业或机构名称" /></view>
+    <view class="field"><text class="label">行业/主营项目</text><textarea value="{{form.industry}}" data-field="industry" bindinput="onInput" placeholder="主营业务、行业方向" /></view>
+    <view class="field"><text class="label">可提供资源</text><textarea value="{{form.resource}}" data-field="resource" bindinput="onInput" placeholder="车辆、场地、物资、专业服务等" /></view>
+    <view class="field"><text class="label">狮友福利</text><textarea value="{{form.benefit}}" data-field="benefit" bindinput="onInput" placeholder="填写可为狮友提供的优惠或福利" /></view>
+    <view class="field"><text class="label">企业地址</text><input value="{{form.companyAddress}}" data-field="companyAddress" bindinput="onInput" placeholder="可选" /></view>
+    <view class="field"><text class="label">联系电话</text><input type="number" value="{{form.phone}}" data-field="phone" bindinput="onInput" placeholder="仅管理员可见" /></view>
+    <button class="save-button" bindtap="save">保存狮友资料</button>
+  </view>
+</view>

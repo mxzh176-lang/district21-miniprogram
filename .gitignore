@@ -1,0 +1,25 @@
+# WeChat Developer Tools local settings
+project.private.config.json
+
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+
+# Dependencies and generated files
+node_modules/
+cloudfunctions/*/node_modules/
+miniprogram_npm/
+*.log
+*.tmp
+*.temp
+*.kdtmp
+
+# Operating system and editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Local preview output
+preview/

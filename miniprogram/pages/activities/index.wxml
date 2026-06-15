@@ -1,0 +1,41 @@
+<view class="page">
+  <view class="archive-hero">
+    <view class="hero-kicker">PUBLIC SERVICE ARCHIVE</view>
+    <view class="hero-title">公益服务档案</view>
+    <view class="hero-desc">保存每一次服务、关爱与相聚</view>
+    <view class="archive-stats">
+      <view><text class="big">6</text><text>示例事件</text></view>
+      <view><text class="big">248</text><text>示例照片</text></view>
+      <view><text class="big">4</text><text>服务队</text></view>
+    </view>
+  </view>
+
+  <scroll-view scroll-x class="team-scroll">
+    <view class="team-filters">
+      <view class="team-filter {{teamId === 'all' ? 'active' : ''}}" data-id="all" bindtap="selectTeam">全部</view>
+      <view class="team-filter {{teamId === item.id ? 'active' : ''}}" wx:for="{{teams}}" wx:key="id" data-id="{{item.id}}" bindtap="selectTeam">{{item.shortName}}</view>
+    </view>
+  </scroll-view>
+
+  <view class="archive-list">
+    <view class="event-card" wx:for="{{filteredActivities}}" wx:key="_id" data-id="{{item._id}}" bindtap="openActivity">
+      <view class="event-cover tone-{{item.tone}}">
+        <view class="cover-top">
+          <view class="event-type">{{item.type}}</view>
+          <view class="photo-count">{{item.photoCount}} 张</view>
+        </view>
+        <view class="cover-mark">{{item.mark}}</view>
+        <view class="cover-caption">二十一协作区 · 内部影像档案</view>
+      </view>
+      <view class="event-copy">
+        <view class="event-date">{{item.dateLabel}}</view>
+        <view class="event-title">{{item.title}}</view>
+        <view class="event-summary">{{item.description}}</view>
+        <view class="event-meta">
+          <view>{{item.team}}</view>
+          <view>{{item.location}} ›</view>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

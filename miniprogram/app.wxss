@@ -1,0 +1,98 @@
+page {
+  min-height: 100%;
+  background:
+    radial-gradient(circle at 8% 0, rgba(120, 55, 194, 0.2), transparent 34%),
+    radial-gradient(circle at 100% 28%, rgba(28, 103, 174, 0.18), transparent 38%),
+    #0b1024;
+  color: #f2efff;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: 28rpx;
+}
+
+.page {
+  padding: 28rpx;
+  box-sizing: border-box;
+}
+
+.card {
+  margin-bottom: 24rpx;
+  padding: 30rpx;
+  border: 1rpx solid rgba(201, 130, 255, 0.18);
+  border-radius: 24rpx;
+  background: rgba(27, 21, 59, 0.9);
+  box-shadow: 0 16rpx 42rpx rgba(4, 4, 22, 0.28);
+}
+
+.section-title {
+  margin: 36rpx 0 20rpx;
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #f4f0ff;
+}
+
+.muted {
+  color: #9b94b5;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 7rpx 16rpx;
+  border-radius: 999rpx;
+  color: #ddb2ff;
+  background: rgba(151, 86, 218, 0.22);
+  font-size: 22rpx;
+}
+
+.primary-button {
+  color: #fff;
+  background: linear-gradient(135deg, #9b5de5, #337eea);
+  border-radius: 18rpx;
+  font-weight: 600;
+}
+
+.secondary-button {
+  color: #d9b4ff;
+  background: rgba(111, 72, 164, 0.25);
+  border-radius: 18rpx;
+}
+
+.danger-button {
+  color: #a0372d;
+  background: #fae8e4;
+  border-radius: 18rpx;
+}
+
+.empty {
+  padding: 90rpx 30rpx;
+  text-align: center;
+  color: #8d86a6;
+}
+
+.field {
+  margin-bottom: 24rpx;
+}
+
+.field-label {
+  display: block;
+  margin-bottom: 12rpx;
+  color: #c1b9d8;
+  font-size: 25rpx;
+  font-weight: 600;
+}
+
+.input,
+.textarea,
+.picker {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 22rpx 24rpx;
+  border: 1rpx solid rgba(183, 124, 237, 0.22);
+  border-radius: 16rpx;
+  color: #f2efff;
+  background: rgba(19, 15, 45, 0.86);
+}
+
+.textarea {
+  min-height: 180rpx;
+}

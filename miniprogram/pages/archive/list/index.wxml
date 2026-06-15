@@ -1,0 +1,52 @@
+<view class="page">
+  <view class="list-hero">
+    <view class="hero-kicker">ARCHIVE EVENTS</view>
+    <view class="hero-title">{{categoryName}}</view>
+    <view class="hero-desc">{{organization.name}} · 一件事一条档案</view>
+    <view class="action-row" wx:if="{{canEdit}}">
+      <button class="add-button" bindtap="addEntry">＋ 新增事件</button>
+      <button wx:if="{{isSuperAdmin}}" class="import-button" bindtap="importWord">导入 Word</button>
+    </view>
+  </view>
+
+  <view class="permission-note">
+    <text wx:if="{{isSuperAdmin}}">只有最高管理员可批量导入 Word；岗位管理员可新增本栏目的单条事件。</text>
+    <text wx:elif="{{canEdit}}">你可以新增本栏目的事件，内容经人工确认后发布。</text>
+    <text wx:else>当前账号只有查看权限。</text>
+  </view>
+
+  <view class="permission-note" wx:if="{{loadError}}">{{loadError}}</view>
+
+  <view wx:if="{{entries.length}}" class="event-list">
+    <view class="archive-event" wx:for="{{entries}}" wx:key="_id"
+      data-id="{{item._id}}" bindtap="openDetail">
+      <image wx:if="{{item.coverImage}}" class="event-cover" src="{{item.coverImage}}" mode="aspectFill" />
+      <view class="event-date">
+        <view class="date-day">{{item.dateDay}}</view>
+        <view class="date-month">{{item.dateMonth}}</view>
+      </view>
+      <view class="event-copy">
+        <view class="event-heading">
+          <view class="event-title">{{item.title}}</view>
+          <view class="status {{item.status}}">
+            {{item.status === 'draft' ? '草稿' : '已发布'}}
+          </view>
+        </view>
+        <view class="event-summary">{{item.summary}}</view>
+        <view class="event-meta">
+          <text>{{item.photoCount}}张照片</text>
+          <text>上传：{{item.uploadedBy}}</text>
+        </view>
+        <view class="event-team">{{item.team}}</view>
+        <view class="entry-actions" wx:if="{{canEdit}}">
+          <text data-index="{{index}}" data-direction="up" catchtap="moveEntry">上移</text>
+          <text data-index="{{index}}" data-direction="down" catchtap="moveEntry">下移</text>
+          <text data-id="{{item._id}}" catchtap="editEntry">编辑</text>
+          <text class="delete" data-id="{{item._id}}" catchtap="deleteEntry">删除</text>
+        </view>
+      </view>
+      <view class="arrow">›</view>
+    </view>
+  </view>
+  <view wx:else class="empty">该栏目暂无事件，可点击“新增事件”开始记录。</view>
+</view>

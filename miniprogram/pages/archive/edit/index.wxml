@@ -1,0 +1,165 @@
+<view class="page">
+  <view class="scope-card">
+    <view class="scope-badge">{{id ? '编辑' : '新建'}}</view>
+    <text class="scope-title">{{organizationName}}</text>
+    <text class="scope-subtitle">{{categoryName}} · 单条事件记录</text>
+    <view class="scope-progress">
+      <view class="progress-item active"><text>1</text><view>填写</view></view>
+      <view class="progress-line"></view>
+      <view class="progress-item"><text>2</text><view>核对</view></view>
+      <view class="progress-line"></view>
+      <view class="progress-item"><text>3</text><view>发布</view></view>
+    </view>
+  </view>
+
+  <view class="permission-tip" wx:if="{{canEdit}}">
+    <view class="tip-icon">✓</view>
+    <view>
+      <view class="tip-title">当前账号可以录入</view>
+      <view class="tip-text">AI 仅协助生成草稿，发布前请核对文字、照片和所属服务队。</view>
+    </view>
+  </view>
+  <view class="permission-tip denied" wx:else>
+    <view class="tip-icon">!</view>
+    <view>当前账号没有该档案的编辑权限。</view>
+  </view>
+
+  <block wx:if="{{canEdit}}">
+    <view class="form-section">
+      <view class="section-heading">
+        <view class="section-number">01</view>
+        <view>
+          <view class="section-title">基本信息</view>
+          <view class="section-desc">先填写时间和事件名称</view>
+        </view>
+      </view>
+
+      <view class="field">
+        <view class="field-head">
+          <text class="label">事件日期</text>
+          <text class="required">必填</text>
+        </view>
+        <picker mode="date" value="{{form.date}}" bindchange="onDateChange">
+          <view class="picker">
+            <text>{{form.date}}</text>
+            <text class="picker-arrow">›</text>
+          </view>
+        </picker>
+      </view>
+
+      <view class="field">
+        <view class="field-head">
+          <text class="label">事件标题</text>
+          <text class="required">必填</text>
+        </view>
+        <input class="input wide-input" style="color:#000000;-webkit-text-fill-color:#000000;font-weight:700;opacity:1;"
+          cursor-color="#7447c8" value="{{form.title}}" data-field="title" bindinput="onInput"
+          placeholder-class="form-placeholder" placeholder-style="color:#626d82;font-weight:500;"
+          placeholder="请输入事件名称，例如：慰问困难家庭公益服务" />
+        <view class="field-help">标题建议控制在 10 至 30 个字，方便历史事件列表展示。</view>
+      </view>
+    </view>
+
+    <view class="form-section ai-section">
+      <view class="section-heading">
+        <view class="section-number ai-number">AI</view>
+        <view>
+          <view class="section-title">AI 辅助整理</view>
+          <view class="section-desc">输入关键信息，自动生成摘要和详情草稿</view>
+        </view>
+      </view>
+
+      <view class="field">
+        <text class="label">事件提示词</text>
+        <input class="input wide-input" style="color:#000000;-webkit-text-fill-color:#000000;font-weight:700;opacity:1;"
+          cursor-color="#7447c8" value="{{form.keywords}}" data-field="keywords" bindinput="onInput"
+          placeholder-class="form-placeholder" placeholder-style="color:#626d82;font-weight:500;"
+          placeholder="请输入地点、服务对象、活动内容和参与人员" />
+        <view class="keyword-examples">
+          <text>示例：</text>
+          <text class="keyword-chip">服务地点</text>
+          <text class="keyword-chip">服务对象</text>
+          <text class="keyword-chip">参与人员</text>
+        </view>
+      </view>
+
+      <button class="ai-button" bindtap="generateDraft">
+        <text class="ai-button-icon">AI</text>
+        <text>生成事件草稿</text>
+      </button>
+      <view class="ai-note success" wx:if="{{aiGenerated}}">
+        草稿已生成，请继续检查和修改下方内容。
+      </view>
+    </view>
+
+    <view class="form-section">
+      <view class="section-heading">
+        <view class="section-number">02</view>
+        <view>
+          <view class="section-title">内容记录</view>
+          <view class="section-desc">摘要用于列表，详情用于完整档案</view>
+        </view>
+      </view>
+
+      <view class="field">
+        <text class="label">内容摘要</text>
+        <textarea class="textarea short" style="color:#000000;-webkit-text-fill-color:#000000;font-weight:700;opacity:1;"
+          cursor-color="#7447c8" value="{{form.summary}}" data-field="summary" bindinput="onInput"
+          placeholder-class="form-placeholder" placeholder-style="color:#626d82;font-weight:500;"
+          placeholder="请输入简短摘要，用于历史事件列表展示" />
+      </view>
+
+      <view class="field">
+        <view class="field-head">
+          <text class="label">事件详情</text>
+          <text class="required">必填</text>
+        </view>
+        <textarea class="textarea" style="color:#000000;-webkit-text-fill-color:#000000;font-weight:700;opacity:1;"
+          cursor-color="#7447c8" value="{{form.content}}" data-field="content" bindinput="onInput"
+          placeholder-class="form-placeholder" placeholder-style="color:#626d82;font-weight:500;"
+          placeholder="请输入活动过程、服务结果、参与人员及其他说明" />
+      </view>
+    </view>
+
+    <view class="form-section">
+      <view class="section-heading">
+        <view class="section-number">03</view>
+        <view>
+          <view class="section-title">照片与发布信息</view>
+          <view class="section-desc">最多上传 9 张现场照片</view>
+        </view>
+      </view>
+
+      <view class="photo-upload" bindtap="choosePhotos">
+        <view class="upload-icon">＋</view>
+        <view class="upload-copy">
+          <view class="upload-title">{{form.photoCount ? '继续添加照片' : '选择现场照片'}}</view>
+          <view class="upload-desc">{{form.photoCount ? '已选择 ' + form.photoCount + ' 张' : '支持相册或相机拍摄'}}</view>
+        </view>
+        <view class="upload-arrow">›</view>
+      </view>
+
+      <view class="photo-preview" wx:if="{{form.photos.length}}">
+        <view class="preview-item" wx:for="{{form.photos}}" wx:key="*this">
+          <image src="{{item}}" mode="aspectFill" />
+          <view class="photo-index">{{index + 1}}</view>
+          <view class="remove-photo" data-index="{{index}}" catchtap="removePhoto">×</view>
+        </view>
+      </view>
+
+      <view class="uploader-row">
+        <view>
+          <view class="uploader-label">上传人</view>
+          <view class="uploader-desc">自动记录当前操作账号</view>
+        </view>
+        <input class="uploader-name" style="color:#5b6476;-webkit-text-fill-color:#5b6476;font-weight:700;opacity:1;"
+          value="{{form.uploadedBy}}" disabled />
+      </view>
+    </view>
+  </block>
+
+  <view class="footer-actions" wx:if="{{canEdit}}">
+    <button class="draft-button" bindtap="saveDraft">保存草稿</button>
+    <button class="publish-button" bindtap="publish">确认并发布</button>
+  </view>
+</view>

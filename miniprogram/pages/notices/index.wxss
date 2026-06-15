@@ -1,0 +1,15 @@
+.list-hero {
+  padding: 36rpx;
+  border-radius: 26rpx;
+  color: #fff;
+  background: #201447;
+}
+.hero-title { font-family: serif; font-size: 42rpx; font-weight: 700; }
+.hero-desc { margin-top: 10rpx; color: rgba(255,255,255,.65); }
+.notice { margin-top: 24rpx; }
+.row { display: flex; align-items: center; justify-content: space-between; }
+.date { color: #8a9591; font-size: 22rpx; }
+.title { margin: 18rpx 0 12rpx; font-size: 32rpx; font-weight: 700; }
+.body { color: #b1a9c8; line-height: 1.8; white-space: pre-wrap; }
+.edit { margin-top: 22rpx; color: #c982ff; text-align: right; }
+.add { margin: 30rpx 0; }

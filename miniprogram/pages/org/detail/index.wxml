@@ -1,0 +1,30 @@
+<view class="page" wx:if="{{member._id}}">
+  <view class="profile-card">
+    <view class="avatar avatar-{{member.avatarTone}}">
+      <image wx:if="{{member.avatarUrl}}" class="avatar-image" src="{{member.avatarUrl}}" mode="aspectFill" />
+      <text wx:else>{{member.initial}}</text>
+    </view>
+    <view class="name">{{member.name}}</view>
+    <view class="position">{{member.position}}</view>
+    <view class="team">{{member.team}}</view>
+    <button wx:if="{{canManage}}" class="edit-button" bindtap="editMember">编辑资料</button>
+  </view>
+
+  <view class="card">
+    <view class="section-title">企业信息</view>
+    <view class="row"><text class="label">企业名称</text><text>{{member.company}}</text></view>
+    <view class="row"><text class="label">行业/主营</text><text>{{member.industry}}</text></view>
+    <view class="row"><text class="label">可提供资源</text><text>{{member.resource}}</text></view>
+    <view class="row"><text class="label">狮友福利</text><text>{{member.benefit || '暂无填写'}}</text></view>
+    <view class="row" wx:if="{{member.companyAddress}}">
+      <text class="label">企业地址</text><text>{{member.companyAddress}}</text>
+    </view>
+  </view>
+
+  <view class="card" wx:if="{{canViewContact}}">
+    <view class="section-title">管理员可见联系方式</view>
+    <view class="row"><text class="label">联系电话</text><text>{{member.phone || '待补充'}}</text></view>
+    <button class="call-button" bindtap="callMember">拨打电话</button>
+  </view>
+  <view class="privacy-note" wx:else>为保护成员隐私，联系方式仅管理员可见。</view>
+</view>

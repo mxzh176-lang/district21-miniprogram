@@ -1,0 +1,35 @@
+<view class="page">
+  <view class="structure-hero">
+    <view class="structure-seal">21</view>
+    <view class="hero-title">二十一协作区组织架构</view>
+    <picker range="{{terms}}" range-key="term" value="{{termIndex}}" bindchange="changeTerm">
+      <view class="term-picker">{{current.term}}⌄</view>
+    </picker>
+  </view>
+
+  <view class="district-card">
+    <view class="level-label">二十一协作区</view>
+    <view class="district-grid">
+      <view class="person-card" wx:for="{{current.district}}" wx:key="position">
+        <view class="person-avatar">{{item.initial}}</view>
+        <view class="person-name">{{item.person}}</view>
+        <view class="person-position">{{item.position}}</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="connector">↓ 四个服务队 ↓</view>
+
+  <view class="team-structure" wx:for="{{current.teams}}" wx:key="name">
+    <view class="team-head">
+      <view>
+        <view class="team-name">{{item.name}}</view>
+        <view class="team-leader">{{item.leader}}</view>
+      </view>
+      <view class="team-number">{{index + 1}}</view>
+    </view>
+    <view class="committee-row">
+      <view class="committee" wx:for="{{item.committees}}" wx:for-item="committee" wx:key="*this">{{committee}}</view>
+    </view>
+  </view>
+</view>

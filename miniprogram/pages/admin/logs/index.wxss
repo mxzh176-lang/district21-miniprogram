@@ -1,0 +1,4 @@
+.row { display: flex; align-items: center; justify-content: space-between; }
+.action { color: #966d2b; font-weight: 700; }
+.date { color: #8b9591; font-size: 21rpx; }
+.detail { margin-top: 14rpx; color: #596b63; }

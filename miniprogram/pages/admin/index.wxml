@@ -1,0 +1,89 @@
+<view class="page">
+  <view class="admin-hero">
+    <view class="hero-kicker">MANAGEMENT DEMO</view>
+    <view class="hero-title">协作区管理后台</view>
+    <view class="hero-desc">四队共用数据，按届次与岗位分配权限</view>
+  </view>
+
+  <view class="stats-grid">
+    <view class="stat-card"><view class="number">{{stats.memberCount}}</view><view>在册狮友</view></view>
+    <view class="stat-card"><view class="number">{{stats.taskCount}}</view><view>本月待办</view></view>
+    <view class="stat-card"><view class="number">{{stats.activityCount}}</view><view>示例档案</view></view>
+    <view class="stat-card"><view class="number">{{stats.photoCount}}</view><view>年度照片</view></view>
+  </view>
+
+  <view class="section-title">成员授权码</view>
+  <view class="invite-card">
+    <view>
+      <view class="invite-label">二十一协作区 · 普通成员</view>
+      <view class="invite-code">{{inviteCode}}</view>
+      <view class="invite-desc">有效期至 2026-06-30 · 可使用 50 次</view>
+    </view>
+    <button class="copy-button" bindtap="copyCode">复制</button>
+  </view>
+  <view class="security-note">授权码只用于首次绑定。正式权限由“成员 + 服务队 + 届次 + 岗位”决定。</view>
+
+  <view class="section-row">
+    <view class="section-title">2026—2027年度岗位</view>
+    <view class="small-link">管理岗位 ›</view>
+  </view>
+  <view class="appointment-card" wx:for="{{appointments}}" wx:key="position">
+    <view class="position-icon">{{index + 1}}</view>
+    <view class="appointment-copy">
+      <view class="position">{{item.position}}</view>
+      <view class="person">{{item.person}} · {{item.organization}}</view>
+    </view>
+    <view class="permission">已授权</view>
+  </view>
+
+  <view class="section-title">页面内容管理</view>
+  <view class="manage-grid">
+    <view class="manage-item" bindtap="goTasks"><view class="manage-icon green">待</view><view>待办与服务</view><text>修改事项</text></view>
+    <view class="manage-item" bindtap="goArchives"><view class="manage-icon red">档</view><view>档案与照片</view><text>编辑排序</text></view>
+    <view class="manage-item" bindtap="goContacts"><view class="manage-icon gold">员</view><view>人员与企业</view><text>头像资料</text></view>
+    <view class="manage-item" bindtap="goNotices"><view class="manage-icon blue">文</view><view>通知内容</view><text>文字编辑</text></view>
+  </view>
+
+  <view class="section-title">管理员设置</view>
+  <view class="add-admin-card" wx:if="{{canAddAdmin}}">
+    <view class="add-admin-title">直接添加管理员</view>
+    <view class="add-admin-desc">从狮友通讯录选择成员并设置管理身份。</view>
+    <view class="admin-picker-row">
+      <picker class="admin-picker" range="{{adminCandidates}}" range-key="name"
+        value="{{candidateIndex}}" bindchange="selectCandidate">
+        <view class="picker-value">
+          {{adminCandidates.length ? adminCandidates[candidateIndex].name + ' · ' + adminCandidates[candidateIndex].team : '暂无可添加成员'}}
+        </view>
+      </picker>
+      <picker class="role-picker" range="{{roleOptions}}" range-key="label"
+        value="{{roleIndex}}" bindchange="selectRole">
+        <view class="picker-value">{{roleOptions[roleIndex].label}}</view>
+      </picker>
+    </view>
+    <button class="add-admin-button" bindtap="addAdmin" disabled="{{!adminCandidates.length}}">添加管理员</button>
+  </view>
+
+  <view class="section-title">管理员板块权限</view>
+  <view class="permission-card" wx:for="{{adminMembers}}" wx:key="_id">
+    <view class="permission-person">
+      <view class="permission-avatar">{{item.initial}}</view>
+      <view class="permission-copy"><view class="permission-name">{{item.name}}</view><view class="permission-team">{{item.team}} · {{item.roleLabel}}</view></view>
+      <view wx:if="{{canAddAdmin}}" class="remove-admin" data-id="{{item._id}}" data-name="{{item.name}}" catchtap="removeAdmin">取消</view>
+    </view>
+    <checkbox-group class="permission-options" data-id="{{item._id}}" bindchange="changePermissions">
+      <label><checkbox value="tasks" checked="{{item.canTasks}}" color="#a15be8" /><text>待办</text></label>
+      <label><checkbox value="archives" checked="{{item.canArchives}}" color="#a15be8" /><text>档案</text></label>
+      <label><checkbox value="contacts" checked="{{item.canContacts}}" color="#a15be8" /><text>通讯录</text></label>
+      <label><checkbox value="photos" checked="{{item.canPhotos}}" color="#a15be8" /><text>照片</text></label>
+      <label><checkbox value="notices" checked="{{item.canNotices}}" color="#a15be8" /><text>通知</text></label>
+    </checkbox-group>
+  </view>
+  <view class="empty-admin" wx:if="{{!adminMembers.length}}">暂未添加管理员。</view>
+
+  <view class="log-entry" bindtap="goLogs">
+    <view><view class="log-title">管理员操作记录</view><view class="log-desc">查看新增、上传、权限变更与删除记录</view></view>
+    <view class="arrow">›</view>
+  </view>
+
+  <view class="demo-footer">权限勾选后立即保存。超级管理员可随时调整每位管理员能够维护的板块。</view>
+</view>

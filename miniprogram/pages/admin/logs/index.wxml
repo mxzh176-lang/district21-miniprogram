@@ -1,0 +1,12 @@
+<view class="page">
+  <view wx:if="{{logs.length}}">
+    <view class="card log" wx:for="{{logs}}" wx:key="_id">
+      <view class="row">
+        <view class="action">{{item.actionLabel}}</view>
+        <view class="date">{{item.createdAtLabel}}</view>
+      </view>
+      <view class="detail">{{item.operatorName}} · {{item.targetType}} · {{item.targetTitle || item.targetId}}</view>
+    </view>
+  </view>
+  <view wx:else class="empty">暂无管理员操作记录</view>
+</view>

@@ -1,0 +1,142 @@
+.structure-hero {
+  padding: 38rpx 28rpx;
+  border-radius: 30rpx;
+  color: #fff;
+  text-align: center;
+  background: linear-gradient(145deg, #173c67, #3d65a4);
+}
+
+.structure-seal {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 92rpx;
+  height: 92rpx;
+  margin: auto;
+  border: 3rpx solid #e5c55e;
+  border-radius: 50%;
+  color: #f0d36d;
+  font-family: serif;
+  font-size: 36rpx;
+  font-weight: 700;
+}
+
+.hero-title {
+  margin-top: 18rpx;
+  font-size: 36rpx;
+  font-weight: 700;
+}
+
+.term-picker {
+  display: inline-block;
+  margin-top: 18rpx;
+  padding: 10rpx 22rpx;
+  border-radius: 999rpx;
+  color: #f0d36d;
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 20rpx;
+}
+
+.district-card,
+.team-structure {
+  margin-top: 22rpx;
+  padding: 25rpx;
+  border-radius: 24rpx;
+  background: #1b153b;
+}
+
+.level-label {
+  color: #173c67;
+  font-size: 30rpx;
+  font-weight: 700;
+  text-align: center;
+}
+
+.district-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 13rpx;
+  margin-top: 24rpx;
+}
+
+.person-card {
+  text-align: center;
+}
+
+.person-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72rpx;
+  height: 72rpx;
+  margin: auto;
+  border: 3rpx solid #d5b044;
+  border-radius: 50%;
+  color: #173c67;
+  background: #f6f0df;
+  font-weight: 700;
+}
+
+.person-name {
+  margin-top: 10rpx;
+  font-size: 20rpx;
+  font-weight: 700;
+}
+
+.person-position {
+  margin-top: 3rpx;
+  color: #a17a2c;
+  font-size: 16rpx;
+}
+
+.connector {
+  margin: 18rpx 0 -5rpx;
+  color: #a17a2c;
+  text-align: center;
+  font-size: 20rpx;
+}
+
+.team-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.team-name {
+  color: #173c67;
+  font-size: 28rpx;
+  font-weight: 700;
+}
+
+.team-leader {
+  margin-top: 5rpx;
+  color: #7c8984;
+  font-size: 19rpx;
+}
+
+.team-number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  color: #fff;
+  background: #315b94;
+  font-weight: 700;
+}
+
+.committee-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx;
+  margin-top: 18rpx;
+}
+
+.committee {
+  padding: 9rpx 14rpx;
+  border-radius: 999rpx;
+  color: #735c27;
+  background: #f3ead7;
+  font-size: 17rpx;
+}

@@ -1,0 +1,50 @@
+<view class="page">
+  <view class="profile-hero">
+    <view class="avatar">21</view>
+    <view class="name">{{member.nickname}}</view>
+    <view class="role">超级管理员 · {{member.term}}</view>
+    <view class="organization">{{member.team}}</view>
+  </view>
+
+  <view class="demo-note">
+    <view class="demo-icon">演</view>
+    <view>
+      <view class="demo-title">当前为本地演示模式</view>
+      <view class="demo-desc">无需服务器和数据库，可直接在微信开发者工具中展示。</view>
+    </view>
+  </view>
+
+  <view class="section-title">协作区资料</view>
+  <view class="menu-card" bindtap="goNotices">
+    <view class="menu-icon gold">告</view>
+    <view class="menu-copy"><view class="menu-title">通知公告</view><view class="menu-desc">岗位交接与公益服务通知</view></view>
+    <view class="arrow">›</view>
+  </view>
+  <view class="menu-card" bindtap="goKnowledge">
+    <view class="menu-icon knowledge">知</view>
+    <view class="menu-copy"><view class="menu-title">中国狮子联会知识库</view><view class="menu-desc">官方资料、制度索引与服务知识</view></view>
+    <view class="arrow">›</view>
+  </view>
+  <view class="menu-card ai-card" bindtap="goAssistant">
+    <view class="menu-icon assistant">AI</view>
+    <view class="menu-copy"><view class="menu-title">二十一协作区 AI 助手</view><view class="menu-desc">询问制度、服务记录和知识库资料</view></view>
+    <view class="arrow">›</view>
+  </view>
+  <view class="menu-card" bindtap="goHistory">
+    <view class="menu-icon green">史</view>
+    <view class="menu-copy"><view class="menu-title">协作区与四队发展历史</view><view class="menu-desc">按年份保存重要服务与里程碑</view></view>
+    <view class="arrow">›</view>
+  </view>
+  <view class="menu-card" bindtap="goAdmin">
+    <view class="menu-icon blue">管</view>
+    <view class="menu-copy"><view class="menu-title">管理后台演示</view><view class="menu-desc">授权码、届次岗位、内容和日志</view></view>
+    <view class="arrow">›</view>
+  </view>
+
+  <view class="privacy-card">
+    <view class="privacy-title">内部资料保护</view>
+    <view class="privacy-text">正式版将通过成员名单或授权码绑定身份。关爱详情、手机号码和企业联系方式按服务队、岗位和任期分级显示。</view>
+  </view>
+
+  <view class="version">二十一协作区公益档案 Demo v1.0</view>
+</view>

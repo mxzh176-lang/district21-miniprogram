@@ -1,0 +1,26 @@
+<view class="page">
+  <view class="card form">
+    <view class="field">
+      <text class="field-label">岗位名称</text>
+      <input class="input" value="{{form.position}}" data-key="position" bindinput="input" placeholder="例如：第一副队长" />
+    </view>
+    <view class="field">
+      <text class="field-label">负责人</text>
+      <input class="input" value="{{form.person}}" data-key="person" bindinput="input" placeholder="负责人姓名" />
+    </view>
+    <view class="field">
+      <text class="field-label">所属委员会</text>
+      <input class="input" value="{{form.committee}}" data-key="committee" bindinput="input" placeholder="没有可留空" />
+    </view>
+    <view class="field">
+      <text class="field-label">显示顺序</text>
+      <input class="input" type="number" value="{{form.order}}" data-key="order" bindinput="input" placeholder="数字越小越靠前" />
+    </view>
+    <view class="field">
+      <text class="field-label">岗位职责</text>
+      <textarea class="textarea" value="{{form.description}}" data-key="description" bindinput="input" placeholder="填写岗位职责和工作要求"></textarea>
+    </view>
+    <button class="primary-button" bindtap="save" loading="{{saving}}">保存</button>
+    <button wx:if="{{id}}" class="danger-button delete" bindtap="remove">移入回收站</button>
+  </view>
+</view>

@@ -1,0 +1,66 @@
+{
+  "entryPagePath": "pages/home/index",
+  "pages": [
+    "pages/home/index",
+    "pages/tasks/index",
+    "pages/archive/index",
+    "pages/archive/list/index",
+    "pages/archive/detail/index",
+    "pages/archive/edit/index",
+    "pages/archive/import/index",
+    "pages/activities/index",
+    "pages/activities/detail/index",
+    "pages/org/index",
+    "pages/org/detail/index",
+    "pages/org/edit/index",
+    "pages/structure/index",
+    "pages/notices/index",
+    "pages/knowledge/index",
+    "pages/assistant/index",
+    "pages/history/index",
+    "pages/profile/index",
+    "pages/admin/index",
+    "pages/admin/task-edit/index",
+    "pages/admin/org-edit/index",
+    "pages/admin/activity-edit/index",
+    "pages/admin/content-edit/index",
+    "pages/admin/logs/index"
+  ],
+  "window": {
+    "navigationBarTitleText": "二十一协作区",
+    "navigationBarBackgroundColor": "#171033",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#0b1024",
+    "backgroundTextStyle": "light"
+  },
+  "tabBar": {
+    "color": "#80799f",
+    "selectedColor": "#c982ff",
+    "backgroundColor": "#120d2b",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/home/index",
+        "text": "首页"
+      },
+      {
+        "pagePath": "pages/history/index",
+        "text": "历史事件"
+      },
+      {
+        "pagePath": "pages/archive/index",
+        "text": "档案"
+      },
+      {
+        "pagePath": "pages/org/index",
+        "text": "通讯录"
+      },
+      {
+        "pagePath": "pages/profile/index",
+        "text": "我的"
+      }
+    ]
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

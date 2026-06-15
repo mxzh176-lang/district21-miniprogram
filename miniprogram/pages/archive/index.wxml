@@ -1,0 +1,66 @@
+<view class="page">
+  <view class="archive-hero">
+    <view class="hero-kicker">ARCHIVE DIRECTORY</view>
+    <view class="hero-title">让爱有迹可寻</view>
+    <view class="hero-desc">岗位人员直接填写内容，保存后自动形成历史事件</view>
+  </view>
+
+  <view class="archive-error" wx:if="{{loadError}}">{{loadError}}</view>
+
+  <scroll-view scroll-x class="organization-scroll">
+    <view class="organization-tabs">
+      <view
+        class="organization-tab {{selectedId === item.id ? 'active' : ''}}"
+        wx:for="{{organizations}}"
+        wx:key="id"
+        data-id="{{item.id}}"
+        bindtap="selectOrganization"
+      >{{item.shortName}}</view>
+    </view>
+  </scroll-view>
+
+  <view class="organization-card">
+    <view class="organization-seal" style="border-color: {{selectedOrganization.color}}; color: {{selectedOrganization.color}}">
+      {{selectedOrganization.seal}}
+    </view>
+    <view class="organization-copy">
+      <view class="organization-name">{{selectedOrganization.name}}</view>
+      <view class="organization-desc">{{selectedOrganization.description}}</view>
+    </view>
+    <view class="cloud-inline" bindtap="uploadPhotos">
+      <view class="photo-kicker">照片云盘</view>
+      <view class="photo-count-inline">{{selectedOrganization.photoCount}} 张</view>
+      <view class="upload-button">上传</view>
+    </view>
+  </view>
+
+  <view class="section-row">
+    <view>
+      <view class="section-title">档案栏目</view>
+      <view class="section-desc">通讯录已独立为单独页面，不在档案中重复维护</view>
+    </view>
+  </view>
+
+  <view class="category-grid">
+    <view
+      class="category-card {{item.restricted ? 'restricted' : ''}}"
+      wx:for="{{selectedOrganization.categories}}"
+      wx:key="id"
+      data-category="{{item.id}}"
+      data-restricted="{{item.restricted}}"
+      bindtap="addContent"
+    >
+      <view class="category-icon">{{item.icon}}</view>
+      <view class="category-name">{{item.name}}</view>
+      <view class="category-role">{{item.role}}</view>
+      <view class="category-footer">
+        <text>{{item.count}}条</text>
+        <text>{{item.restricted ? '受限' : '填写 ›'}}</text>
+      </view>
+      <view class="sort-actions" wx:if="{{canManage}}">
+        <text data-index="{{index}}" data-direction="up" catchtap="moveCategory">上移</text>
+        <text data-index="{{index}}" data-direction="down" catchtap="moveCategory">下移</text>
+      </view>
+    </view>
+  </view>
+</view>

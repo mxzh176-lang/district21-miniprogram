@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>二十一协作区 UI 方案</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    #themes { flex-wrap: wrap; max-width: 660px; justify-content: flex-end; }
+    @media (max-width: 1100px) { #themes { justify-content: flex-start; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <span class="eyebrow">UI DIRECTION 2026</span>
+      <h1>二十一协作区 · 科技感界面提案</h1>
+      <p>六种视觉方向，功能结构保持一致。点击方案切换查看首页、档案和通讯录。</p>
+    </div>
+    <nav id="themes">
+      <button class="active" data-theme="blue">A 深蓝玻璃</button>
+      <button data-theme="green">B 绿色中枢</button>
+      <button data-theme="gold">C 黑金档案</button>
+      <button data-theme="violet">D 紫色全息</button>
+      <button data-theme="silver">E 银白智屏</button>
+      <button data-theme="red">F 赤红指挥</button>
+    </nav>
+  </header>
+
+  <main class="concept blue" id="concept">
+    <section class="description">
+      <span class="number">01</span>
+      <div>
+        <h2 id="themeTitle">深蓝玻璃科技</h2>
+        <p id="themeDesc">稳重、现代、层次清晰。适合展示公益活动、档案照片和组织信息。</p>
+      </div>
+    </section>
+
+    <section class="phones">
+      <article class="phone">
+        <div class="status"><b>07:45</b><span>●●● 5G</span></div>
+        <div class="screen">
+          <div class="brand"><span class="logo">21</span><div><b>二十一协作区</b><small>公益协作数字档案</small></div><i>•••</i></div>
+          <div class="hero">
+            <small>早上好，张明星</small>
+            <h3>让每一次服务<br>都有温度与记录</h3>
+            <div class="stats"><span><b>5</b>待办</span><span><b>120</b>狮友</span><span><b>1,248</b>照片</span></div>
+          </div>
+          <div class="section-title"><b>本月待办</b><span>查看全部 ›</span></div>
+          <div class="task"><em>14</em><div><b>暖阳助学走访</b><small>二十一协作区 · 绥化市北林区</small></div><i>重要</i></div>
+          <div class="task"><em>18</em><div><b>住院狮友慰问</b><small>爱领航服务队 · 关爱记录</small></div><i>关爱</i></div>
+          <div class="care"><span>生日关爱</span><b>本月 8 位狮友</b><i>送上祝福 ›</i></div>
+          <div class="tabbar"><b>⌂<small>首页</small></b><span>◷<small>历史</small></span><span>▣<small>档案</small></span><span>♙<small>通讯录</small></span><span>○<small>我的</small></span></div>
+        </div>
+      </article>
+
+      <article class="phone">
+        <div class="status"><b>07:45</b><span>●●● 5G</span></div>
+        <div class="screen archive">
+          <div class="page-head"><span>档案中心</span><i>⌕</i></div>
+          <div class="org-switch"><b>远航服务队</b><span>二十一</span><span>领航</span><span>爱领航</span><span>精英</span></div>
+          <div class="archive-hero"><small>Yuanhang Archive</small><h3>远航服务队</h3><p>150 条事件 · 161 张照片</p></div>
+          <div class="section-title"><b>档案分类</b><span>按岗位维护</span></div>
+          <div class="grid">
+            <div><i>◎</i><b>公益服务</b><small>25 条记录</small></div>
+            <div><i>◇</i><b>狮友关爱</b><small>31 条记录</small></div>
+            <div><i>△</i><b>会员发展</b><small>30 条记录</small></div>
+            <div><i>◈</i><b>聚会联谊</b><small>29 条记录</small></div>
+          </div>
+          <div class="section-title"><b>最近事件</b><span>全部 ›</span></div>
+          <div class="event"><div class="photo p1"></div><div><small>2025.11.28</small><b>秦家小学助学服务</b><span>远航服务队 · 8张照片</span></div></div>
+          <div class="event"><div class="photo p2"></div><div><small>2025.11.20</small><b>绥棱假肢捐赠行动</b><span>远航服务队 · 5张照片</span></div></div>
+          <div class="tabbar"><span>⌂<small>首页</small></span><span>◷<small>历史</small></span><b>▣<small>档案</small></b><span>♙<small>通讯录</small></span><span>○<small>我的</small></span></div>
+        </div>
+      </article>
+
+      <article class="phone">
+        <div class="status"><b>07:45</b><span>●●● 5G</span></div>
+        <div class="screen contacts">
+          <div class="page-head"><span>狮友通讯录</span><i>＋</i></div>
+          <div class="search">⌕　搜索姓名、企业、岗位或资源</div>
+          <div class="team-pills"><b>全部</b><span>领航</span><span>爱领航</span><span>远航</span><span>精英</span></div>
+          <h4>G</h4>
+          <div class="person"><em>关</em><div><b>关丙刚 <small>巧媳妇铁锅炖</small></b><span>远航服务队 · 队长</span><i>餐饮场地 · 活动保障</i></div></div>
+          <h4>J</h4>
+          <div class="person"><em>景</em><div><b>景雅东 <small>小鱼故事中餐厅</small></b><span>远航服务队 · 联谊主席</span><i>餐饮服务 · 联谊场地</i></div></div>
+          <div class="person"><em>荆</em><div><b>荆立月 <small>茗华酒店</small></b><span>远航服务队 · 狮友</span><i>餐饮住宿 · 会议场地</i></div></div>
+          <h4>L</h4>
+          <div class="person"><em>李</em><div><b>李晶 <small>慕思寝具</small></b><span>远航服务队 · 第一副队长</span><i>家居资源 · 公益物资</i></div></div>
+          <div class="letters">A<br>B<br>C<br>D<br>G<br><b>J</b><br>L<br>M<br>W<br>X<br>Y<br>Z</div>
+          <div class="tabbar"><span>⌂<small>首页</small></span><span>◷<small>历史</small></span><span>▣<small>档案</small></span><b>♙<small>通讯录</small></b><span>○<small>我的</small></span></div>
+        </div>
+      </article>
+    </section>
+  </main>
+
+  <script>
+    const themes = {
+      blue: ['深蓝玻璃科技', '稳重、现代、层次清晰。适合展示公益活动、档案照片和组织信息。'],
+      green: ['绿色数据中枢', '保留公益组织的温度，加入数据仪表、荧光绿线条和轻量科技纹理。'],
+      gold: ['黑金未来档案', '更庄重、更有荣誉感，黑曜石背景配香槟金，适合发展历史和组织传承。'],
+      violet: ['紫色全息协作舱', '以蓝紫霓虹、悬浮玻璃卡片和柔和光晕表现年轻、开放的跨服务队协作氛围。'],
+      silver: ['银白智能终端', '大面积浅色留白配电光蓝，信息清晰、阅读舒适，适合成员日常长期使用。'],
+      red: ['赤红行动指挥中心', '黑灰底色配行动红，强调待办、紧急事项和活动执行，具有强烈的任务指挥感。']
+    }
+    document.querySelectorAll('#themes button').forEach(button => {
+      button.onclick = () => {
+        document.querySelectorAll('#themes button').forEach(item => item.classList.remove('active'))
+        button.classList.add('active')
+        const theme = button.dataset.theme
+        document.getElementById('concept').className = `concept ${theme}`
+        document.getElementById('themeTitle').textContent = themes[theme][0]
+        document.getElementById('themeDesc').textContent = themes[theme][1]
+      }
+    })
+  </script>
+</body>
+</html>

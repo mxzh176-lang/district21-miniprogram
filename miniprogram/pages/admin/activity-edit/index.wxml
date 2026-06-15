@@ -1,0 +1,36 @@
+<view class="page">
+  <view class="card form">
+    <view class="field">
+      <text class="field-label">活动名称</text>
+      <input class="input" value="{{form.title}}" data-key="title" bindinput="input" placeholder="请填写活动名称" />
+    </view>
+    <view class="field">
+      <text class="field-label">活动日期</text>
+      <picker mode="date" value="{{form.date}}" bindchange="changeDate">
+        <view class="picker">{{form.date || '选择日期'}}</view>
+      </picker>
+    </view>
+    <view class="field">
+      <text class="field-label">活动地点</text>
+      <input class="input" value="{{form.location}}" data-key="location" bindinput="input" placeholder="可后续补充" />
+    </view>
+    <view class="field">
+      <text class="field-label">负责人</text>
+      <input class="input" value="{{form.owner}}" data-key="owner" bindinput="input" placeholder="可后续补充" />
+    </view>
+    <view class="field">
+      <text class="field-label">参与成员</text>
+      <input class="input" value="{{form.participants}}" data-key="participants" bindinput="input" placeholder="多人用顿号分隔" />
+    </view>
+    <view class="field">
+      <text class="field-label">活动介绍</text>
+      <textarea class="textarea" value="{{form.description}}" data-key="description" bindinput="input" placeholder="可后续补充"></textarea>
+    </view>
+    <view class="field">
+      <text class="field-label">活动总结</text>
+      <textarea class="textarea" value="{{form.summary}}" data-key="summary" bindinput="input" placeholder="活动结束后补充"></textarea>
+    </view>
+    <button class="primary-button" bindtap="save" loading="{{saving}}">保存活动</button>
+    <button wx:if="{{id}}" class="danger-button delete" bindtap="remove">移入回收站</button>
+  </view>
+</view>

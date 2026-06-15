@@ -1,0 +1,65 @@
+<view class="contacts-page">
+  <view class="member-hero">
+    <view class="hero-heading">
+      <view>
+        <view class="hero-kicker">MEMBER CONTACTS</view>
+        <view class="hero-title">狮友通讯录</view>
+      </view>
+      <button wx:if="{{canManage}}" class="add-member" bindtap="addMember">＋</button>
+    </view>
+    <view class="search-box">
+      <view class="search-icon">⌕</view>
+      <input placeholder="搜索姓名、企业、岗位或资源" value="{{keyword}}" bindinput="search" />
+    </view>
+  </view>
+
+  <scroll-view scroll-x class="team-scroll">
+    <view class="team-filters">
+      <view class="team-filter {{teamId === 'all' ? 'active' : ''}}" data-id="all" bindtap="selectTeam">全部</view>
+      <view class="team-filter {{teamId === item.id ? 'active' : ''}}" wx:for="{{teams}}" wx:key="id" data-id="{{item.id}}" bindtap="selectTeam">{{item.shortName}}</view>
+    </view>
+  </scroll-view>
+
+  <view wx:if="{{activeLetter}}" class="letter-bubble">{{activeLetter}}</view>
+
+  <scroll-view
+    scroll-y
+    class="contacts-scroll"
+    scroll-into-view="{{scrollIntoView}}"
+    scroll-with-animation
+    bindscroll="onContactScroll"
+  >
+    <view class="contact-group" wx:for="{{groups}}" wx:key="letter" id="letter-{{item.letter}}">
+      <view class="group-letter">{{item.letter}}</view>
+      <view class="contact-card" wx:for="{{item.members}}" wx:for-item="member" wx:key="_id"
+        data-id="{{member._id}}" bindtap="openMember">
+        <view class="avatar avatar-{{member.avatarTone}}">
+          <image wx:if="{{member.avatarUrl}}" class="avatar-image" src="{{member.avatarUrl}}" mode="aspectFill" />
+          <text wx:else>{{member.initial}}</text>
+        </view>
+        <view class="contact-copy">
+          <view class="name-line">
+            <view class="identity">
+              <text class="name">{{member.name}}</text>
+              <text class="company-inline">{{member.company}}</text>
+            </view>
+            <view class="team-name">{{member.team}}</view>
+          </view>
+          <view class="position">{{member.position}} · {{member.industry}}</view>
+        </view>
+        <view class="contact-arrow">›</view>
+      </view>
+    </view>
+    <view wx:if="{{!groups.length}}" class="empty">未找到符合条件的狮友</view>
+  </scroll-view>
+
+  <view class="alphabet-rail">
+    <view
+      class="alphabet-letter {{activeLetter === item.letter ? 'active' : ''}} {{item.available ? '' : 'disabled'}}"
+      wx:for="{{alphabet}}"
+      wx:key="letter"
+      data-letter="{{item.letter}}"
+      bindtap="selectLetter"
+    >{{item.letter}}</view>
+  </view>
+</view>

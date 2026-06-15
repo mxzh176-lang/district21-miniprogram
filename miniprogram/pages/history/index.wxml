@@ -1,0 +1,46 @@
+<view class="page">
+  <view class="history-hero">
+    <view class="year-mark">史</view>
+    <view>
+      <view class="hero-title">历史事件</view>
+      <view class="hero-desc">由各岗位档案内容自动汇总生成</view>
+    </view>
+  </view>
+
+  <scroll-view scroll-x class="team-scroll">
+    <view class="team-filters">
+      <view class="team-filter {{teamId === 'all' ? 'active' : ''}}" data-id="all" bindtap="selectTeam">全部</view>
+      <view class="team-filter {{teamId === item.id ? 'active' : ''}}" wx:for="{{teams}}" wx:key="id" data-id="{{item.id}}" bindtap="selectTeam">{{item.shortName}}</view>
+    </view>
+  </scroll-view>
+
+  <view class="source-note">
+    <view class="source-icon">档</view>
+    <view>档案填写日期、标题、类型和内容后，将自动进入本页；无需重复录入。</view>
+  </view>
+
+  <view class="timeline">
+    <view class="timeline-item" wx:for="{{filteredEvents}}" wx:key="_id" data-id="{{item._id}}" bindtap="openEvent">
+      <view class="date-column">
+        <view class="date-year">{{item.dateYear}}</view>
+        <view class="date-day">{{item.dateDay}}</view>
+      </view>
+      <view class="line-column">
+        <view class="dot-main"></view>
+        <view class="line"></view>
+      </view>
+      <view class="event-card">
+        <view class="event-type">{{item.type}}</view>
+        <view class="event-title">{{item.title}}</view>
+        <view class="event-summary">{{item.description}}</view>
+        <view class="event-footer">
+          <text>{{item.photoCount}}张照片</text>
+          <view class="event-footer-right">
+            <text class="team-name">{{item.team}}</text>
+            <text wx:if="{{canEdit}}" class="delete-event" data-id="{{item._id}}" catchtap="deleteEvent">删除</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

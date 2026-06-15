@@ -1,0 +1,71 @@
+<view class="page">
+  <view class="task-hero">
+    <view>
+      <view class="hero-kicker">MONTHLY PLAN</view>
+      <view class="hero-title">六月协作待办</view>
+      <view class="hero-desc">公益服务 · 狮友关爱 · 生日 · 联谊</view>
+    </view>
+    <view class="progress-ring">
+      <view class="progress-number">1/6</view>
+      <view class="progress-label">已完成</view>
+    </view>
+  </view>
+
+  <view class="calendar-card">
+    <view class="calendar-head">
+      <view>
+        <view class="calendar-title">六月事项日期</view>
+        <view class="calendar-subtitle">只显示有待办事项的日期</view>
+      </view>
+      <view class="today">{{taskDates.length}}个日期</view>
+    </view>
+    <scroll-view scroll-x class="date-scroll">
+      <view class="date-list">
+        <view class="date-chip {{selectedDay === 'all' ? 'active' : ''}}" data-day="all" bindtap="selectDay">
+          <view class="chip-day">全部</view>
+          <view class="chip-count">本月</view>
+        </view>
+        <view class="date-chip {{selectedDay === item.day ? 'active' : ''}}" wx:for="{{taskDates}}" wx:key="day" data-day="{{item.day}}" bindtap="selectDay">
+          <view class="chip-day">{{item.day}}</view>
+          <view class="chip-count">{{item.count}}项</view>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
+
+  <scroll-view scroll-x class="category-scroll">
+    <view class="categories">
+      <view class="category {{category === 'all' ? 'active' : ''}}" data-category="all" bindtap="selectCategory">全部</view>
+      <view class="category {{category === item ? 'active' : ''}}" wx:for="{{categories}}" wx:key="*this" data-category="{{item}}" bindtap="selectCategory">{{item}}</view>
+    </view>
+  </scroll-view>
+
+  <view class="status-row">
+    <view class="status-chip {{status === 'all' ? 'active' : ''}}" data-status="all" bindtap="selectStatus">全部事项</view>
+    <view class="status-chip {{status === 'pending' ? 'active' : ''}}" data-status="pending" bindtap="selectStatus">待完成</view>
+    <view class="status-chip {{status === 'done' ? 'active' : ''}}" data-status="done" bindtap="selectStatus">已完成</view>
+  </view>
+
+  <view wx:if="{{tasks.length}}">
+    <view class="task-card {{item.status === 'done' ? 'done' : ''}}" wx:for="{{tasks}}" wx:key="_id">
+      <view class="date-column">
+        <view class="day">{{item.day}}</view>
+        <view class="month">JUN</view>
+      </view>
+      <view class="task-body">
+        <view class="task-heading">
+          <view class="tag">{{item.category}}</view>
+          <view class="state">{{item.status === 'done' ? '已完成' : '待完成'}}</view>
+        </view>
+        <view class="title">{{item.title}}</view>
+        <view class="description">{{item.description}}</view>
+        <view class="meta-row">
+          <view>负责人：{{item.owner}}</view>
+          <view>{{item.location}}</view>
+        </view>
+        <view class="organization-label">{{item.team}}</view>
+      </view>
+    </view>
+  </view>
+  <view wx:else class="empty">当前筛选下暂无待办</view>
+</view>

@@ -1,0 +1,59 @@
+const api = require('../../../utils/api')
+
+Page({
+  data: { id: '', entry: {}, photos: [], canEdit: false },
+
+  onLoad(options) {
+    this.setData({ id: options.id || 'ar-1' })
+  },
+
+  async onShow() {
+    const [entry, session] = await Promise.all([
+      api.call('getArchiveEntry', { id: this.data.id }),
+      api.call('getSession')
+    ])
+    const photos = (entry.photos || []).map((url, index) => ({
+      id: `${entry._id}-${index}`,
+      url,
+      label: `事件照片 ${index + 1}`
+    }))
+    this.setData({
+      entry: {
+        ...entry,
+        keywordText: (entry.keywords || []).join(' · ')
+      },
+      photos,
+      canEdit: ['superadmin', 'admin', 'editor'].includes(session.role)
+    })
+    wx.setNavigationBarTitle({ title: entry.title })
+  },
+
+  previewPhoto(event) {
+    const current = event.currentTarget.dataset.url
+    wx.previewImage({
+      current,
+      urls: this.data.photos.map(item => item.url)
+    })
+  },
+
+  editEntry() {
+    const entry = this.data.entry
+    wx.navigateTo({
+      url: `/pages/archive/edit/index?id=${entry._id}&organization=${entry.organizationId}&category=${entry.categoryId}`
+    })
+  },
+
+  deleteEntry() {
+    wx.showModal({
+      title: '删除档案',
+      content: '确认删除这条档案吗？',
+      confirmColor: '#d94f65',
+      success: async result => {
+        if (!result.confirm) return
+        await api.call('deleteArchiveEntry', { id: this.data.id })
+        wx.showToast({ title: '已删除', icon: 'success' })
+        setTimeout(() => wx.navigateBack(), 600)
+      }
+    })
+  }
+})

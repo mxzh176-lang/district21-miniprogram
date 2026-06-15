@@ -1,0 +1,37 @@
+<view class="page">
+  <view class="header-card">
+    <text class="eyebrow">仅超级管理员可用</text>
+    <text class="title">Word 批量导入</text>
+    <text class="subtitle">{{organizationName}} · {{categoryName}}</text>
+  </view>
+
+  <view class="denied" wx:if="{{!canImport}}">
+    当前账号无 Word 导入权限。岗位管理员可返回档案窗口录入单条事件。
+  </view>
+
+  <block wx:if="{{canImport}}">
+    <view class="notice">
+      Word 将按“一件事一条档案”拆分，提取日期、标题、正文和图片。AI 只生成草稿，不会自动发布。
+    </view>
+    <view class="upload-card">
+      <text class="step-title">1. 选择 .docx 文件</text>
+      <button class="choose-button" bindtap="chooseWord">{{fileName || '从微信会话选择 Word'}}</button>
+      <button class="analyze-button" bindtap="analyzeWord" loading="{{analyzing}}">
+        {{analyzing ? '正在识别内容…' : '识别并拆分事件'}}
+      </button>
+    </view>
+    <view class="result-card" wx:if="{{analyzed}}">
+      <text class="step-title">2. 检查识别草稿</text>
+      <view class="summary-row">
+        <view class="summary-item"><text class="summary-number">{{eventCount}}</text><text>条事件草稿</text></view>
+        <view class="summary-item"><text class="summary-number">{{imageCount}}</text><text>张关联图片</text></view>
+      </view>
+      <view class="draft-item" wx:for="{{drafts}}" wx:key="id">
+        <view><text class="draft-date">日期待核对</text><text class="draft-title">{{item.title}}</text></view>
+        <text class="draft-status">需人工核对</text>
+      </view>
+      <button class="import-button" bindtap="importDrafts">导入草稿箱</button>
+      <text class="final-note">逐条人工核对并发布后，内容才进入历史事件。</text>
+    </view>
+  </block>
+</view>

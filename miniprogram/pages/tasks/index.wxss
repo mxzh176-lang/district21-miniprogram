@@ -1,0 +1,237 @@
+.task-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 34rpx;
+  border-radius: 28rpx;
+  color: #fff;
+  background: linear-gradient(145deg, #201447, #3a2675);
+}
+
+.hero-kicker {
+  color: #d391ff;
+  font-size: 18rpx;
+  letter-spacing: 3rpx;
+}
+
+.hero-title {
+  margin-top: 12rpx;
+  font-size: 40rpx;
+  font-weight: 700;
+}
+
+.hero-desc {
+  margin-top: 8rpx;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 20rpx;
+}
+
+.progress-ring {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 112rpx;
+  height: 112rpx;
+  border: 7rpx solid rgba(216, 182, 111, 0.75);
+  border-radius: 50%;
+}
+
+.progress-number {
+  font-size: 27rpx;
+  font-weight: 700;
+}
+
+.progress-label {
+  margin-top: 3rpx;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 17rpx;
+}
+
+.calendar-card {
+  margin-top: 22rpx;
+  padding: 26rpx 24rpx 20rpx;
+  border-radius: 24rpx;
+  background: #1b153b;
+  box-shadow: 0 10rpx 28rpx rgba(18, 59, 50, 0.05);
+}
+
+.calendar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.calendar-title {
+  font-size: 30rpx;
+  font-weight: 700;
+}
+
+.calendar-subtitle {
+  margin-top: 5rpx;
+  color: #9189a9;
+  font-size: 18rpx;
+}
+
+.today {
+  padding: 9rpx 16rpx;
+  border-radius: 999rpx;
+  color: #d7a8ff;
+  background: #2d2050;
+  font-size: 19rpx;
+}
+
+.date-scroll {
+  margin-top: 22rpx;
+  white-space: nowrap;
+}
+
+.date-list {
+  display: inline-flex;
+  gap: 12rpx;
+}
+
+.date-chip {
+  min-width: 78rpx;
+  padding: 13rpx 10rpx;
+  border-radius: 18rpx;
+  color: #52615c;
+  text-align: center;
+  background: #211943;
+}
+
+.date-chip.active {
+  color: #fff;
+  background: #9b5de5;
+}
+
+.chip-day {
+  font-size: 27rpx;
+  font-weight: 700;
+}
+
+.chip-count {
+  margin-top: 4rpx;
+  font-size: 16rpx;
+  opacity: 0.75;
+}
+
+.category-scroll {
+  margin: 24rpx 0 18rpx;
+  white-space: nowrap;
+}
+
+.categories {
+  display: inline-flex;
+  gap: 12rpx;
+}
+
+.category,
+.status-chip {
+  padding: 12rpx 22rpx;
+  border-radius: 999rpx;
+  color: #6d7a75;
+  background: #211943;
+  font-size: 21rpx;
+}
+
+.category.active,
+.status-chip.active {
+  color: #fff;
+  background: #201447;
+}
+
+.status-row {
+  display: flex;
+  gap: 12rpx;
+  margin-bottom: 22rpx;
+}
+
+.status-chip {
+  padding: 9rpx 20rpx;
+}
+
+.task-card {
+  display: flex;
+  margin-bottom: 18rpx;
+  overflow: hidden;
+  border-radius: 24rpx;
+  background: #1b153b;
+  box-shadow: 0 10rpx 28rpx rgba(18, 59, 50, 0.05);
+}
+
+.task-card.done {
+  opacity: 0.65;
+}
+
+.date-column {
+  flex: 0 0 100rpx;
+  padding: 28rpx 0;
+  color: #fff;
+  text-align: center;
+  background: #9b5de5;
+}
+
+.day {
+  font-family: serif;
+  font-size: 44rpx;
+  font-weight: 700;
+}
+
+.month {
+  margin-top: 4rpx;
+  font-size: 17rpx;
+  letter-spacing: 2rpx;
+}
+
+.task-body {
+  flex: 1;
+  min-width: 0;
+  padding: 24rpx;
+}
+
+.task-heading,
+.meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.state {
+  color: #9f97b6;
+  font-size: 20rpx;
+}
+
+.title {
+  margin-top: 14rpx;
+  font-size: 29rpx;
+  font-weight: 700;
+}
+
+.task-card.done .title {
+  text-decoration: line-through;
+}
+
+.description {
+  margin-top: 15rpx;
+  color: #61716a;
+  font-size: 22rpx;
+  line-height: 1.65;
+}
+
+.organization-label {
+  margin-top: 14rpx;
+  color: #c982ff;
+  font-size: 19rpx;
+  font-weight: 700;
+  text-align: right;
+}
+
+.meta-row {
+  gap: 16rpx;
+  margin-top: 18rpx;
+  padding-top: 15rpx;
+  border-top: 1rpx solid rgba(201,130,255,.16);
+  color: #9189a9;
+  font-size: 18rpx;
+}

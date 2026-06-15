@@ -1,0 +1,5 @@
+.form { padding: 34rpx; }
+.long { min-height: 360rpx; }
+.switch-row { display: flex; align-items: center; justify-content: space-between; }
+.no-margin { margin: 0; }
+.delete { margin-top: 22rpx; }
