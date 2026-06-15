@@ -19,16 +19,26 @@
   </view>
 
   <view class="connector">↓ 四个服务队 ↓</view>
+  <view class="founder-note">创队队长为服务队创立阶段授予的重要荣誉岗位</view>
 
   <view class="team-structure" wx:for="{{current.teams}}" wx:key="name">
     <view class="team-head">
       <view>
         <view class="team-name">{{item.name}}</view>
-        <view class="team-leader">{{item.leader}}</view>
+        <view class="team-leader">
+          <text class="founder-badge">{{item.leaderTitle || '队长'}}</text>
+          <text class="leader-name">{{item.leader}}</text>
+        </view>
       </view>
       <view class="team-number">{{index + 1}}</view>
     </view>
-    <view class="committee-row">
+    <view class="role-list" wx:if="{{item.roles}}">
+      <view class="role-row" wx:for="{{item.roles}}" wx:for-item="role" wx:key="position">
+        <view class="role-position">{{role.position}}</view>
+        <view class="role-person">{{role.person}}</view>
+      </view>
+    </view>
+    <view class="committee-row" wx:else>
       <view class="committee" wx:for="{{item.committees}}" wx:for-item="committee" wx:key="*this">{{committee}}</view>
     </view>
   </view>

@@ -54,7 +54,7 @@
 
 .district-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 13rpx;
   margin-top: 24rpx;
 }
@@ -96,6 +96,14 @@
   font-size: 20rpx;
 }
 
+.founder-note {
+  margin: 20rpx 12rpx 0;
+  color: #d7b95e;
+  font-size: 19rpx;
+  line-height: 1.6;
+  text-align: center;
+}
+
 .team-head {
   display: flex;
   align-items: center;
@@ -109,9 +117,26 @@
 }
 
 .team-leader {
-  margin-top: 5rpx;
-  color: #7c8984;
-  font-size: 19rpx;
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-top: 10rpx;
+}
+
+.founder-badge {
+  padding: 7rpx 13rpx;
+  border: 1rpx solid rgba(240, 211, 109, 0.7);
+  border-radius: 999rpx;
+  color: #f0d36d;
+  background: rgba(240, 211, 109, 0.12);
+  font-size: 17rpx;
+  font-weight: 700;
+}
+
+.leader-name {
+  color: #fff;
+  font-size: 24rpx;
+  font-weight: 700;
 }
 
 .team-number {
@@ -139,4 +164,39 @@
   color: #735c27;
   background: #f3ead7;
   font-size: 17rpx;
+}
+
+.role-list {
+  margin-top: 22rpx;
+  overflow: hidden;
+  border: 1rpx solid rgba(255, 255, 255, 0.07);
+  border-radius: 18rpx;
+}
+
+.role-row {
+  display: flex;
+  align-items: center;
+  min-height: 66rpx;
+  padding: 0 18rpx;
+  border-bottom: 1rpx solid rgba(255, 255, 255, 0.06);
+}
+
+.role-row:last-child {
+  border-bottom: 0;
+}
+
+.role-position {
+  flex: 1;
+  padding-right: 20rpx;
+  color: #aaa2bd;
+  font-size: 18rpx;
+  line-height: 1.45;
+}
+
+.role-person {
+  flex: 0 0 128rpx;
+  color: #fff;
+  font-size: 20rpx;
+  font-weight: 700;
+  text-align: right;
 }

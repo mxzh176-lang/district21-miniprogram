@@ -83,16 +83,106 @@ const structureTerms = [
   {
     term: '2026—2027年度',
     district: [
-      { position: '协调长', person: '演示人员', initial: '演' },
-      { position: '秘书长', person: '张秘书', initial: '张' },
-      { position: '服务委员会', person: '王主席', initial: '王' },
-      { position: '关爱委员会', person: '刘主席', initial: '刘' }
+      { position: '执委会主席', person: '侯盛楠', initial: '侯' },
+      { position: '上届主席', person: '王刚', initial: '王' },
+      { position: '秘书长', person: '张明星', initial: '张' },
+      { position: '财务长', person: '吴含', initial: '吴' },
+      { position: '总务长', person: '刘磊', initial: '刘' },
+      { position: '纠察长', person: '孙明龙', initial: '孙' },
+      { position: '副秘书长', person: '张南翔', initial: '张' }
     ],
     teams: [
-      { name: '领航服务队', leader: '队长 王志强', committees: ['秘书', '服务', '关爱', '联谊', '宣传'] },
-      { name: '爱领航服务队', leader: '队长 刘静', committees: ['秘书', '服务', '关爱', '联谊', '宣传'] },
-      { name: '远航服务队', leader: '队长 关丙刚', committees: ['第一副队长', '第二副队长', '第三副队长', '秘书', '司库', '总务'] },
-      { name: '精英服务队', leader: '队长 赵宏伟', committees: ['秘书', '服务', '关爱', '联谊', '宣传'] }
+      {
+        name: '领航服务队',
+        leader: '王刚',
+        leaderTitle: '创队队长',
+        roles: [
+          { position: '第一副队长', person: '吴含' },
+          { position: '第二副队长', person: '徐红雷' },
+          { position: '第三副队长', person: '李力安' },
+          { position: '秘书', person: '蒋燕彤' },
+          { position: '司库', person: '关向星' },
+          { position: '总务', person: '宋严' },
+          { position: '纠察', person: '腾保国' },
+          { position: '会员发展与保留委员会主席', person: '朱连春' },
+          { position: '领导力发展与培训委员会主席', person: '贾晓梅' },
+          { position: '对外交流委员会主席', person: '刘宝山' },
+          { position: '服务委员会主席', person: '刘金辉' },
+          { position: '公共关系与宣传委员会主席', person: '金萍' },
+          { position: '筹款委员会主席', person: '王洪伟' },
+          { position: '狮友关爱委员会主席', person: '王立秋' },
+          { position: '狮友联谊委员会主席', person: '魏远超' },
+          { position: '狮友联谊委员会副主席', person: '杨磊' },
+          { position: '年会委员会主席', person: '王连会' },
+          { position: '年会委员会副主席', person: '王明库' }
+        ]
+      },
+      {
+        name: '爱领航服务队',
+        leader: '王必东',
+        leaderTitle: '创队队长',
+        roles: [
+          { position: '第一副队长', person: '张成功' },
+          { position: '第二副队长', person: '刘磊' },
+          { position: '第三副队长', person: '谢志琴' },
+          { position: '秘书', person: '邰欢欢' },
+          { position: '司库', person: '李月' },
+          { position: '总务', person: '范晓波' },
+          { position: '纠察', person: '孙显波' },
+          { position: '对外交流委员会主席', person: '王磊' },
+          { position: '狮友关爱委员会主席', person: '吴亚娟' },
+          { position: '狮友关爱委员会副主席', person: '孙慧霖' },
+          { position: '狮友联谊委员会主席', person: '杨秀娟' },
+          { position: '狮友联谊委员会副主席', person: '李玉博' },
+          { position: '年会委员会主席', person: '杨振忠' }
+        ]
+      },
+      {
+        name: '远航服务队',
+        leader: '关丙刚',
+        leaderTitle: '创队队长',
+        roles: [
+          { position: '第一副队长', person: '王丽' },
+          { position: '第二副队长', person: '徐双龙' },
+          { position: '第三副队长', person: '吕媛媛' },
+          { position: '秘书', person: '李玲玲' },
+          { position: '司库', person: '李文强' },
+          { position: '总务', person: '谭振峰' },
+          { position: '纠察', person: '腾飞' },
+          { position: '服务委员会主席', person: '杨景辉' },
+          { position: '会员发展与保留委员会主席', person: '王奇' },
+          { position: '领导力发展与培训委员会主席', person: '关丙刚' },
+          { position: '对外交流委员会主席', person: '关丙刚' },
+          { position: '公共关系与宣传委员会主席', person: '刘建鑫' },
+          { position: '筹款委员会主席', person: '徐铭宣' },
+          { position: '狮友关爱委员会主席', person: '潘洋洋' },
+          { position: '狮友联谊委员会主席', person: '徐雪峰' },
+          { position: '年会委员会主席', person: '李明浩' }
+        ]
+      },
+      {
+        name: '精英服务队',
+        leader: '王丽',
+        leaderTitle: '创队队长',
+        roles: [
+          { position: '第一副队长', person: '孙明龙' },
+          { position: '第二副队长', person: '周玉慧' },
+          { position: '第三副队长', person: '郭晓红' },
+          { position: '秘书', person: '薛允丽' },
+          { position: '司库', person: '张影' },
+          { position: '总务', person: '裴大伟' },
+          { position: '纠察', person: '吕洪威' },
+          { position: '会员发展与保留委员会主席', person: '王丽' },
+          { position: '领导力发展与培训委员会主席', person: '任凤影' },
+          { position: '对外交流委员会主席', person: '张南翔' },
+          { position: '服务委员会主席', person: '孙洪涛' },
+          { position: '公共关系与宣传委员会主席', person: '范新卓' },
+          { position: '筹款委员会主席', person: '林衍伟' },
+          { position: '狮友关爱委员会主席', person: '王继芳' },
+          { position: '狮友联谊委员会主席', person: '李永生' },
+          { position: '年会委员会主席', person: '杨丽宝' }
+        ]
+      }
     ]
   },
   {

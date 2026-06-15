@@ -1,20 +1,21 @@
 <view class="page">
-  <view class="hero">
-    <view class="hero-top">
-      <view>
-        <view class="eyebrow">LIONS DISTRICT 21 · SUIHUA</view>
-        <view class="hero-title">二十一协作区</view>
-        <view class="hero-subtitle">二一聚力 · 再创佳绩</view>
-      </view>
-      <view class="hero-seal">21</view>
-    </view>
-    <view class="term-row">
-      <view>2026—2027年度</view>
-      <view class="demo-tag">DEMO 演示版</view>
-    </view>
-  </view>
-
   <swiper class="hero-swiper" autoplay circular indicator-dots interval="3500">
+    <swiper-item>
+      <view class="hero">
+        <view class="hero-top">
+          <view>
+            <view class="eyebrow">LIONS DISTRICT 21 · SUIHUA</view>
+            <view class="hero-title">二十一协作区</view>
+            <view class="hero-subtitle">二一聚力 · 再创佳绩</view>
+          </view>
+          <view class="hero-seal">21</view>
+        </view>
+        <view class="term-row">
+          <view>2026—2027年度</view>
+          <view class="demo-tag">四队同心</view>
+        </view>
+      </view>
+    </swiper-item>
     <swiper-item wx:for="{{banners}}" wx:key="*this">
       <image src="{{item}}" mode="aspectFill" />
     </swiper-item>
