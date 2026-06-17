@@ -9,19 +9,44 @@ Page({
     activities: [],
     teams: [],
     banners: [],
+    heroSlides: [],
     selectedTeamId: 'all',
     allTasks: []
   },
 
   async onShow() {
-    const data = await api.call('getHome')
-    this.setData({ ...data, allTasks: data.tasks })
+    try {
+      await this.loadHome()
+    } catch (error) {
+      api.showError(error)
+    }
   },
 
   async onPullDownRefresh() {
+    try {
+      await this.loadHome()
+    } catch (error) {
+      api.showError(error)
+    } finally {
+      wx.stopPullDownRefresh()
+    }
+  },
+
+  buildHeroSlides(banners = []) {
+    return [
+      { type: 'intro', key: 'intro' },
+      ...banners.map((src, index) => ({ type: 'image', key: `banner-${index}`, src }))
+    ]
+  },
+
+  async loadHome() {
     const data = await api.call('getHome')
-    this.setData({ ...data, allTasks: data.tasks })
-    wx.stopPullDownRefresh()
+    const tasks = data.tasks || []
+    this.setData({
+      ...data,
+      heroSlides: this.buildHeroSlides(data.banners || []),
+      allTasks: tasks
+    })
   },
 
   goTasks() {

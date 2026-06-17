@@ -7,7 +7,7 @@
 
   <view class="archive-error" wx:if="{{loadError}}">{{loadError}}</view>
 
-  <scroll-view scroll-x class="organization-scroll">
+  <scroll-view scroll-x class="organization-scroll" wx:if="{{organizations.length > 1}}">
     <view class="organization-tabs">
       <view
         class="organization-tab {{selectedId === item.id ? 'active' : ''}}"
@@ -53,6 +53,13 @@
       <view class="category-icon">{{item.icon}}</view>
       <view class="category-name">{{item.name}}</view>
       <view class="category-role">{{item.role}}</view>
+      <view class="category-desc">{{item.desc}}</view>
+      <view wx:if="{{item.children && item.children.length}}" class="expand-line" data-id="{{item.id}}" catchtap="toggleCategory">
+        {{expandedCategories[item.id] ? '收起委员' : '展开委员'}}
+      </view>
+      <view wx:if="{{expandedCategories[item.id]}}" class="committee-list">
+        <view class="committee-item" wx:for="{{item.children}}" wx:key="*this">{{item}}</view>
+      </view>
       <view class="category-footer">
         <text>{{item.count}}条</text>
         <text>{{item.restricted ? '受限' : '填写 ›'}}</text>

@@ -12,7 +12,15 @@ const CATEGORY_NAMES = {
   care: '狮友关爱',
   social: '聚会联谊',
   inventory: '物品清单',
-  finance: '账目档案'
+  finance: '账目档案',
+  captain: '队长档案',
+  'first-vp': '第一副队长档案',
+  'second-vp': '第二副队长档案',
+  'third-vp': '第三副队长档案',
+  secretary: '秘书档案',
+  tamer: '纠察档案',
+  treasurer: '司库档案',
+  admin: '总务档案'
 }
 
 Page({
@@ -127,18 +135,45 @@ Page({
   },
 
   generateDraft() {
-    const { form, categoryName, organizationName } = this.data
+    const { form, categoryName, organizationName, categoryId } = this.data
     const keywords = form.keywords.trim()
     if (!keywords) {
       wx.showToast({ title: '请先输入事件提示词', icon: 'none' })
       return
     }
+    const owner = form.uploadedBy || '负责人'
+    const templates = {
+      'second-vp': {
+        title: `${owner}狮兄狮姐带领远航做了${keywords}`,
+        summary: `${organizationName}围绕“${keywords}”完成公益服务并形成服务档案。`,
+        content: `事件日期：${form.date}\n所属组织：${organizationName}\n档案分类：${categoryName}\n负责人：${owner}\n\n${owner}狮兄狮姐带领远航做了“${keywords}”。\n\n一、服务对象：请补充\n二、服务地点：请补充\n三、参与狮友：请补充\n四、服务过程：请补充\n五、服务成果：请补充\n六、嘉许记录：请补充本次值得表扬的狮兄狮姐。`
+      },
+      secretary: {
+        title: `${owner}狮姐组织召开远航服务队${keywords}`,
+        summary: `${organizationName}召开“${keywords}”，形成会议纪要、会议决议和后续待办。`,
+        content: `会议日期：${form.date}\n会议组织：${organizationName}\n档案分类：${categoryName}\n记录人：${owner}\n\n一、会议主题：${keywords}\n二、参会人员：请补充\n三、会议议题：请补充\n四、会议决议：请补充\n五、后续待办：请补充\n六、嘉许记录：请补充本次推动会议和落实事项的狮兄狮姐。`
+      },
+      'first-vp': {
+        title: `${owner}狮兄狮姐开展远航对外交流`,
+        summary: `${organizationName}围绕“${keywords}”开展会员发展、领导力或对外交流工作。`,
+        content: `事件日期：${form.date}\n所属组织：${organizationName}\n档案分类：${categoryName}\n负责人：${owner}\n\n${owner}狮兄狮姐开展“${keywords}”。请补充交流对象、交流主题、达成共识、后续跟进和嘉许对象。`
+      },
+      'third-vp': {
+        title: `${owner}狮兄狮姐组织远航开展${keywords}`,
+        summary: `${organizationName}围绕“${keywords}”开展关爱、联谊或年会相关工作。`,
+        content: `事件日期：${form.date}\n所属组织：${organizationName}\n档案分类：${categoryName}\n负责人：${owner}\n\n${owner}狮兄狮姐组织远航开展“${keywords}”。请补充关爱对象、联谊主题、参与人员、现场成果和后续跟进。`
+      }
+    }
+    const fallback = {
+      title: `${owner}狮兄狮姐完成远航${categoryName}：${keywords}`,
+      summary: `${organizationName}围绕“${keywords}”完成${categoryName}相关记录。`,
+      content: `事件日期：${form.date}\n所属组织：${organizationName}\n档案分类：${categoryName}\n负责人：${owner}\n\n请补充工作背景、执行过程、完成情况、后续改进和嘉许记录。`
+    }
+    const draft = templates[categoryId] || fallback
     this.setData({
-      'form.title': form.title || `${form.date} ${organizationName}${categoryName}记录`,
-      'form.summary': form.summary ||
-        `${organizationName}围绕“${keywords}”开展相关工作，本条内容由管理员核对后发布。`,
-      'form.content': form.content ||
-        `事件日期：${form.date}\n所属组织：${organizationName}\n档案分类：${categoryName}\n事件提示词：${keywords}\n\n请管理员补充参与人员、活动过程、结果和照片说明。`,
+      'form.title': form.title || draft.title,
+      'form.summary': form.summary || draft.summary,
+      'form.content': form.content || draft.content,
       aiGenerated: true
     })
     wx.showToast({ title: '草稿已生成', icon: 'success' })

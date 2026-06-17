@@ -7,12 +7,12 @@ const teams = [
 ]
 
 const tasks = [
-  { _id: 'task-1', month: '2026-06', day: '14', category: '公益服务', title: '暖阳助学走访', team: '二十一协作区', teamId: 'district', owner: '服务委员会', location: '绥化市北林区', status: 'pending', priority: 'important', description: '四队联合走访困难学生家庭，确认暑期助学物资与学习需求。' },
-  { _id: 'task-2', month: '2026-06', day: '18', category: '狮友关爱', title: '住院狮友慰问', team: '爱领航服务队', teamId: 'ailinghang', owner: '关爱主席', location: '绥化市第一医院', status: 'pending', priority: 'important', description: '具体关爱信息仅对授权岗位显示，普通成员仅查看时间和集合安排。' },
-  { _id: 'task-3', month: '2026-06', day: '21', category: '狮友生日', title: '六月狮友集体生日会', team: '领航服务队', teamId: 'linghang', owner: '联谊委员会', location: '绥化市兰西路活动中心', status: 'pending', priority: 'normal', description: '本月共有8位狮友生日，准备祝福卡片和纪念合影。' },
-  { _id: 'task-4', month: '2026-06', day: '25', category: '聚会联谊', title: '四队夏季交流联谊', team: '二十一协作区', teamId: 'district', owner: '联谊委员会', location: '绥化市森林公园', status: 'pending', priority: 'normal', description: '四个服务队联合交流，预计80人参加。' },
-  { _id: 'task-5', month: '2026-06', day: '28', category: '会议培训', title: '2026—2027年度岗位交接会', team: '二十一协作区', teamId: 'district', owner: '秘书处', location: '协作区会议室', status: 'pending', priority: 'urgent', description: '确认新一届岗位任职、系统权限及资料交接。' },
-  { _id: 'task-6', month: '2026-06', day: '08', category: '公益服务', title: '社区爱心衣物整理', team: '精英服务队', teamId: 'jingying', owner: '张海峰', location: '祥和社区', status: 'done', priority: 'normal', description: '完成衣物分类、消毒和社区发放，共服务46户家庭。' }
+  { _id: 'task-1', month: '2026-06', day: '14', category: '公益服务', categoryId: 'second-vp', title: '景辉狮兄带领远航开展暖阳助学走访', team: '远航服务队', teamId: 'yuanhang', owner: '景辉', location: '绥化市北林区', status: 'pending', priority: 'important', description: '走访困难学生家庭，确认暑期助学物资与学习需求。' },
+  { _id: 'task-2', month: '2026-06', day: '18', category: '狮友关爱', categoryId: 'third-vp', title: '潘阳阳狮姐组织远航开展住院狮友慰问', team: '远航服务队', teamId: 'yuanhang', owner: '潘阳阳', location: '绥化市第一医院', status: 'pending', priority: 'important', description: '具体关爱信息仅对授权岗位显示，普通成员仅查看时间和集合安排。' },
+  { _id: 'task-3', month: '2026-06', day: '21', category: '聚会联谊', categoryId: 'third-vp', title: '雪峰狮兄组织远航开展六月狮友集体生日会', team: '远航服务队', teamId: 'yuanhang', owner: '雪峰', location: '绥化市兰西路活动中心', status: 'pending', priority: 'normal', description: '准备祝福卡片、纪念合影和联谊流程。' },
+  { _id: 'task-4', month: '2026-06', day: '25', category: '对外交流', categoryId: 'first-vp', title: '丙刚狮兄开展远航对外交流走访', team: '远航服务队', teamId: 'yuanhang', owner: '丙刚', location: '绥化市公益伙伴单位', status: 'pending', priority: 'normal', description: '走访公益伙伴，介绍远航公益方向并形成后续协作清单。' },
+  { _id: 'task-5', month: '2026-06', day: '28', category: '会议纪要', categoryId: 'secretary', title: '玲玲狮姐组织召开远航服务队岗位交接会议', team: '远航服务队', teamId: 'yuanhang', owner: '玲玲', location: '远航会议室', status: 'pending', priority: 'urgent', description: '确认新一届岗位任职、系统权限及资料交接。' },
+  { _id: 'task-6', month: '2026-06', day: '08', category: '公益服务', categoryId: 'second-vp', title: '景辉狮兄带领远航完成社区爱心衣物整理服务', team: '远航服务队', teamId: 'yuanhang', owner: '景辉', location: '祥和社区', status: 'done', priority: 'normal', description: '完成衣物分类、消毒和社区发放，共服务46户家庭。' }
 ]
 
 const activities = [
@@ -42,41 +42,64 @@ const members = [
 ]
 
 const archiveCategories = [
-  { id: 'main', name: '记事本总目录', icon: '总', role: '秘书', count: 18 },
-  { id: 'member', name: '会员发展', icon: '员', role: '会员发展主席', count: 34 },
-  { id: 'training', name: '领导力与培训', icon: '培', role: '培训主席', count: 8 },
-  { id: 'service', name: '公益服务', icon: '服', role: '服务主席', count: 21 },
-  { id: 'plan', name: '年度服务计划', icon: '计', role: '服务主席', count: 12 },
-  { id: 'meeting', name: '会议纪要', icon: '会', role: '秘书', count: 16 },
-  { id: 'exchange', name: '对外交流', icon: '外', role: '对外交流主席', count: 9 },
-  { id: 'publicity', name: '新闻宣传', icon: '宣', role: '新闻宣传主席', count: 12 },
-  { id: 'care', name: '狮友关爱', icon: '爱', role: '关爱主席', count: 26 },
-  { id: 'social', name: '聚会联谊', icon: '联', role: '联谊主席', count: 31 },
-  { id: 'inventory', name: '物品清单', icon: '物', role: '总务', count: 48 },
-  { id: 'finance', name: '账目档案', icon: '账', role: '仅司库与最高管理员', count: 125, restricted: true }
+  {
+    id: 'captain',
+    name: '队长档案',
+    icon: '队',
+    role: '队长：张明星',
+    count: 1,
+    desc: '统筹远航服务队年度方向、重要嘉许和队务推进'
+  },
+  {
+    id: 'first-vp',
+    name: '第一副队长档案',
+    icon: '一',
+    role: '第一副队长：张芳',
+    count: 3,
+    desc: '会员与保留、领导力培训、对外交流',
+    children: ['会员与保留委员会主席：大奇', '领导力培训委员会主席：姗姗', '对外交流委员会主席：丙刚']
+  },
+  {
+    id: 'second-vp',
+    name: '第二副队长档案',
+    icon: '二',
+    role: '第二副队长：双龙',
+    count: 3,
+    desc: '服务与计划、新闻宣传、筹款与计划',
+    children: ['服务与计划委员会主席：景辉', '新闻宣传委员会主席：建鑫', '筹款与计划委员会主席：珊珊']
+  },
+  {
+    id: 'third-vp',
+    name: '第三副队长档案',
+    icon: '三',
+    role: '第三副队长：媛媛',
+    count: 3,
+    desc: '关爱、联谊、年会',
+    children: ['关爱委员会主席：潘阳阳', '联谊委员会主席：雪峰', '年会主席：泉宏']
+  },
+  { id: 'secretary', name: '秘书档案', icon: '秘', role: '秘书：玲玲', count: 1, desc: '会议纪要、通知、队务文字资料' },
+  { id: 'tamer', name: '纠察档案', icon: '纠', role: '纠察：振锋', count: 1, desc: '会场秩序、礼仪流程、纪律执行' },
+  { id: 'treasurer', name: '司库档案', icon: '库', role: '司库：文强', count: 1, restricted: true, desc: '账目、收支、物资价值记录' },
+  { id: 'admin', name: '总务档案', icon: '务', role: '总务：腾飞', count: 1, desc: '物资、场地、后勤、车辆与清单管理' }
 ]
 
-const archiveOrganizations = teams.map((team, index) => ({
-  ...team,
-  seal: team.id === 'district' ? '21' : team.shortName.slice(0, 1),
-  description: index === 0 ? '四队联合资料与协作区公共档案' : `${team.shortName}服务队岗位资料`,
-  photoCount: [328, 246, 218, 384, 196][index],
-  categories: archiveCategories.map(item => ({ ...item, count: Math.max(2, item.count - index * 2) }))
-}))
+const archiveOrganizations = [{
+  id: 'yuanhang',
+  name: '远航服务队',
+  shortName: '远航',
+  color: '#346b8c',
+  members: 32,
+  seal: '远',
+  captain: '张明星',
+  description: '远航服务队队长：张明星；一二三副队长与四大金刚共 8 个岗位档案',
+  photoCount: 3,
+  categories: archiveCategories
+}]
 
 const archiveEntries = [
-  { _id: 'ar-1', organizationId: 'yuanhang', categoryId: 'member', date: '2024-11-08', dateLabel: '2024年11月8日', title: '远航服务队召集小组成立', team: '远航服务队', uploadedBy: '会员发展主席', uploaderRole: '会员发展', status: 'published', photoCount: 5, tone: 'blue', keywords: ['创队', '会员发展'], summary: '远航服务队召集小组正式成立，形成首批创队成员和企业资源记录。', content: '本条由原会员发展Word档案拆分形成。系统保留成立日期、参与人员、组织关系和发展节点，敏感联系方式不在普通事件详情中展示。' },
-  { _id: 'ar-2', organizationId: 'yuanhang', categoryId: 'member', date: '2024-11-14', dateLabel: '2024年11月14日', title: '第六名创队会员加入远航服务队', team: '远航服务队', uploadedBy: '会员发展主席', uploaderRole: '会员发展', status: 'published', photoCount: 1, tone: 'green', keywords: ['新会员', '创队'], summary: '新增一名创队会员，并记录介绍人、企业类型和加入日期。', content: '会员加入事件只向授权人员展示完整资料。普通成员看到姓名、服务队、加入日期和经本人同意公开的企业信息。' },
-  { _id: 'ar-3', organizationId: 'yuanhang', categoryId: 'training', date: '2024-11-19', dateLabel: '2024年11月19日', title: '第一次培训：短视频运营分享', team: '远航服务队', uploadedBy: '领导力发展主席', uploaderRole: '培训', status: 'published', photoCount: 2, tone: 'purple', keywords: ['培训', '短视频'], summary: '围绕短视频运营开展内部经验分享。', content: '培训档案记录培训主题、讲师、参加人员、主要内容、现场照片和后续应用计划。' },
-  { _id: 'ar-4', organizationId: 'yuanhang', categoryId: 'training', date: '2024-12-04', dateLabel: '2024年12月4日', title: '第二次培训：创队说明会', team: '远航服务队', uploadedBy: '领导力发展主席', uploaderRole: '培训', status: 'published', photoCount: 3, tone: 'gold', keywords: ['创队说明会', '组织认知'], summary: '通过说明会帮助成员认识组织理念与服务方式。', content: '本条由领导力与培训Word档案拆分形成，并关联培训照片。' },
-  { _id: 'ar-5', organizationId: 'yuanhang', categoryId: 'service', date: '2024-12-22', dateLabel: '2024年12月22日', title: '联合关爱环卫工人服务', team: '远航服务队', uploadedBy: '服务主席', uploaderRole: '公益服务', status: 'published', photoCount: 4, tone: 'red', keywords: ['环卫工人', '联合服务'], summary: '远航发起联合服务，为环卫工人送去暖心餐食，并走访需要帮助的家庭。', content: '活动由多个服务队联合开展。事件详情记录主办组织、联合组织、服务对象、参与人员、服务成果和后续走访安排。' },
-  { _id: 'ar-6', organizationId: 'yuanhang', categoryId: 'service', date: '2025-03-01', dateLabel: '2025年3月1日', title: '四队联合“金剪刀”公益服务', team: '远航服务队', uploadedBy: '服务主席', uploaderRole: '公益服务', status: 'published', photoCount: 7, tone: 'green', keywords: ['敬老', '义剪', '联合'], summary: '四个服务队联合为养老中心老人提供暖心义剪。', content: '活动记录参与服务队、现场人员、服务过程、服务对象反馈和影像资料。联合活动可同时出现在协作区及相关服务队档案中。' },
-  { _id: 'ar-7', organizationId: 'yuanhang', categoryId: 'service', date: '2025-03-27', dateLabel: '2025年3月27日', title: '点亮蓝灯·关爱自闭症儿童', team: '远航服务队', uploadedBy: '服务主席', uploaderRole: '公益服务', status: 'published', photoCount: 9, tone: 'blue', keywords: ['自闭症儿童', '四队联合'], summary: '四支服务队联合开展互动陪伴和公益宣传活动。', content: '事件保留活动介绍、参与组织、服务过程、现场成果与宣传照片。涉及儿童的照片按照内部授权范围展示。' },
-  { _id: 'ar-8', organizationId: 'yuanhang', categoryId: 'publicity', date: '2025-02-02', dateLabel: '2025年2月2日', title: '养老院义剪活动宣传稿', team: '远航服务队', uploadedBy: '新闻宣传主席', uploaderRole: '新闻宣传', status: 'published', photoCount: 2, tone: 'gold', keywords: ['宣传稿', '养老院'], summary: '记录活动宣传标题、正文、配图和发布情况。', content: '新闻宣传档案与对应公益服务事件关联，避免重复录入基础信息。宣传角色负责整理标题、摘要、正文和照片。' },
-  { _id: 'ar-9', organizationId: 'yuanhang', categoryId: 'care', date: '2025-01-12', dateLabel: '2025年1月12日', title: '第一次生日关爱', team: '远航服务队', uploadedBy: '关爱主席', uploaderRole: '狮友关爱', status: 'published', photoCount: 3, tone: 'red', keywords: ['生日', '关爱'], summary: '开展生日祝福与内部关爱活动。', content: '普通成员可查看公开祝福、日期和照片；健康、家庭困难等敏感详情仅关爱岗位和最高管理员可见。' },
-  { _id: 'ar-10', organizationId: 'yuanhang', categoryId: 'social', date: '2025-03-02', dateLabel: '2025年3月2日', title: '第七次联谊活动', team: '远航服务队', uploadedBy: '联谊主席', uploaderRole: '聚会联谊', status: 'published', photoCount: 4, tone: 'purple', keywords: ['联谊', '团队交流'], summary: '狮友开展内部交流联谊，增进团队了解。', content: '联谊档案记录日期、地点、召集人、参与成员、活动说明和照片。' },
-  { _id: 'ar-11', organizationId: 'yuanhang', categoryId: 'plan', date: '2025-07-10', dateLabel: '2025年7月10日', title: '年度计划：公共设施捐赠服务', team: '远航服务队', uploadedBy: '服务主席', uploaderRole: '年度计划', status: 'published', photoCount: 0, tone: 'teal', keywords: ['年度计划', '公共设施'], summary: '纳入年度计划的七月公益服务事项。', content: '年度计划事件保存执行主席、计划月份、准备事项和当前状态，完成后转入正式公益服务档案。' },
-  { _id: 'ar-12', organizationId: 'yuanhang', categoryId: 'social', date: '2025-04-28', dateLabel: '2025年4月28日', title: '开业祝贺联谊活动', team: '远航服务队', uploadedBy: '联谊主席', uploaderRole: '聚会联谊', status: 'draft', photoCount: 5, tone: 'gold', keywords: ['开业', '联谊'], summary: 'Word导入后生成的草稿，等待管理员核对参与人员和照片。', content: 'AI已根据日期、地点和提示词形成草稿。管理员检查标题、正文及照片后才能点击发布。' }
+  { _id: 'ar-1', organizationId: 'yuanhang', categoryId: 'captain', date: '2026-06-01', dateLabel: '2026年6月1日', title: '张明星狮兄带领远航明确年度服务方向', team: '远航服务队', uploadedBy: '队长档案', uploaderRole: '队长', status: 'published', photoCount: 0, photos: [], tone: 'blue', keywords: ['队长', '年度方向'], summary: '远航服务队年度方向与岗位协作要求。', content: '张明星狮兄带领远航服务队明确年度服务方向，推动各委员会围绕服务、关爱、联谊、会员发展和对外交流建立协作机制。' },
+  { _id: 'ar-2', organizationId: 'yuanhang', categoryId: 'second-vp', date: '2026-06-14', dateLabel: '2026年6月14日', title: '景辉狮兄带领远航开展暖阳助学走访', team: '远航服务队', uploadedBy: '服务与计划委员会', uploaderRole: '公益服务', status: 'published', photoCount: 1, photos: ['/images/archives/word-service-001/01.jpg'], tone: 'green', keywords: ['公益服务', '助学'], summary: '远航服务队围绕助学开展走访服务。', content: '景辉狮兄带领远航服务队开展暖阳助学走访，确认学生家庭需求、后续帮扶计划和参与狮友分工。' },
+  { _id: 'ar-3', organizationId: 'yuanhang', categoryId: 'secretary', date: '2026-06-28', dateLabel: '2026年6月28日', title: '玲玲狮姐组织召开远航岗位交接会议', team: '远航服务队', uploadedBy: '秘书处', uploaderRole: '会议纪要', status: 'published', photoCount: 0, photos: [], tone: 'gold', keywords: ['会议纪要', '岗位交接'], summary: '记录远航岗位交接会议议题、决议和待办。', content: '玲玲狮姐组织召开远航服务队岗位交接会议，记录会议议题、形成决议事项，并明确各岗位后续资料交接责任。' }
 ]
 
 const structureTerms = [

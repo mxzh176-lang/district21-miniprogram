@@ -7,7 +7,8 @@ Page({
     selectedOrganization: {},
     loading: true,
     loadError: ''
-    ,canManage: false
+    ,canManage: false,
+    expandedCategories: {}
   },
 
   async onShow() {
@@ -58,6 +59,13 @@ Page({
       return
     }
     wx.navigateTo({ url: `/pages/archive/list/index?organization=${this.data.selectedId}&category=${category}` })
+  },
+
+  toggleCategory(event) {
+    const id = event.currentTarget.dataset.id
+    this.setData({
+      [`expandedCategories.${id}`]: !this.data.expandedCategories[id]
+    })
   },
 
   uploadPhotos() {

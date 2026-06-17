@@ -8,6 +8,13 @@
   background: linear-gradient(145deg, #201447, #3a2675);
 }
 
+.hero-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14rpx;
+}
+
 .hero-kicker {
   color: #d391ff;
   font-size: 18rpx;
@@ -46,6 +53,17 @@
   margin-top: 3rpx;
   color: rgba(255, 255, 255, 0.62);
   font-size: 17rpx;
+}
+
+.create-button {
+  min-width: 132rpx;
+  height: 48rpx;
+  padding: 0 18rpx;
+  border-radius: 999rpx;
+  color: #201447;
+  background: #7be4ff;
+  font-size: 20rpx;
+  line-height: 48rpx;
 }
 
 .calendar-card {
@@ -153,6 +171,7 @@
 
 .task-card {
   display: flex;
+  align-items: stretch;
   margin-bottom: 18rpx;
   overflow: hidden;
   border-radius: 24rpx;
@@ -234,4 +253,31 @@
   border-top: 1rpx solid rgba(201,130,255,.16);
   color: #9189a9;
   font-size: 18rpx;
+}
+
+.check-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 88rpx;
+  padding-right: 20rpx;
+}
+
+.check-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42rpx;
+  height: 42rpx;
+  border: 3rpx solid rgba(123, 228, 255, 0.7);
+  border-radius: 10rpx;
+  color: #130f2c;
+  background: transparent;
+  font-size: 27rpx;
+  font-weight: 700;
+}
+
+.check-box.checked {
+  border-color: #7be4ff;
+  background: #7be4ff;
 }

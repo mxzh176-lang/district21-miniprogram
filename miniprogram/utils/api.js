@@ -1,6 +1,11 @@
 const data = require('../data/mock-data')
-const importedData = require('../data/imported-archives')
 const knowledgeBase = require('../data/knowledge-base')
+
+let importedDataCache = null
+function importedData() {
+  if (!importedDataCache) importedDataCache = require('../data/imported-archives')
+  return importedDataCache
+}
 
 const demoMember = {
   _id: 'demo-admin',
@@ -40,10 +45,37 @@ function saveArchiveOrders(orders) {
   wx.setStorageSync('demoArchiveOrders', orders)
 }
 
+function getLocalTasks() {
+  try {
+    return wx.getStorageSync('demoTasks') || []
+  } catch (error) {
+    return []
+  }
+}
+
+function saveLocalTasks(tasks) {
+  wx.setStorageSync('demoTasks', tasks)
+}
+
+function allTasks() {
+  const tasks = {}
+  data.tasks.concat(getLocalTasks()).forEach(item => {
+    tasks[item._id] = item
+  })
+  return Object.values(tasks)
+}
+
+function dateLabel(date) {
+  const value = String(date || '')
+  if (value.length < 10) return value
+  return `${value.slice(0, 4)}年${Number(value.slice(5, 7))}月${Number(value.slice(8, 10))}日`
+}
+
 function allArchiveEntries() {
+  const imported = importedData()
   const orders = getArchiveOrders()
   const hidden = wx.getStorageSync('hiddenArchiveEntries') || []
-  return importedData.archiveEntries.concat(getLocalArchiveEntries())
+  return imported.archiveEntries.concat(getLocalArchiveEntries())
     .filter(item => !hidden.includes(item._id))
     .map((item, index) => ({
       ...item,
@@ -72,8 +104,9 @@ function getMemberRoles() {
 }
 
 function allMembers() {
+  const imported = importedData()
   const members = {}
-  data.members.concat(importedData.members, getLocalMembers()).forEach(item => {
+  data.members.concat(imported.members, getLocalMembers()).forEach(item => {
     members[item.name] = item
   })
   if (members['关丙刚']) {
@@ -109,6 +142,98 @@ function archiveListItem(item) {
     keywords: item.keywords,
     summary: item.summary
   }
+}
+
+const categoryTemplates = {
+  captain: {
+    role: '队长',
+    tone: 'blue',
+    title: (owner, org, topic) => `${owner}狮兄带领${org}推进${topic || '年度重点工作'}`,
+    summary: (org, topic) => `${org}围绕“${topic || '年度重点工作'}”推进队务协作和嘉许文化。`,
+    content: (date, org, category, owner, topic) => `事件日期：${date}\n所属组织：${org}\n档案分类：${category}\n负责人：${owner}\n\n${owner}狮兄带领${org}推进“${topic || '年度重点工作'}”，明确目标、分工、完成情况和需要嘉许的狮友贡献。`
+  },
+  'first-vp': {
+    role: '第一副队长',
+    tone: 'purple',
+    title: (owner, org, topic) => `${owner}狮兄狮姐开展${org}会员发展与对外交流`,
+    summary: (org, topic) => `${org}围绕“${topic || '会员发展与对外交流'}”形成工作记录。`,
+    content: (date, org, category, owner, topic) => `事件日期：${date}\n所属组织：${org}\n档案分类：${category}\n负责人：${owner}\n\n${owner}狮兄狮姐开展“${topic || '会员发展与对外交流'}”，请补充参与人员、交流对象、达成共识、后续跟进和嘉许对象。`
+  },
+  'second-vp': {
+    role: '第二副队长',
+    tone: 'green',
+    title: (owner, org, topic) => `${owner}狮兄狮姐带领${org}做了${topic || '一项公益服务'}`,
+    summary: (org, topic) => `${org}完成“${topic || '公益服务'}”并形成服务档案。`,
+    content: (date, org, category, owner, topic) => `事件日期：${date}\n所属组织：${org}\n档案分类：${category}\n负责人：${owner}\n\n${owner}狮兄狮姐带领${org}做了“${topic || '一项公益服务'}”。请补充服务对象、服务地点、参与狮友、服务过程、服务成果和嘉许说明。`
+  },
+  'third-vp': {
+    role: '第三副队长',
+    tone: 'red',
+    title: (owner, org, topic) => `${owner}狮兄狮姐组织${org}开展${topic || '关爱联谊活动'}`,
+    summary: (org, topic) => `${org}围绕“${topic || '关爱联谊'}”开展成员关怀与团队凝聚。`,
+    content: (date, org, category, owner, topic) => `事件日期：${date}\n所属组织：${org}\n档案分类：${category}\n负责人：${owner}\n\n${owner}狮兄狮姐组织${org}开展“${topic || '关爱联谊活动'}”。请补充关爱对象、联谊主题、参与人员、现场成果和后续跟进。`
+  },
+  secretary: {
+    role: '会议纪要',
+    tone: 'gold',
+    title: (owner, org, topic) => `${owner}狮姐组织召开${org}${topic || '工作会议'}`,
+    summary: (org, topic) => `${org}召开“${topic || '工作会议'}”，形成会议纪要和待办事项。`,
+    content: (date, org, category, owner, topic) => `会议日期：${date}\n会议组织：${org}\n档案分类：${category}\n记录人：${owner}\n\n一、会议主题：${topic || '工作会议'}\n二、参会人员：请补充\n三、会议议题：请补充\n四、会议决议：请补充\n五、后续待办：请补充\n六、嘉许记录：请补充本次推动会议和落实事项的狮兄狮姐。`
+  },
+  tamer: {
+    role: '纠察',
+    tone: 'teal',
+    title: (owner, org, topic) => `${owner}狮兄维护${org}${topic || '会议活动秩序'}`,
+    summary: (org, topic) => `${org}完成“${topic || '会议活动秩序'}”相关纠察记录。`,
+    content: (date, org, category, owner, topic) => `事件日期：${date}\n所属组织：${org}\n档案分类：${category}\n负责人：${owner}\n\n${owner}狮兄维护${org}“${topic || '会议活动秩序'}”，请补充现场流程、礼仪要求、执行情况和改进建议。`
+  },
+  treasurer: {
+    role: '司库',
+    tone: 'blue',
+    title: (owner, org, topic) => `${owner}狮兄整理${org}${topic || '司库账目记录'}`,
+    summary: (org, topic) => `${org}完成“${topic || '司库账目'}”记录，敏感明细仅授权人员查看。`,
+    content: (date, org, category, owner, topic) => `记录日期：${date}\n所属组织：${org}\n档案分类：${category}\n负责人：${owner}\n\n${owner}狮兄整理${org}“${topic || '司库账目记录'}”。请补充收支摘要、凭证情况、物资价值和审核说明，敏感明细请按权限维护。`
+  },
+  admin: {
+    role: '总务',
+    tone: 'purple',
+    title: (owner, org, topic) => `${owner}狮兄完成${org}${topic || '总务后勤保障'}`,
+    summary: (org, topic) => `${org}完成“${topic || '总务后勤'}”保障记录。`,
+    content: (date, org, category, owner, topic) => `事件日期：${date}\n所属组织：${org}\n档案分类：${category}\n负责人：${owner}\n\n${owner}狮兄完成${org}“${topic || '总务后勤保障'}”。请补充物资、场地、车辆、人员分工和后续改进。`
+  }
+}
+
+function buildArchiveDraftFromTask(task, status = 'published') {
+  const org = task.team || '远航服务队'
+  const categoryId = task.categoryId || 'second-vp'
+  const category = archiveOrganizationsCategory(categoryId)
+  const template = categoryTemplates[categoryId] || categoryTemplates['second-vp']
+  const owner = task.owner || '负责人'
+  const topic = task.title || task.description || task.category
+  const date = `${task.month || '2026-06'}-${String(task.day || '01').padStart(2, '0')}`
+  return {
+    _id: `task-entry-${task._id}`,
+    organizationId: task.teamId || 'yuanhang',
+    categoryId,
+    date,
+    dateLabel: dateLabel(date),
+    title: task.title && task.title.includes(owner) ? task.title : template.title(owner, org, topic),
+    team: org,
+    uploadedBy: owner,
+    uploaderRole: category ? category.name : template.role,
+    status,
+    photoCount: 0,
+    photos: [],
+    tone: template.tone,
+    keywords: [task.category, owner].filter(Boolean),
+    summary: task.description || template.summary(org, topic),
+    content: template.content(date, org, category ? category.name : task.category, owner, topic)
+  }
+}
+
+function archiveOrganizationsCategory(categoryId) {
+  const org = data.archiveOrganizations.find(item => item.id === 'yuanhang') || data.archiveOrganizations[0]
+  return org && org.categories ? org.categories.find(item => item.id === categoryId) : null
 }
 
 function knowledgeScore(item, question) {
@@ -178,9 +303,10 @@ function call(action, payload = {}) {
       result = demoMember
       break
     case 'getHome':
+      const visibleHomeTasks = allTasks().filter(item => item.status !== 'deleted' && (item.status === 'pending' || item.month === '2026-06'))
       result = {
-        summary: { pendingCount: 5, doneCount: 1, memberCount: 120, photoCount: 1248 },
-        tasks: data.tasks.filter(item => item.status === 'pending').slice(0, 4),
+        summary: { pendingCount: visibleHomeTasks.filter(item => item.status !== 'done').length, doneCount: visibleHomeTasks.filter(item => item.status === 'done').length, memberCount: 120, photoCount: 3 },
+        tasks: visibleHomeTasks.slice(0, 4),
         careOverview: { birthdayCount: 8, careCount: 2 },
         notices: data.notices,
         activities: data.activities.slice(0, 3),
@@ -195,7 +321,8 @@ function call(action, payload = {}) {
       }
       break
     case 'listTasks': {
-      const tasks = data.tasks.filter(item => {
+      const tasks = allTasks().filter(item => {
+        if (item.status === 'deleted') return false
         const monthMatch = !payload.month || payload.month === 'all' || item.month === payload.month
         const statusMatch = !payload.status || payload.status === 'all' || item.status === payload.status
         const categoryMatch = !payload.category || payload.category === 'all' || item.category === payload.category
@@ -203,7 +330,7 @@ function call(action, payload = {}) {
         const teamMatch = !payload.teamId || payload.teamId === 'all' || item.teamId === payload.teamId
         return monthMatch && statusMatch && categoryMatch && dayMatch && teamMatch
       })
-      result = { tasks, months: [{ value: '2026-06', label: '2026年6月' }], categories: ['公益服务', '狮友关爱', '狮友生日', '聚会联谊', '会议培训'] }
+      result = { tasks, months: [{ value: '2026-06', label: '2026年6月' }], categories: ['公益服务', '会议纪要', '对外交流', '狮友关爱', '聚会联谊', '会员发展', '新闻宣传', '司库账目', '总务后勤'] }
       break
     }
     case 'listActivities':
@@ -221,19 +348,18 @@ function call(action, payload = {}) {
       result = data.teams
       break
     case 'listArchives':
-      result = data.archiveOrganizations.map(organization => {
-        if (organization.id !== 'yuanhang') return organization
-        return {
-          ...organization,
-          categories: organization.categories.map(category => ({
-            ...category,
-            count: importedData.archiveEntries.filter(
-              item => item.organizationId === organization.id &&
-                item.categoryId === category.id
-            ).length
-          }))
-        }
-      })
+      const entriesForCount = allArchiveEntries()
+      result = data.archiveOrganizations.map(organization => ({
+        ...organization,
+        categories: organization.categories.map(category => ({
+          ...category,
+          count: entriesForCount.filter(item =>
+            item.organizationId === organization.id &&
+            item.categoryId === category.id &&
+            item.status === 'published'
+          ).length
+        }))
+      }))
       break
     case 'listArchiveEntries':
       result = allArchiveEntries()
@@ -258,6 +384,66 @@ function call(action, payload = {}) {
       else entries.push(entry)
       saveLocalArchiveEntries(entries)
       result = entry
+      break
+    }
+    case 'saveTask': {
+      const tasks = getLocalTasks()
+      const now = new Date()
+      const base = payload.task || {}
+      const id = payload.id || base._id || `local-task-${Date.now()}`
+      const task = {
+        _id: id,
+        month: base.month || '2026-06',
+        day: String(base.day || now.getDate()).padStart(2, '0'),
+        category: base.category || '公益服务',
+        categoryId: base.categoryId || 'second-vp',
+        title: base.title || '待补充事项',
+        team: base.team || '远航服务队',
+        teamId: base.teamId || 'yuanhang',
+        owner: base.owner || '负责人',
+        location: base.location || '',
+        status: base.status || 'pending',
+        priority: base.priority || 'normal',
+        description: base.description || ''
+      }
+      const index = tasks.findIndex(item => item._id === id)
+      if (index >= 0) tasks[index] = task
+      else tasks.push(task)
+      saveLocalTasks(tasks)
+      result = task
+      break
+    }
+    case 'deleteTask': {
+      const tasks = getLocalTasks().filter(item => item._id !== payload.id)
+      const seeded = data.tasks.find(item => item._id === payload.id)
+      if (seeded) {
+        tasks.push({ ...seeded, status: 'deleted' })
+      }
+      saveLocalTasks(tasks)
+      result = true
+      break
+    }
+    case 'completeTask': {
+      const id = payload.id
+      const localTasks = getLocalTasks()
+      let task = localTasks.find(item => item._id === id) || data.tasks.find(item => item._id === id)
+      if (!task) {
+        result = false
+        break
+      }
+      task = { ...task, status: 'done', completedAt: new Date().toISOString() }
+      const index = localTasks.findIndex(item => item._id === id)
+      if (index >= 0) localTasks[index] = task
+      else localTasks.push(task)
+      saveLocalTasks(localTasks)
+
+      const entries = getLocalArchiveEntries()
+      const entry = buildArchiveDraftFromTask(task, 'published')
+      const entryIndex = entries.findIndex(item => item._id === entry._id)
+      if (entryIndex >= 0) entries[entryIndex] = entry
+      else entries.push(entry)
+      saveLocalArchiveEntries(entries)
+      result = { task, entry }
       break
     }
     case 'deleteArchiveEntry': {
@@ -386,7 +572,7 @@ function call(action, payload = {}) {
       result = data.appointments
       break
     case 'getTask':
-      result = findById(data.tasks, payload.id) || {}
+      result = findById(allTasks(), payload.id) || {}
       break
     case 'getOrg':
       result = findById(data.members, payload.id) || {}

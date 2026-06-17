@@ -1,7 +1,7 @@
 <view class="page">
   <swiper class="hero-swiper" autoplay circular indicator-dots interval="3500">
-    <swiper-item>
-      <view class="hero">
+    <swiper-item wx:for="{{heroSlides}}" wx:key="key">
+      <view wx:if="{{item.type === 'intro'}}" class="hero">
         <view class="hero-top">
           <view>
             <view class="eyebrow">LIONS DISTRICT 21 · SUIHUA</view>
@@ -15,9 +15,7 @@
           <view class="demo-tag">四队同心</view>
         </view>
       </view>
-    </swiper-item>
-    <swiper-item wx:for="{{banners}}" wx:key="*this">
-      <image src="{{item}}" mode="aspectFill" />
+      <image wx:else src="{{item.src}}" mode="aspectFill" />
     </swiper-item>
   </swiper>
 

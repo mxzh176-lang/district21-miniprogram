@@ -3,11 +3,14 @@
     <view>
       <view class="hero-kicker">MONTHLY PLAN</view>
       <view class="hero-title">六月协作待办</view>
-      <view class="hero-desc">公益服务 · 狮友关爱 · 生日 · 联谊</view>
+      <view class="hero-desc">完成后自动进入历史事件与对应档案</view>
     </view>
-    <view class="progress-ring">
-      <view class="progress-number">1/6</view>
-      <view class="progress-label">已完成</view>
+    <view class="hero-actions">
+      <view class="progress-ring">
+        <view class="progress-number">{{doneCount}}/{{totalCount}}</view>
+        <view class="progress-label">已完成</view>
+      </view>
+      <button wx:if="{{canEdit}}" class="create-button" bindtap="createTask">创建待办</button>
     </view>
   </view>
 
@@ -47,7 +50,7 @@
   </view>
 
   <view wx:if="{{tasks.length}}">
-    <view class="task-card {{item.status === 'done' ? 'done' : ''}}" wx:for="{{tasks}}" wx:key="_id">
+    <view class="task-card {{item.status === 'done' ? 'done' : ''}}" wx:for="{{tasks}}" wx:key="_id" data-id="{{item._id}}" bindtap="openTask">
       <view class="date-column">
         <view class="day">{{item.day}}</view>
         <view class="month">JUN</view>
@@ -64,6 +67,11 @@
           <view>{{item.location}}</view>
         </view>
         <view class="organization-label">{{item.team}}</view>
+      </view>
+      <view class="check-wrap" data-id="{{item._id}}" catchtap="completeTask">
+        <view class="check-box {{item.status === 'done' ? 'checked' : ''}}">
+          <text wx:if="{{item.status === 'done'}}">✓</text>
+        </view>
       </view>
     </view>
   </view>

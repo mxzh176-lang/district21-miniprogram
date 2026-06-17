@@ -12,7 +12,15 @@ const CATEGORY_NAMES = {
   care: '狮友关爱',
   social: '聚会联谊',
   inventory: '物品清单',
-  finance: '账目档案'
+  finance: '账目档案',
+  captain: '队长档案',
+  'first-vp': '第一副队长档案',
+  'second-vp': '第二副队长档案',
+  'third-vp': '第三副队长档案',
+  secretary: '秘书档案',
+  tamer: '纠察档案',
+  treasurer: '司库档案',
+  admin: '总务档案'
 }
 
 Page({
@@ -30,7 +38,7 @@ Page({
   onLoad(options) {
     const categoryId = options.category || 'main'
     this.setData({
-      organizationId: options.organization || 'district',
+      organizationId: options.organization || 'yuanhang',
       categoryId,
       categoryName: CATEGORY_NAMES[categoryId] || '档案事件'
     })

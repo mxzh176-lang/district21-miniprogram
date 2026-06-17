@@ -271,6 +271,41 @@
   white-space: nowrap;
 }
 
+.category-desc {
+  margin-top: 10rpx;
+  color: #aaa2bf;
+  font-size: 18rpx;
+  line-height: 1.55;
+}
+
+.expand-line {
+  display: inline-flex;
+  margin-top: 12rpx;
+  padding: 7rpx 13rpx;
+  border-radius: 999rpx;
+  color: #7be4ff;
+  background: rgba(123, 228, 255, 0.1);
+  font-size: 18rpx;
+}
+
+.committee-list {
+  margin-top: 12rpx;
+  padding: 12rpx;
+  border-radius: 16rpx;
+  background: rgba(45, 32, 80, 0.72);
+}
+
+.committee-item {
+  margin-bottom: 8rpx;
+  color: #f0e8ff;
+  font-size: 18rpx;
+  line-height: 1.45;
+}
+
+.committee-item:last-child {
+  margin-bottom: 0;
+}
+
 .category-footer {
   display: flex;
   justify-content: space-between;
