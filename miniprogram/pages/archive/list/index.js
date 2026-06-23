@@ -1,4 +1,5 @@
 const api = require('../../../utils/api')
+const permission = require('../../../utils/permission')
 
 const CATEGORY_NAMES = {
   main: '记事本总目录',
@@ -13,14 +14,23 @@ const CATEGORY_NAMES = {
   social: '聚会联谊',
   inventory: '物品清单',
   finance: '账目档案',
-  captain: '队长档案',
-  'first-vp': '第一副队长档案',
-  'second-vp': '第二副队长档案',
-  'third-vp': '第三副队长档案',
-  secretary: '秘书档案',
-  tamer: '纠察档案',
-  treasurer: '司库档案',
-  admin: '总务档案'
+  captain: '队长——张明星',
+  'first-vp': '第一副队长——张芳',
+  'second-vp': '第二副队长——双龙',
+  'third-vp': '第三副队长——媛媛',
+  secretary: '秘书——玲玲',
+  tamer: '纠察——振锋',
+  treasurer: '司库——文强',
+  admin: '总务——腾飞',
+  'member-retention': '会员与保留委员会——大奇',
+  'leadership-training': '领导力培训委员会——姗姗',
+  'external-exchange': '对外交流委员会——丙刚',
+  'service-plan': '服务与计划委员会——景辉',
+  'news-publicity': '新闻宣传委员会——建鑫',
+  'fundraising-plan': '筹款与计划委员会——珊珊',
+  'care-committee': '关爱委员会——潘阳阳',
+  'fellowship-committee': '联谊委员会——雪峰',
+  'annual-meeting': '年会委员会——泉宏'
 }
 
 Page({
@@ -30,7 +40,9 @@ Page({
     categoryName: '',
     organization: {},
     entries: [],
+    canCreate: false,
     canEdit: false,
+    canDelete: false,
     isSuperAdmin: false,
     loadError: ''
   },
@@ -57,6 +69,7 @@ Page({
       const organization = organizations.find(
         (item) => item.id === this.data.organizationId
       ) || organizations[0]
+      const position = permission.findArchivePosition(organization, this.data.categoryId)
       const sortedEntries = entries
         .slice()
         .sort((a, b) => (a.order || 0) - (b.order || 0) || b.date.localeCompare(a.date))
@@ -68,12 +81,15 @@ Page({
         }))
       this.setData({
         organization,
+        categoryName: position ? position.name : this.data.categoryName,
         entries: sortedEntries,
-        canEdit: ['superadmin', 'admin', 'editor'].includes(member.role),
-        isSuperAdmin: member.role === 'superadmin',
+        canCreate: permission.canMaintainArchive(member, organization, this.data.categoryId, 'create'),
+        canEdit: permission.canMaintainArchive(member, organization, this.data.categoryId, 'update'),
+        canDelete: permission.canMaintainArchive(member, organization, this.data.categoryId, 'delete'),
+        isSuperAdmin: permission.isSuperAdmin(member),
         loadError: ''
       })
-      wx.setNavigationBarTitle({ title: `${organization.shortName} · ${this.data.categoryName}` })
+      wx.setNavigationBarTitle({ title: `${organization.shortName} · ${position ? position.name : this.data.categoryName}` })
     } catch (error) {
       this.setData({ loadError: '档案列表加载失败，请重新编译后重试。' })
       api.showError(error)
@@ -121,9 +137,13 @@ Page({
       confirmColor: '#d94f65',
       success: async result => {
         if (!result.confirm) return
-        await api.call('deleteArchiveEntry', { id })
-        this.setData({ entries: this.data.entries.filter(item => item._id !== id) })
-        wx.showToast({ title: '已删除', icon: 'success' })
+        try {
+          await api.call('deleteArchiveEntry', { id })
+          this.setData({ entries: this.data.entries.filter(item => item._id !== id) })
+          wx.showToast({ title: '已删除', icon: 'success' })
+        } catch (error) {
+          api.showError(error)
+        }
       }
     })
   }

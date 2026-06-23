@@ -1,4 +1,5 @@
 const api = require('../../utils/api')
+const permission = require('../../utils/permission')
 const auth = require('../../utils/auth')
 
 Page({
@@ -7,7 +8,7 @@ Page({
   async onShow() {
     const member = await auth.requireApproved()
     if (!member) return
-    this.setData({ canEdit: ['superadmin', 'editor', 'admin'].includes(member.role) })
+    this.setData({ canEdit: permission.canEditContent(member) })
     await this.loadItems()
   },
 

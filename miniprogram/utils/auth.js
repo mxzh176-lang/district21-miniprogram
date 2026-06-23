@@ -1,16 +1,17 @@
 const api = require('./api')
+const permission = require('./permission')
 
 async function requireApproved(options = {}) {
   const app = getApp()
   try {
     const member = await api.call('getSession')
     app.globalData.member = member
-    if (options.admin && !['superadmin', 'admin'].includes(member.role)) {
+    if (options.admin && !permission.canManage(member)) {
       wx.showToast({ title: '仅管理员可访问', icon: 'none' })
       wx.switchTab({ url: '/pages/home/index' })
       return null
     }
-    if (options.editor && !['superadmin', 'editor', 'admin'].includes(member.role)) {
+    if (options.editor && !permission.canEditContent(member)) {
       wx.showToast({ title: '仅内容管理员可访问', icon: 'none' })
       wx.switchTab({ url: '/pages/home/index' })
       return null

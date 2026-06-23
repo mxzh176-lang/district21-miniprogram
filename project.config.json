@@ -1,10 +1,12 @@
 {
   "appid": "wxfe3c3da5ae16aa1d",
-  "projectname": "district-21-demo",
-  "description": "二十一协作区公益服务档案演示版",
+  "projectname": "district-21-notebook",
+  "description": "协作区内部组织与档案管理工具",
   "compileType": "miniprogram",
   "miniprogramRoot": "miniprogram/",
   "cloudfunctionRoot": "cloudfunctions/",
+  "cloudbaseRoot": "cloudbase/",
+  "cloudbaseEnv": "cloud1-d6ghj5dev32a15a81",
   "setting": {
     "es6": true,
     "enhance": true,

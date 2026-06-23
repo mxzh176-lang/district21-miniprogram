@@ -20,11 +20,6 @@
   </scroll-view>
 
   <view class="source-note">官方资料均保留来源链接和更新时间；制度执行以官方现行文件为准。</view>
-  <view class="ask-assistant" bindtap="goAssistant">
-    <view class="ask-mark">AI</view>
-    <view class="ask-copy"><view class="ask-title">向 AI 助手提问</view><view class="ask-desc">根据知识库快速查找答案和来源</view></view>
-    <view class="ask-arrow">›</view>
-  </view>
 
   <view wx:if="{{filteredItems.length}}">
     <view class="knowledge-card" wx:for="{{filteredItems}}" wx:key="_id">

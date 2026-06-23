@@ -2,6 +2,35 @@
   padding: 34rpx;
 }
 
+.task-input,
+.task-textarea {
+  min-height: 88rpx;
+  color: #f8f3ff !important;
+  -webkit-text-fill-color: #f8f3ff !important;
+  caret-color: #7be4ff;
+  background: rgba(16, 12, 38, 0.96) !important;
+  opacity: 1 !important;
+  font-size: 28rpx;
+  line-height: 1.45;
+}
+
+.task-textarea {
+  min-height: 300rpx;
+}
+
+.form-placeholder {
+  color: rgba(210, 201, 231, 0.62) !important;
+  -webkit-text-fill-color: rgba(210, 201, 231, 0.62) !important;
+}
+
+.picker {
+  min-height: 88rpx;
+  display: flex;
+  align-items: center;
+  color: #f8f3ff;
+  background: rgba(16, 12, 38, 0.96);
+}
+
 .delete {
   margin-top: 22rpx;
 }

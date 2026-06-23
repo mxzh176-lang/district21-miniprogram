@@ -22,7 +22,7 @@
 
   <view class="section-row">
     <view class="section-title">活动影像</view>
-    <view class="muted">演示照片墙</view>
+    <view class="muted">内部活动附件</view>
   </view>
   <view class="photo-grid">
     <view class="photo tone-{{item.tone}}" wx:for="{{photos}}" wx:key="_id">

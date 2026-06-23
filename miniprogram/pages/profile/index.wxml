@@ -2,17 +2,20 @@
   <view class="profile-hero">
     <view class="avatar">21</view>
     <view class="name">{{member.nickname}}</view>
-    <view class="role">超级管理员 · {{member.term}}</view>
+    <view class="role">{{member.displayRole}} · {{member.term}}</view>
     <view class="organization">{{member.team}}</view>
+    <view class="organization" bindtap="copyUserId">成员编号：{{member.displayCode}}</view>
   </view>
+  <button class="reconnect-button" bindtap="editProfile">完善内部身份资料</button>
 
   <view class="demo-note">
-    <view class="demo-icon">演</view>
+    <view class="demo-icon">内</view>
     <view>
-      <view class="demo-title">当前为本地演示模式</view>
-      <view class="demo-desc">无需服务器和数据库，可直接在微信开发者工具中展示。</view>
+      <view class="demo-title">组织内部资料管理工具</view>
+      <view class="demo-desc">按组织、岗位和任期控制权限，不提供用户公开发表、评论、转发或社交互动。</view>
     </view>
   </view>
+  <button wx:if="{{member.status === 'readonly'}}" class="reconnect-button" bindtap="retryCloud">重新连接云端</button>
 
   <view class="section-title">协作区资料</view>
   <view class="menu-card" bindtap="goNotices">
@@ -25,19 +28,14 @@
     <view class="menu-copy"><view class="menu-title">中国狮子联会知识库</view><view class="menu-desc">官方资料、制度索引与服务知识</view></view>
     <view class="arrow">›</view>
   </view>
-  <view class="menu-card ai-card" bindtap="goAssistant">
-    <view class="menu-icon assistant">AI</view>
-    <view class="menu-copy"><view class="menu-title">二十一协作区 AI 助手</view><view class="menu-desc">询问制度、服务记录和知识库资料</view></view>
-    <view class="arrow">›</view>
-  </view>
   <view class="menu-card" bindtap="goHistory">
     <view class="menu-icon green">史</view>
     <view class="menu-copy"><view class="menu-title">协作区与四队发展历史</view><view class="menu-desc">按年份保存重要服务与里程碑</view></view>
     <view class="arrow">›</view>
   </view>
-  <view class="menu-card" bindtap="goAdmin">
+  <view wx:if="{{canManage}}" class="menu-card" bindtap="goAdmin">
     <view class="menu-icon blue">管</view>
-    <view class="menu-copy"><view class="menu-title">管理后台演示</view><view class="menu-desc">授权码、届次岗位、内容和日志</view></view>
+    <view class="menu-copy"><view class="menu-title">权限中心</view><view class="menu-desc">届次岗位、内部内容和操作日志</view></view>
     <view class="arrow">›</view>
   </view>
 
@@ -46,5 +44,5 @@
     <view class="privacy-text">正式版将通过成员名单或授权码绑定身份。关爱详情、手机号码和企业联系方式按服务队、岗位和任期分级显示。</view>
   </view>
 
-  <view class="version">二十一协作区公益档案 Demo v1.0</view>
+  <view class="version">21纪事本 v1.0</view>
 </view>

@@ -1,0 +1,318 @@
+{
+  "envId": "cloud1-d6ghj5dev32a15a81",
+  "collections": [
+    {
+      "name": "organization",
+      "description": "组织树：联会、代表处、协作区、服务队，支持无限层级。",
+      "indexes": [
+        ["type", "status"],
+        ["parentId", "status"],
+        ["ancestorIds", "status"],
+        ["level", "sortOrder"]
+      ],
+      "fields": {
+        "id": "string",
+        "name": "string",
+        "shortName": "string",
+        "type": "federation | office | region | team",
+        "parentId": "string | null",
+        "ancestorIds": "string[]",
+        "level": "number",
+        "pathName": "string",
+        "status": "active | inactive | archived",
+        "sortOrder": "number",
+        "createdAt": "Date",
+        "updatedAt": "Date",
+        "deletedAt": "Date | null"
+      }
+    },
+    {
+      "name": "user",
+      "description": "用户主表，保留 openid/unionid 与基本资料。",
+      "indexes": [
+        ["openid"],
+        ["unionid"],
+        ["status"],
+        ["defaultOrganizationId"]
+      ],
+      "fields": {
+        "id": "string",
+        "openid": "string",
+        "unionid": "string",
+        "name": "string",
+        "avatar": "string",
+        "phone": "string",
+        "status": "pending | active | disabled",
+        "defaultOrganizationId": "string",
+        "profileCompleted": "boolean",
+        "memberCode": "string",
+        "createdAt": "Date",
+        "updatedAt": "Date",
+        "lastLoginAt": "Date"
+      }
+    },
+    {
+      "name": "user_role",
+      "description": "用户角色表，一个用户可以在多个组织拥有多个角色。",
+      "indexes": [
+        ["userId", "status"],
+        ["organizationId", "role", "status"],
+        ["userId", "organizationId", "role"]
+      ],
+      "fields": {
+        "id": "string",
+        "userId": "string",
+        "organizationId": "string",
+        "role": "super_admin | federation_admin | office_admin | region_admin | area_admin | team_admin | role_manager | member",
+        "status": "active | inactive",
+        "grantedBy": "string",
+        "grantedAt": "Date",
+        "expiresAt": "Date | null",
+        "createdAt": "Date",
+        "updatedAt": "Date"
+      }
+    },
+    {
+      "name": "position",
+      "description": "协作区和服务队岗位定义，不保存具体负责人。",
+      "indexes": [
+        ["organizationId", "status", "sortOrder"],
+        ["organizationId", "parentPositionId", "status"],
+        ["code", "status"]
+      ],
+      "fields": {
+        "id": "string",
+        "organizationId": "string",
+        "code": "string",
+        "name": "string",
+        "type": "area | team | committee",
+        "parentPositionId": "string | null",
+        "responsibilities": "string",
+        "sortOrder": "number",
+        "status": "active | inactive | archived",
+        "createdAt": "Date",
+        "updatedAt": "Date",
+        "deletedAt": "Date | null"
+      }
+    },
+    {
+      "name": "role_assignment",
+      "description": "年度岗位授权，到期后自动失效；人员不写死在岗位定义中。",
+      "indexes": [
+        ["organizationId", "positionId", "status"],
+        ["userId", "status", "endDate"],
+        ["startDate", "endDate", "status"]
+      ],
+      "fields": {
+        "id": "string",
+        "areaId": "string",
+        "teamId": "string | null",
+        "organizationId": "string",
+        "positionId": "string",
+        "userId": "string",
+        "memberId": "string",
+        "roleType": "role_manager",
+        "startDate": "string",
+        "endDate": "string",
+        "status": "active | inactive | revoked",
+        "createdBy": "string",
+        "createdAt": "Date",
+        "updatedAt": "Date"
+      }
+    },
+    {
+      "name": "permission_grant",
+      "description": "人员精细授权，可按组织、模块、岗位范围、操作和任期叠加生效。",
+      "indexes": [
+        ["userId", "status", "endDate"],
+        ["organizationId", "module", "status"],
+        ["scopeType", "scopeId", "status"]
+      ],
+      "fields": {
+        "id": "string",
+        "userId": "string",
+        "organizationId": "string",
+        "module": "all | archives | contacts | tasks | history | notices | photos | honors",
+        "scopeType": "global | organization | organization_tree | position | position_tree",
+        "scopeId": "string",
+        "actions": "read | create | update | delete []",
+        "startDate": "string",
+        "endDate": "string",
+        "status": "active | revoked | expired",
+        "grantedBy": "string",
+        "createdAt": "Date",
+        "updatedAt": "Date"
+      }
+    },
+    {
+      "name": "event_record",
+      "description": "纪事主表，正文与元信息；图片必须放到 event_image。",
+      "indexes": [
+        ["organizationId", "status", "eventDate"],
+        ["organizationAncestorIds", "status", "eventDate"],
+        ["eventMonth", "status"],
+        ["category", "status"],
+        ["creatorId", "createdAt"]
+      ],
+      "fields": {
+        "id": "string",
+        "areaId": "string",
+        "teamId": "string | null",
+        "title": "string",
+        "content": "string",
+        "summary": "string",
+        "organizationId": "string",
+        "organizationAncestorIds": "string[]",
+        "category": "string",
+        "categoryId": "string",
+        "positionId": "string",
+        "archiveId": "string",
+        "keywords": "string[]",
+        "eventDate": "string",
+        "eventMonth": "string",
+        "location": "string",
+        "creatorId": "string",
+        "ownerName": "string",
+        "status": "draft | pending_review | published | rejected | archived",
+        "visibility": "private | organization | public",
+        "viewCount": "number",
+        "imageCount": "number",
+        "createdAt": "Date",
+        "updatedAt": "Date",
+        "publishedAt": "Date | null",
+        "deletedAt": "Date | null"
+      }
+    },
+    {
+      "name": "event_image",
+      "description": "纪事图片表，兼容微信云存储和未来 OSS。",
+      "indexes": [
+        ["eventId", "sortOrder"],
+        ["organizationId", "createdAt"],
+        ["provider", "status"]
+      ],
+      "fields": {
+        "id": "string",
+        "eventId": "string",
+        "organizationId": "string",
+        "provider": "wechat_cloud | aliyun_oss",
+        "fileId": "string",
+        "imageUrl": "string",
+        "objectKey": "string",
+        "width": "number",
+        "height": "number",
+        "size": "number",
+        "sortOrder": "number",
+        "status": "active | deleted",
+        "createdBy": "string",
+        "createdAt": "Date",
+        "deletedAt": "Date | null"
+      }
+    },
+    {
+      "name": "todo",
+      "description": "协作区与服务队待办，本月完成后保留，archiveMonth 到达后进入历史事件。",
+      "indexes": [
+        ["organizationId", "month", "status"],
+        ["positionId", "status", "date"],
+        ["archiveMonth", "status"]
+      ],
+      "fields": {
+        "id": "string",
+        "areaId": "string",
+        "teamId": "string | null",
+        "organizationId": "string",
+        "positionId": "string",
+        "title": "string",
+        "type": "string",
+        "date": "string",
+        "month": "string",
+        "status": "pending | completed | overdue",
+        "description": "string",
+        "completedAt": "Date | null",
+        "completedBy": "string | null",
+        "archiveMonth": "string",
+        "createdBy": "string",
+        "createdAt": "Date",
+        "updatedAt": "Date"
+      }
+    },
+    {
+      "name": "ledger_record",
+      "description": "账目公开读取，写操作仅管理员或当前有效司库授权人。",
+      "indexes": [
+        ["organizationId", "date"],
+        ["organizationId", "type", "date"],
+        ["createdBy", "createdAt"]
+      ],
+      "fields": {
+        "id": "string",
+        "areaId": "string",
+        "teamId": "string | null",
+        "organizationId": "string",
+        "positionId": "string",
+        "title": "string",
+        "type": "income | expense | asset | other",
+        "amount": "number",
+        "description": "string",
+        "date": "string",
+        "createdBy": "string",
+        "createdAt": "Date",
+        "updatedAt": "Date",
+        "deletedAt": "Date | null"
+      }
+    },
+    {
+      "name": "operation_log",
+      "description": "操作日志，所有新增、修改、删除、审核、授权都由云函数写入。",
+      "indexes": [
+        ["organizationId", "createdAt"],
+        ["userId", "createdAt"],
+        ["targetType", "targetId"],
+        ["action", "createdAt"]
+      ],
+      "fields": {
+        "id": "string",
+        "userId": "string",
+        "organizationId": "string",
+        "action": "create | update | delete | review | login | grant_role | revoke_role | grant_permission | revoke_permission | update_profile",
+        "targetType": "string",
+        "targetId": "string",
+        "before": "object | null",
+        "after": "object | null",
+        "ip": "string",
+        "userAgent": "string",
+        "createdAt": "Date"
+      }
+    },
+    {
+      "name": "honor_record",
+      "description": "远航服务队荣誉达成记录；按组织、岗位、指标和任期隔离。",
+      "indexes": [
+        ["organizationId", "term", "status", "date"],
+        ["organizationId", "ruleId", "status", "value"],
+        ["positionId", "status", "date"]
+      ],
+      "fields": {
+        "id": "string",
+        "organizationId": "string",
+        "term": "string",
+        "ruleId": "string",
+        "positionId": "string",
+        "ruleName": "string",
+        "metric": "string",
+        "unit": "string",
+        "recipient": "string",
+        "value": "number",
+        "date": "string",
+        "note": "string",
+        "status": "active | deleted",
+        "createdBy": "string",
+        "createdByName": "string",
+        "createdAt": "Date",
+        "updatedAt": "Date",
+        "deletedAt": "Date | null"
+      }
+    }
+  ]
+}

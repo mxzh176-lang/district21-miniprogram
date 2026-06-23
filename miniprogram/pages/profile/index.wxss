@@ -96,6 +96,8 @@
 .menu-icon.blue { background: #346b8c; }
 .menu-icon.knowledge { background: linear-gradient(145deg, #7b46c5, #2779c8); }
 .menu-icon.assistant { background: linear-gradient(145deg, #c35ef0, #267dd5); font-family: sans-serif; font-size: 20rpx; font-weight: 800; }
+
+.reconnect-button { margin: 18rpx 0; color: #fff; background: linear-gradient(135deg, #a15be8, #377ddd); }
 .ai-card{border-color:rgba(123,228,255,.25)}
 
 .menu-copy {

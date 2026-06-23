@@ -14,7 +14,7 @@ Page({
     if (!member) return
     const type = options.type === 'history' ? 'history' : 'notice'
     this.setData({ type, id: options.id || '' })
-    wx.setNavigationBarTitle({ title: type === 'notice' ? '编辑公告' : '编辑历史记录' })
+    wx.setNavigationBarTitle({ title: type === 'notice' ? '编辑内部公告' : '编辑内部历史记录' })
     if (options.id) {
       const form = await api.call('getContent', { type, id: options.id })
       this.setData({ form })

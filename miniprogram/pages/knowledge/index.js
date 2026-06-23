@@ -52,9 +52,5 @@ Page({
       data: url,
       success: () => wx.showToast({ title: '官方链接已复制', icon: 'success' })
     })
-  },
-
-  goAssistant() {
-    wx.navigateTo({ url: '/pages/assistant/index' })
   }
 })

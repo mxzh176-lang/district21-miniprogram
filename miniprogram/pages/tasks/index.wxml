@@ -2,7 +2,7 @@
   <view class="task-hero">
     <view>
       <view class="hero-kicker">MONTHLY PLAN</view>
-      <view class="hero-title">六月协作待办</view>
+    <view class="hero-title">{{monthLabel}}协作待办</view>
       <view class="hero-desc">完成后自动进入历史事件与对应档案</view>
     </view>
     <view class="hero-actions">
@@ -17,7 +17,7 @@
   <view class="calendar-card">
     <view class="calendar-head">
       <view>
-        <view class="calendar-title">六月事项日期</view>
+        <view class="calendar-title">{{monthLabel}}事项日期</view>
         <view class="calendar-subtitle">只显示有待办事项的日期</view>
       </view>
       <view class="today">{{taskDates.length}}个日期</view>
@@ -50,15 +50,15 @@
   </view>
 
   <view wx:if="{{tasks.length}}">
-    <view class="task-card {{item.status === 'done' ? 'done' : ''}}" wx:for="{{tasks}}" wx:key="_id" data-id="{{item._id}}" bindtap="openTask">
+    <view class="task-card {{item.completed ? 'done' : ''}}" wx:for="{{tasks}}" wx:key="_id" data-id="{{item._id}}" bindtap="openTask">
       <view class="date-column">
         <view class="day">{{item.day}}</view>
-        <view class="month">JUN</view>
+        <view class="month">{{item.monthShort}}</view>
       </view>
       <view class="task-body">
         <view class="task-heading">
           <view class="tag">{{item.category}}</view>
-          <view class="state">{{item.status === 'done' ? '已完成' : '待完成'}}</view>
+          <view class="state">{{item.completed ? '已完成' : '待完成'}}</view>
         </view>
         <view class="title">{{item.title}}</view>
         <view class="description">{{item.description}}</view>
@@ -69,8 +69,8 @@
         <view class="organization-label">{{item.team}}</view>
       </view>
       <view class="check-wrap" data-id="{{item._id}}" catchtap="completeTask">
-        <view class="check-box {{item.status === 'done' ? 'checked' : ''}}">
-          <text wx:if="{{item.status === 'done'}}">✓</text>
+        <view class="check-box {{item.completed ? 'checked' : ''}} {{item.canComplete ? '' : 'disabled'}}">
+          <text wx:if="{{item.completed}}">✓</text>
         </view>
       </view>
     </view>

@@ -1,8 +1,10 @@
 const api = require('../../utils/api')
+const permission = require('../../utils/permission')
 
 Page({
   data: {
-    selectedMonth: '2026-06',
+    selectedMonth: '',
+    monthLabel: '',
     selectedDay: 'all',
     status: 'all',
     category: 'all',
@@ -16,7 +18,10 @@ Page({
   },
 
   onLoad(options) {
+    const selectedMonth = new Date().toISOString().slice(0, 7)
     this.setData({
+      selectedMonth,
+      monthLabel: `${Number(selectedMonth.slice(5, 7))}月`,
       category: options.category || 'all',
       teamId: options.teamId || 'all'
     })
@@ -24,7 +29,8 @@ Page({
 
   async onShow() {
     const session = await api.call('getSession')
-    this.setData({ canEdit: ['superadmin', 'admin', 'editor'].includes(session.role) })
+    this.setData({ canEdit: permission.canPerform(session, 'tasks', 'update') || permission.canPerform(session, 'tasks', 'create') })
+    this.session = session
     await this.loadDates()
     await this.loadTasks()
   },
@@ -60,9 +66,14 @@ Page({
       teamId: this.data.teamId
     })
     this.setData({
-      tasks: data.tasks,
+      tasks: data.tasks.map(item => ({
+        ...item,
+        monthShort: String(item.month || '').slice(5, 7),
+        completed: ['done', 'completed'].includes(item.status),
+        canComplete: permission.canCompleteTodo(this.session, item)
+      })),
       categories: data.categories,
-      doneCount: monthData.tasks.filter(item => item.status === 'done').length,
+      doneCount: monthData.tasks.filter(item => ['done', 'completed'].includes(item.status)).length,
       totalCount: monthData.tasks.length
     })
   },
@@ -89,7 +100,11 @@ Page({
   async completeTask(event) {
     const id = event.currentTarget.dataset.id
     const task = this.data.tasks.find(item => item._id === id)
-    if (!task || task.status === 'done') return
+    if (!task || task.completed) return
+    if (!task.canComplete) {
+      wx.showToast({ title: '仅创建人、岗位负责人或管理员可完成', icon: 'none' })
+      return
+    }
     const confirmed = await new Promise(resolve => {
       wx.showModal({
         title: '完成待办',

@@ -1,17 +1,20 @@
 const api = require('../../../utils/api')
+const permission = require('../../../utils/permission')
 
 Page({
-  data: { id: '', entry: {}, photos: [], canEdit: false },
+  data: { id: '', entry: {}, photos: [], canEdit: false, canDelete: false },
 
   onLoad(options) {
     this.setData({ id: options.id || 'ar-1' })
   },
 
   async onShow() {
-    const [entry, session] = await Promise.all([
+    const [entry, session, organizations] = await Promise.all([
       api.call('getArchiveEntry', { id: this.data.id }),
-      api.call('getSession')
+      api.call('getSession'),
+      api.call('listArchives')
     ])
+    const organization = organizations.find(item => item.id === entry.organizationId)
     const photos = (entry.photos || []).map((url, index) => ({
       id: `${entry._id}-${index}`,
       url,
@@ -23,7 +26,8 @@ Page({
         keywordText: (entry.keywords || []).join(' · ')
       },
       photos,
-      canEdit: ['superadmin', 'admin', 'editor'].includes(session.role)
+      canEdit: permission.canMaintainArchive(session, organization, entry.categoryId, 'update'),
+      canDelete: permission.canMaintainArchive(session, organization, entry.categoryId, 'delete')
     })
     wx.setNavigationBarTitle({ title: entry.title })
   },
@@ -50,9 +54,13 @@ Page({
       confirmColor: '#d94f65',
       success: async result => {
         if (!result.confirm) return
-        await api.call('deleteArchiveEntry', { id: this.data.id })
-        wx.showToast({ title: '已删除', icon: 'success' })
-        setTimeout(() => wx.navigateBack(), 600)
+        try {
+          await api.call('deleteArchiveEntry', { id: this.data.id })
+          wx.showToast({ title: '已删除', icon: 'success' })
+          setTimeout(() => wx.navigateBack(), 600)
+        } catch (error) {
+          api.showError(error)
+        }
       }
     })
   }

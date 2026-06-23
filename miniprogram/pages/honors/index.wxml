@@ -1,0 +1,40 @@
+<view class="page honor-page">
+  <view class="honor-hero">
+    <view class="hero-kicker">YUAN HANG · HONOR SYSTEM</view>
+    <view class="honor-title">荣誉与表彰</view>
+    <view class="honor-purpose">付出的人需要被看见</view>
+    <view class="hero-metric"><view><view class="overall">{{overall}}%</view><view class="overall-label">卓越目标平均进度</view></view><view class="version"><text>V{{version}}</text><text>{{term}}</text></view></view>
+    <view class="goal-row"><text>本年度 优秀</text><text>下一年度 杰出</text><text>三年目标 卓越</text></view>
+  </view>
+
+  <view class="level-grid">
+    <view class="level-cell good"><text class="strong">{{counts.good}}</text><text>达到优秀</text></view>
+    <view class="level-cell great"><text class="strong">{{counts.great}}</text><text>达到杰出</text></view>
+    <view class="level-cell excellent"><text class="strong">{{counts.excellent}}</text><text>达到卓越</text></view>
+  </view>
+
+  <view class="hint">每两次例会普及目标与标准 · 点击委员会查看完整规则</view>
+
+  <block wx:for="{{groups}}" wx:key="id" wx:for-item="group">
+    <view class="group-head"><view><text class="strong">{{group.name}}</text><text>{{group.leader}}</text></view></view>
+    <view class="rule-card" wx:for="{{group.items}}" wx:key="id" wx:for-item="rule" data-id="{{rule.id}}" bindtap="toggle">
+      <view class="rule-top"><view><view class="rule-name">{{rule.name}}</view><view class="chair">主席 / 负责人：{{rule.chair}}</view></view><view class="level-tag {{rule.levelKey}}">{{rule.levelName}}</view></view>
+      <view class="metric-row"><text>{{rule.metric}}</text><text class="strong">{{rule.displayValue}}</text></view>
+      <view class="bar"><view class="bar-fill {{rule.levelKey}}" style="width: {{rule.progress}}%"></view></view>
+      <view class="next">{{rule.nextLabel}}<text>{{expandedId === rule.id ? '⌃' : '⌄'}}</text></view>
+      <view class="detail" wx:if="{{expandedId === rule.id}}">
+        <text class="strong">履职要求</text><text>{{rule.requirement}}</text>
+        <view class="threshold-row"><view><text class="small">优秀</text><text class="strong">{{rule.thresholds.good}}{{rule.unit}}</text></view><view><text class="small">杰出</text><text class="strong">{{rule.thresholds.great}}{{rule.unit}}</text></view><view><text class="small">卓越</text><text class="strong">{{rule.thresholds.excellent}}{{rule.unit}}</text></view></view>
+        <text class="strong">主席 / 岗位表彰</text><text wx:for="{{rule.chairRules}}" wx:key="*this">• {{item}}</text>
+        <block wx:if="{{rule.memberRules.length}}"><text class="strong">狮友表彰</text><text wx:for="{{rule.memberRules}}" wx:key="*this">• {{item}}</text></block>
+      </view>
+    </view>
+  </block>
+
+  <view class="recent-head" wx:if="{{records.length}}">最近录入</view>
+  <view class="record-row" wx:for="{{records}}" wx:key="id">
+    <view class="record-date">{{item.dateShort}}</view><view class="record-main"><text class="strong">{{item.recipient}}</text><text>{{item.ruleName}} · {{item.note || '达成数据更新'}}</text></view><view class="record-value">{{item.valueLabel}}</view>
+  </view>
+  <view class="bottom-space" wx:if="{{canCreate}}"></view>
+  <view class="action-bar" wx:if="{{canCreate}}"><view><text class="strong">已获荣誉录入权限</text><text>写操作由云端再次鉴权</text></view><button bindtap="createRecord">＋ 录入达成</button></view>
+</view>

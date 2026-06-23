@@ -1,4 +1,5 @@
 const api = require('../../utils/api')
+const permission = require('../../utils/permission')
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
 
@@ -27,7 +28,7 @@ Page({
     this.setData({
       members,
       teams: teams.slice(1),
-      canManage: ['superadmin', 'admin'].includes(session.role)
+      canManage: permission.canPerform(session, 'contacts', 'update') || permission.canPerform(session, 'contacts', 'create')
     })
     this.applyFilter()
   },

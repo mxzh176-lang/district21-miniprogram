@@ -1,4 +1,5 @@
 const api = require('../../utils/api')
+const permission = require('../../utils/permission')
 
 Page({
   data: {
@@ -31,7 +32,7 @@ Page({
       events: sorted,
       filteredEvents: sorted.slice(0, 50),
       teams,
-      canEdit: ['superadmin', 'admin', 'editor'].includes(member.role)
+      canEdit: permission.canPerform(member, 'history', 'update') || permission.canPerform(member, 'history', 'delete')
     })
   },
 

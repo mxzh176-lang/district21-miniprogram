@@ -1,5 +1,5 @@
 const api = require('../../../utils/api')
-const auth = require('../../../utils/auth')
+const permission = require('../../../utils/permission')
 
 Page({
   data: {
@@ -35,8 +35,14 @@ Page({
   },
 
   async onLoad(options) {
-    const member = await auth.requireApproved({ editor: true })
-    if (!member) return
+    const member = await api.call('getSession')
+    const action = options.id ? 'update' : 'create'
+    if (!permission.canPerform(member, 'tasks', action)) {
+      wx.showToast({ title: '当前账号没有待办管理权限', icon: 'none' })
+      setTimeout(() => wx.navigateBack(), 600)
+      return
+    }
+    this.session = member
     if (options.id) {
       this.setData({ id: options.id })
       await this.loadTask()
@@ -151,7 +157,10 @@ Page({
     try {
       await api.call('saveTask', {
         id: this.data.id,
-        task: this.data.form
+        task: {
+          ...this.data.form,
+          createdBy: this.data.form.createdBy || (this.session && (this.session.id || this.session._id))
+        }
       })
       wx.showToast({ title: '保存成功', icon: 'success' })
       setTimeout(() => wx.navigateBack(), 500)

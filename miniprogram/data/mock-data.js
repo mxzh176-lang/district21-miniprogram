@@ -44,43 +44,59 @@ const members = [
 const archiveCategories = [
   {
     id: 'captain',
-    name: '队长档案',
+    name: '队长',
+    person: '张明星',
     icon: '队',
-    role: '队长：张明星',
+    role: '队长——张明星',
     count: 1,
     desc: '统筹远航服务队年度方向、重要嘉许和队务推进'
   },
   {
     id: 'first-vp',
-    name: '第一副队长档案',
+    name: '第一副队长',
+    person: '张芳',
     icon: '一',
-    role: '第一副队长：张芳',
+    role: '第一副队长——张芳',
     count: 3,
     desc: '会员与保留、领导力培训、对外交流',
-    children: ['会员与保留委员会主席：大奇', '领导力培训委员会主席：姗姗', '对外交流委员会主席：丙刚']
+    children: [
+      { id: 'member-retention', name: '会员与保留委员会', person: '大奇', role: '会员与保留委员会主席——大奇' },
+      { id: 'leadership-training', name: '领导力培训委员会', person: '姗姗', role: '领导力培训委员会主席——姗姗' },
+      { id: 'external-exchange', name: '对外交流委员会', person: '丙刚', role: '对外交流委员会主席——丙刚' }
+    ]
   },
   {
     id: 'second-vp',
-    name: '第二副队长档案',
+    name: '第二副队长',
+    person: '双龙',
     icon: '二',
-    role: '第二副队长：双龙',
+    role: '第二副队长——双龙',
     count: 3,
     desc: '服务与计划、新闻宣传、筹款与计划',
-    children: ['服务与计划委员会主席：景辉', '新闻宣传委员会主席：建鑫', '筹款与计划委员会主席：珊珊']
+    children: [
+      { id: 'service-plan', name: '服务与计划委员会', person: '景辉', role: '服务与计划委员会主席——景辉' },
+      { id: 'news-publicity', name: '新闻宣传委员会', person: '建鑫', role: '新闻宣传委员会主席——建鑫' },
+      { id: 'fundraising-plan', name: '筹款与计划委员会', person: '珊珊', role: '筹款与计划委员会主席——珊珊' }
+    ]
   },
   {
     id: 'third-vp',
-    name: '第三副队长档案',
+    name: '第三副队长',
+    person: '媛媛',
     icon: '三',
-    role: '第三副队长：媛媛',
+    role: '第三副队长——媛媛',
     count: 3,
     desc: '关爱、联谊、年会',
-    children: ['关爱委员会主席：潘阳阳', '联谊委员会主席：雪峰', '年会主席：泉宏']
+    children: [
+      { id: 'care-committee', name: '关爱委员会', person: '潘阳阳', role: '关爱委员会主席——潘阳阳' },
+      { id: 'fellowship-committee', name: '联谊委员会', person: '雪峰', role: '联谊委员会主席——雪峰' },
+      { id: 'annual-meeting', name: '年会委员会', person: '泉宏', role: '年会主席——泉宏' }
+    ]
   },
-  { id: 'secretary', name: '秘书档案', icon: '秘', role: '秘书：玲玲', count: 1, desc: '会议纪要、通知、队务文字资料' },
-  { id: 'tamer', name: '纠察档案', icon: '纠', role: '纠察：振锋', count: 1, desc: '会场秩序、礼仪流程、纪律执行' },
-  { id: 'treasurer', name: '司库档案', icon: '库', role: '司库：文强', count: 1, restricted: true, desc: '账目、收支、物资价值记录' },
-  { id: 'admin', name: '总务档案', icon: '务', role: '总务：腾飞', count: 1, desc: '物资、场地、后勤、车辆与清单管理' }
+  { id: 'secretary', name: '秘书', person: '玲玲', icon: '秘', role: '秘书——玲玲', count: 1, desc: '会议纪要、通知、队务文字资料' },
+  { id: 'tamer', name: '纠察', person: '振锋', icon: '纠', role: '纠察——振锋', count: 1, desc: '会场秩序、礼仪流程、纪律执行' },
+  { id: 'treasurer', name: '司库', person: '文强', icon: '库', role: '司库——文强', count: 1, restricted: true, desc: '账目、收支、物资价值记录' },
+  { id: 'admin', name: '总务', person: '腾飞', icon: '务', role: '总务——腾飞', count: 1, desc: '物资、场地、后勤、车辆与清单管理' }
 ]
 
 const archiveOrganizations = [{
@@ -91,7 +107,7 @@ const archiveOrganizations = [{
   members: 32,
   seal: '远',
   captain: '张明星',
-  description: '远航服务队队长：张明星；一二三副队长与四大金刚共 8 个岗位档案',
+  description: '远航服务队队长——张明星；一二三副队长与秘书、纠察、司库、总务共 8 个主栏目',
   photoCount: 3,
   categories: archiveCategories
 }]

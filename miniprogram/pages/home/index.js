@@ -1,4 +1,5 @@
 const api = require('../../utils/api')
+const permission = require('../../utils/permission')
 
 Page({
   data: {
@@ -11,7 +12,10 @@ Page({
     banners: [],
     heroSlides: [],
     selectedTeamId: 'all',
-    allTasks: []
+    allTasks: [],
+    completedTasks: [],
+    allCompletedTasks: [],
+    canCreateTask: false
   },
 
   async onShow() {
@@ -40,12 +44,27 @@ Page({
   },
 
   async loadHome() {
-    const data = await api.call('getHome')
-    const tasks = data.tasks || []
+    const [data, session] = await Promise.all([
+      api.call('getHome'),
+      api.call('getSession')
+    ])
+    const tasks = (data.tasks || []).map(item => ({
+      ...item,
+      displayMonth: `${Number(String(item.month || '').slice(5, 7)) || ''}月`,
+      canComplete: permission.canCompleteTodo(session, item)
+    }))
+    const completedTasks = (data.completedTasks || []).map(item => ({
+      ...item,
+      displayMonth: `${Number(String(item.month || '').slice(5, 7)) || ''}月`,
+      canComplete: false
+    }))
     this.setData({
       ...data,
       heroSlides: this.buildHeroSlides(data.banners || []),
-      allTasks: tasks
+      allTasks: tasks,
+      completedTasks,
+      allCompletedTasks: completedTasks,
+      canCreateTask: permission.canPerform(session, 'tasks', 'create')
     })
   },
 
@@ -53,12 +72,35 @@ Page({
     wx.navigateTo({ url: '/pages/tasks/index' })
   },
 
+  createTask() {
+    wx.navigateTo({ url: '/pages/admin/task-edit/index' })
+  },
+
   selectTeam(event) {
     const selectedTeamId = event.currentTarget.dataset.id
     const tasks = selectedTeamId === 'all'
       ? this.data.allTasks
       : this.data.allTasks.filter(item => item.teamId === selectedTeamId)
-    this.setData({ selectedTeamId, tasks })
+    const completedTasks = selectedTeamId === 'all'
+      ? this.data.allCompletedTasks
+      : this.data.allCompletedTasks.filter(item => item.teamId === selectedTeamId)
+    this.setData({ selectedTeamId, tasks, completedTasks })
+  },
+
+  async completeTask(event) {
+    const id = event.currentTarget.dataset.id
+    const task = this.data.tasks.find(item => item._id === id)
+    if (!task || !task.canComplete) {
+      wx.showToast({ title: '仅创建人、岗位负责人或管理员可完成', icon: 'none' })
+      return
+    }
+    try {
+      await api.call('completeTask', { id })
+      wx.showToast({ title: '已完成并归档', icon: 'success' })
+      await this.loadHome()
+    } catch (error) {
+      api.showError(error)
+    }
   },
 
   goContacts() {
@@ -91,5 +133,9 @@ Page({
 
   goStructure() {
     wx.navigateTo({ url: '/pages/structure/index' })
+  },
+
+  goHonors() {
+    wx.navigateTo({ url: '/pages/honors/index' })
   }
 })

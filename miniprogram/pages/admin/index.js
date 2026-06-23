@@ -1,4 +1,6 @@
 const api = require('../../utils/api')
+const permission = require('../../utils/permission')
+const auth = require('../../utils/auth')
 
 Page({
   data: {
@@ -24,6 +26,8 @@ Page({
   },
 
   async onShow() {
+    const approved = await auth.requireApproved({ admin: true })
+    if (!approved) return
     const [stats, appointments, adminMembers, adminCandidates, session] = await Promise.all([
       api.call('getAdminStats'),
       api.call('listAppointments'),
@@ -37,7 +41,7 @@ Page({
       adminMembers: adminMembers.map(item => this.withPermissionFlags(item)),
       adminCandidates,
       candidateIndex: 0,
-      canAddAdmin: session.role === 'superadmin'
+      canAddAdmin: permission.isSuperAdmin(session)
     })
   },
 
@@ -50,6 +54,18 @@ Page({
 
   goLogs() {
     wx.navigateTo({ url: '/pages/admin/logs/index' })
+  },
+
+  goRoleAssignments() {
+    wx.navigateTo({ url: '/pages/admin/role-assignments/index' })
+  },
+
+  goUserRoles() {
+    wx.navigateTo({ url: '/pages/admin/user-roles/index' })
+  },
+
+  goPermissionGrants() {
+    wx.navigateTo({ url: '/pages/admin/permission-grants/index' })
   },
 
   async changePermissions(event) {
@@ -88,9 +104,10 @@ Page({
     })
     if (!confirmed) return
     await api.call('setMemberRole', { id: candidate._id, role: role.value })
-    const permissions = role.value === 'admin'
-      ? this.data.permissionOptions.map(item => item.value)
-      : ['archives', 'photos', 'notices']
+    const permissions = permission.defaultMenuPermissions(
+      role.value,
+      this.data.permissionOptions.map(item => item.value)
+    )
     await api.call('saveAdminPermissions', { id: candidate._id, permissions })
     wx.showToast({ title: '管理员已添加', icon: 'success' })
     await this.onShow()
@@ -114,16 +131,7 @@ Page({
   },
 
   withPermissionFlags(item) {
-    const permissions = item.permissions || []
-    return {
-      ...item,
-      roleLabel: item.role === 'admin' ? '管理员' : '内容管理员',
-      canTasks: permissions.includes('tasks'),
-      canArchives: permissions.includes('archives'),
-      canContacts: permissions.includes('contacts'),
-      canPhotos: permissions.includes('photos'),
-      canNotices: permissions.includes('notices')
-    }
+    return permission.decorateAdminMember(item)
   },
 
   goTasks() { wx.navigateTo({ url: '/pages/tasks/index' }) },

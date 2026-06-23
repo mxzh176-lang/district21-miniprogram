@@ -1,0 +1,43 @@
+<view class="page">
+  <view class="role-hero">
+    <view class="hero-kicker">ACCESS CONTROL</view>
+    <view class="hero-title">用户与管理员</view>
+    <view class="hero-desc">用户先用自己的微信打开一次小程序，再由超级管理员设置管理范围。</view>
+  </view>
+
+  <view class="steps-card">
+    <view>1. 对方微信打开小程序</view>
+    <view>2. 在“我的”复制账号编号</view>
+    <view>3. 在此选择用户、角色和组织</view>
+    <view>4. 保存后重新进入小程序生效</view>
+  </view>
+
+  <view class="form-card">
+    <view class="label">选择用户</view>
+    <picker range="{{users}}" range-key="displayName" value="{{userIndex}}" bindchange="onUserChange">
+      <view class="picker-value">{{users.length ? users[userIndex].displayName : '暂无用户，请让对方先打开小程序'}}</view>
+    </picker>
+    <view class="label">成员编号</view>
+    <input class="picker-value" maxlength="30" value="{{memberCode}}" bindinput="onMemberCodeInput" placeholder="例如 YH-001" />
+    <button class="save-button secondary" disabled="{{!users.length}}" bindtap="saveMemberCode">保存成员编号</button>
+    <view class="label">选择角色</view>
+    <picker range="{{roleOptions}}" range-key="label" value="{{roleIndex}}" bindchange="onRoleChange">
+      <view class="picker-value">{{roleOptions[roleIndex].label}}</view>
+    </picker>
+    <view class="label">管理范围</view>
+    <picker range="{{organizations}}" range-key="name" value="{{organizationIndex}}" bindchange="onOrganizationChange">
+      <view class="picker-value">{{organizations.length ? organizations[organizationIndex].name : '暂无组织'}}</view>
+    </picker>
+    <button class="save-button" disabled="{{!users.length || !organizations.length}}" bindtap="saveRole">保存管理员角色</button>
+  </view>
+
+  <view class="section-title">当前管理员角色</view>
+  <view class="role-card" wx:for="{{roles}}" wx:key="id">
+    <view class="role-copy">
+      <view class="user-name">{{item.userName}}</view>
+      <view class="role-name">{{item.roleLabel}} · {{item.organizationName}}</view>
+    </view>
+    <view class="revoke" data-id="{{item.id}}" bindtap="revokeRole">取消</view>
+  </view>
+  <view wx:if="{{!roles.length}}" class="empty">暂无管理员角色。</view>
+</view>

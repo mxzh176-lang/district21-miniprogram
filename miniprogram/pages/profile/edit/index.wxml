@@ -1,0 +1,27 @@
+<view class="page">
+  <view class="identity-hero">
+    <view class="hero-kicker">INTERNAL IDENTITY</view>
+    <view class="hero-title">完善内部身份资料</view>
+    <view class="hero-desc">资料仅用于协作区内部辨认和权限分配，不是微信实名认证，也不会公开展示。</view>
+  </view>
+
+  <view class="notice-card">
+    <view class="notice-title">填写说明</view>
+    <view>请填写狮友常用真实姓名并选择所属服务队。管理员会根据姓名、服务队和账号尾号核对身份。</view>
+  </view>
+
+  <view class="form-card">
+    <view class="field-label">姓名</view>
+    <input class="input" maxlength="30" value="{{name}}" bindinput="onNameInput" placeholder="例如：大奇" />
+
+    <view class="field-label">所属协作区或服务队</view>
+    <picker range="{{organizations}}" range-key="name" value="{{organizationIndex}}" bindchange="onOrganizationChange">
+      <view class="picker-value">{{organizations.length ? organizations[organizationIndex].name : '暂无组织数据'}}</view>
+    </picker>
+
+    <view class="account-row"><text>账号尾号</text><text>{{accountSuffix}}</text></view>
+    <button class="save-button" loading="{{saving}}" disabled="{{saving || !organizations.length}}" bindtap="save">提交内部资料</button>
+  </view>
+
+  <view class="privacy-note">不要求上传身份证、证件照片或人脸信息。请勿在姓名栏填写手机号、身份证号等敏感信息。</view>
+</view>

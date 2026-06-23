@@ -1,4 +1,5 @@
 const api = require('../../../utils/api')
+const permission = require('../../../utils/permission')
 
 const CATEGORY_NAMES = {
   main: '记事本总目录',
@@ -43,7 +44,7 @@ Page({
       categoryId: options.category || 'service',
       organizationName: organization.name,
       categoryName: CATEGORY_NAMES[options.category] || '档案事件',
-      canImport: member.role === 'superadmin'
+      canImport: permission.isSuperAdmin(member)
     })
   },
 
@@ -86,7 +87,7 @@ Page({
   importDrafts() {
     wx.showModal({
       title: '导入为草稿',
-      content: '系统不会自动公开。导入后需逐条检查日期、标题、文字、照片和所属服务队。',
+      content: '系统不会自动归档。导入后需逐条检查日期、标题、文字、附件和所属服务队。',
       confirmText: '确认导入',
       success: async (result) => {
         if (!result.confirm) return
@@ -111,7 +112,7 @@ Page({
             tone: 'gold',
             keywords: ['Word导入', '待核对'],
             summary: '由 Word 识别生成的事件草稿，等待管理员核对。',
-            content: '请核对原 Word 中的日期、正文、图片及所属服务队后再人工发布。'
+            content: '请核对原 Word 中的日期、正文、附件及所属服务队后再人工归档。'
           }))
         })
         wx.showToast({ title: '草稿已导入', icon: 'success' })

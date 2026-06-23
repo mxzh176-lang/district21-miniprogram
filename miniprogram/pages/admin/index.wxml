@@ -1,7 +1,7 @@
 <view class="page">
   <view class="admin-hero">
-    <view class="hero-kicker">MANAGEMENT DEMO</view>
-    <view class="hero-title">协作区管理后台</view>
+    <view class="hero-kicker">INTERNAL MANAGEMENT</view>
+    <view class="hero-title">协作区权限中心</view>
     <view class="hero-desc">四队共用数据，按届次与岗位分配权限</view>
   </view>
 
@@ -25,7 +25,7 @@
 
   <view class="section-row">
     <view class="section-title">2026—2027年度岗位</view>
-    <view class="small-link">管理岗位 ›</view>
+    <view class="small-link" bindtap="goRoleAssignments">管理岗位 ›</view>
   </view>
   <view class="appointment-card" wx:for="{{appointments}}" wx:key="position">
     <view class="position-icon">{{index + 1}}</view>
@@ -38,6 +38,8 @@
 
   <view class="section-title">页面内容管理</view>
   <view class="manage-grid">
+    <view class="manage-item" bindtap="goUserRoles"><view class="manage-icon blue">权</view><view>用户与管理员</view><text>设置管理范围</text></view>
+    <view class="manage-item" bindtap="goPermissionGrants"><view class="manage-icon blue">授</view><view>人员精细授权</view><text>模块、范围和任期</text></view>
     <view class="manage-item" bindtap="goTasks"><view class="manage-icon green">待</view><view>待办与服务</view><text>修改事项</text></view>
     <view class="manage-item" bindtap="goArchives"><view class="manage-icon red">档</view><view>档案与照片</view><text>编辑排序</text></view>
     <view class="manage-item" bindtap="goContacts"><view class="manage-icon gold">员</view><view>人员与企业</view><text>头像资料</text></view>

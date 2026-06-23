@@ -1,0 +1,49 @@
+<view class="page" wx:if="{{allowed}}">
+  <view class="role-hero">
+    <view class="hero-kicker">ANNUAL AUTHORIZATION</view>
+    <view class="hero-title">年度岗位授权</view>
+    <view class="hero-desc">负责人按组织、岗位和任期授权；到期自动失效。</view>
+  </view>
+
+  <view class="setup-card" wx:if="{{setupRequired}}">
+    <view class="setup-title">岗位数据尚未初始化</view>
+    <view class="setup-desc">请先在云开发中创建 position 和 role_assignment 集合，再执行初始化。</view>
+    <button class="primary-button" bindtap="initializePositions">初始化岗位</button>
+  </view>
+
+  <view class="form-card" wx:if="{{organizations.length}}">
+    <view class="field-label">选择协作区或服务队</view>
+    <picker range="{{organizations}}" range-key="name" value="{{organizationIndex}}" bindchange="onOrganizationChange">
+      <view class="picker-value">{{organizations[organizationIndex].name}}</view>
+    </picker>
+
+    <view class="field-label">选择岗位</view>
+    <picker range="{{positions}}" range-key="name" value="{{positionIndex}}" bindchange="onPositionChange">
+      <view class="picker-value">{{positions.length ? positions[positionIndex].name : '请先初始化岗位'}}</view>
+    </picker>
+
+    <view class="field-label">选择负责人</view>
+    <picker range="{{users}}" range-key="displayName" value="{{userIndex}}" bindchange="onUserChange">
+      <view class="picker-value">{{users.length ? users[userIndex].displayName : '暂无可授权用户'}}</view>
+    </picker>
+
+    <view class="date-row">
+      <view class="date-field">
+        <view class="field-label">开始时间</view>
+        <picker mode="date" value="{{startDate}}" bindchange="onStartDateChange"><view class="picker-value">{{startDate}}</view></picker>
+      </view>
+      <view class="date-field">
+        <view class="field-label">结束时间</view>
+        <picker mode="date" value="{{endDate}}" bindchange="onEndDateChange"><view class="picker-value">{{endDate}}</view></picker>
+      </view>
+    </view>
+    <button class="primary-button" disabled="{{!positions.length || !users.length}}" bindtap="saveAssignment">保存岗位授权</button>
+  </view>
+
+  <view class="section-title">当前岗位授权</view>
+  <view class="assignment-card" wx:for="{{assignments}}" wx:key="id">
+    <view><view class="assignment-position">{{item.positionName}}</view><view class="assignment-user">{{item.userName}}</view></view>
+    <view class="assignment-term">{{item.startDate}} 至 {{item.endDate}}</view>
+  </view>
+  <view class="empty" wx:if="{{!assignments.length}}">当前组织暂无岗位授权。</view>
+</view>

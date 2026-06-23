@@ -1,7 +1,7 @@
 <view class="page">
   <view class="archive-hero">
     <view class="hero-kicker">ARCHIVE DIRECTORY</view>
-    <view class="hero-title">让爱有迹可寻</view>
+    <view class="hero-title">让狮爱有迹可循</view>
     <view class="hero-desc">岗位人员直接填写内容，保存后自动形成历史事件</view>
   </view>
 
@@ -27,10 +27,10 @@
       <view class="organization-name">{{selectedOrganization.name}}</view>
       <view class="organization-desc">{{selectedOrganization.description}}</view>
     </view>
-    <view class="cloud-inline" bindtap="uploadPhotos">
+    <view wx:if="{{canManage}}" class="cloud-inline" bindtap="uploadPhotos">
       <view class="photo-kicker">照片云盘</view>
       <view class="photo-count-inline">{{selectedOrganization.photoCount}} 张</view>
-      <view class="upload-button">上传</view>
+      <view class="upload-button">内部附件</view>
     </view>
   </view>
 
@@ -50,24 +50,30 @@
       data-restricted="{{item.restricted}}"
       bindtap="addContent"
     >
-      <view class="category-icon">{{item.icon}}</view>
-      <view class="category-name">{{item.name}}</view>
-      <view class="category-role">{{item.role}}</view>
-      <view class="category-desc">{{item.desc}}</view>
-      <view wx:if="{{item.children && item.children.length}}" class="expand-line" data-id="{{item.id}}" catchtap="toggleCategory">
-        {{expandedCategories[item.id] ? '收起委员' : '展开委员'}}
+      <view class="category-heading">
+        <view class="category-name">{{item.name}}</view>
+        <view class="category-person">{{item.person}}</view>
       </view>
-      <view wx:if="{{expandedCategories[item.id]}}" class="committee-list">
-        <view class="committee-item" wx:for="{{item.children}}" wx:key="*this">{{item}}</view>
+      <view wx:if="{{item.children && item.children.length}}" class="committee-list">
+        <view
+          class="committee-item compact"
+          wx:for="{{item.children}}"
+          wx:key="id"
+          data-category="{{item.id}}"
+          catchtap="openSubArchive"
+        >
+          <view>
+            <view class="committee-name">{{item.name}}</view>
+            <view class="committee-role">{{item.person}}</view>
+          </view>
+          <view class="committee-arrow">›</view>
+        </view>
       </view>
       <view class="category-footer">
         <text>{{item.count}}条</text>
-        <text>{{item.restricted ? '受限' : '填写 ›'}}</text>
+        <text>{{item.canMaintain ? '填写 ›' : '查看 ›'}}</text>
       </view>
-      <view class="sort-actions" wx:if="{{canManage}}">
-        <text data-index="{{index}}" data-direction="up" catchtap="moveCategory">上移</text>
-        <text data-index="{{index}}" data-direction="down" catchtap="moveCategory">下移</text>
-      </view>
+      <view wx:if="{{item.id === 'treasurer'}}" class="ledger-note">账目公开透明，所有成员可查看；仅管理员和司库可维护。</view>
     </view>
   </view>
 </view>

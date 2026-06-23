@@ -2,7 +2,7 @@
   <view class="card form">
     <view class="field">
       <text class="field-label">事项名称</text>
-      <input class="input" value="{{form.title}}" data-key="title" bindinput="input" placeholder="例如：圆梦助学活动" />
+      <input class="input task-input" value="{{form.title}}" data-key="title" bindinput="input" placeholder="例如：圆梦助学活动" placeholder-class="form-placeholder" cursor-color="#7be4ff" always-embed="{{true}}" />
     </view>
     <view class="field">
       <text class="field-label">月份</text>
@@ -12,7 +12,7 @@
     </view>
     <view class="field">
       <text class="field-label">日期</text>
-      <input class="input" value="{{form.day}}" data-key="day" bindinput="input" placeholder="例如：14" type="number" />
+      <input class="input task-input" value="{{form.day}}" data-key="day" bindinput="input" placeholder="例如：14" placeholder-class="form-placeholder" cursor-color="#7be4ff" always-embed="{{true}}" type="number" />
     </view>
     <view class="field">
       <text class="field-label">档案分类模板</text>
@@ -22,15 +22,15 @@
     </view>
     <view class="field">
       <text class="field-label">展示类别</text>
-      <input class="input" value="{{form.category}}" data-key="category" bindinput="input" placeholder="公益服务、会议纪要、对外交流等" />
+      <input class="input task-input" value="{{form.category}}" data-key="category" bindinput="input" placeholder="公益服务、会议纪要、对外交流等" placeholder-class="form-placeholder" cursor-color="#7be4ff" always-embed="{{true}}" />
     </view>
     <view class="field">
       <text class="field-label">负责人</text>
-      <input class="input" value="{{form.owner}}" data-key="owner" bindinput="input" placeholder="负责人姓名" />
+      <input class="input task-input" value="{{form.owner}}" data-key="owner" bindinput="input" placeholder="负责人姓名" placeholder-class="form-placeholder" cursor-color="#7be4ff" always-embed="{{true}}" />
     </view>
     <view class="field">
       <text class="field-label">地点</text>
-      <input class="input" value="{{form.location}}" data-key="location" bindinput="input" placeholder="活动或会议地点" />
+      <input class="input task-input" value="{{form.location}}" data-key="location" bindinput="input" placeholder="活动或会议地点" placeholder-class="form-placeholder" cursor-color="#7be4ff" always-embed="{{true}}" />
     </view>
     <view class="field">
       <text class="field-label">状态</text>
@@ -40,7 +40,7 @@
     </view>
     <view class="field">
       <text class="field-label">详细说明</text>
-      <textarea class="textarea" value="{{form.description}}" data-key="description" bindinput="input" placeholder="时间、地点和注意事项"></textarea>
+      <textarea class="textarea task-textarea" value="{{form.description}}" data-key="description" bindinput="input" placeholder="时间、地点和注意事项" placeholder-class="form-placeholder" cursor-color="#7be4ff" always-embed="{{true}}"></textarea>
     </view>
     <button class="secondary-button" bindtap="generateDraft">按分类生成嘉许模板</button>
     <button class="primary-button" bindtap="save" loading="{{saving}}">保存</button>

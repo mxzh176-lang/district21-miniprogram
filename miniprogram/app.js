@@ -1,15 +1,16 @@
+const api = require('./utils/api')
+
 App({
   globalData: {
     member: null,
-    demoMode: true
+    cloudMode: true,
+    cloudEnvId: 'cloud1-d6ghj5dev32a15a81'
   },
 
   onLaunch() {
-    wx.setStorageSync('district21-demo-version', '1.0.0')
-    if (wx.cloud) {
-      try {
-        wx.cloud.init({ traceUser: true })
-      } catch (error) {}
-    }
+    wx.setStorageSync('district21-app-version', '1.0.0')
+    try {
+      api.initialize({ env: this.globalData.cloudEnvId, traceUser: true })
+    } catch (error) {}
   }
 })

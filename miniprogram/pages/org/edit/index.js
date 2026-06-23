@@ -1,4 +1,5 @@
 const api = require('../../../utils/api')
+const permission = require('../../../utils/permission')
 
 const SURNAME_LETTERS = {
   安: 'A', 白: 'B', 陈: 'C', 崔: 'C', 丁: 'D', 董: 'D', 付: 'F', 冯: 'F',
@@ -37,7 +38,9 @@ Page({
     this.setData({
       id: options.id || '',
       teams: serviceTeams,
-      canManage: ['superadmin', 'admin'].includes(session.role)
+      canManage: permission.canPerform(session, 'contacts', options.id ? 'update' : 'create', {
+        organizationId: serviceTeams[0] && (serviceTeams[0].cloudId || serviceTeams[0].id)
+      })
     })
     if (options.id) {
       const result = await api.call('getMember', { id: options.id })

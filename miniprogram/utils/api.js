@@ -1,5 +1,11 @@
 const data = require('../data/mock-data')
 const knowledgeBase = require('../data/knowledge-base')
+const platformService = require('../services/platform-service')
+const organizationService = require('../services/organization-service')
+const eventService = require('../services/event-service')
+const userService = require('../services/user-service')
+const honorService = require('../services/honor-service')
+const permission = require('./permission')
 
 let importedDataCache = null
 function importedData() {
@@ -8,11 +14,11 @@ function importedData() {
 }
 
 const demoMember = {
-  _id: 'demo-admin',
-  nickname: '演示管理员',
+  _id: 'readonly-guest',
+  nickname: '未授权访客',
   avatarUrl: '',
-  status: 'approved',
-  role: 'superadmin',
+  status: 'readonly',
+  role: 'member',
   team: '二十一协作区',
   term: '2026—2027年度'
 }
@@ -57,12 +63,50 @@ function saveLocalTasks(tasks) {
   wx.setStorageSync('demoTasks', tasks)
 }
 
+function getLocalLedgerRecords() {
+  try {
+    return wx.getStorageSync('demoLedgerRecords') || []
+  } catch (error) {
+    return []
+  }
+}
+
+function saveLocalLedgerRecords(records) {
+  wx.setStorageSync('demoLedgerRecords', records)
+}
+
 function allTasks() {
   const tasks = {}
   data.tasks.concat(getLocalTasks()).forEach(item => {
     tasks[item._id] = item
   })
   return Object.values(tasks)
+}
+
+function isTaskCompleted(task) {
+  return ['done', 'completed'].includes(task.status)
+}
+
+function effectiveTaskStatus(task) {
+  if (isTaskCompleted(task) || task.status === 'deleted') return task.status
+  const fullDate = `${task.month || ''}-${String(task.day || '').padStart(2, '0')}`
+  return fullDate.length === 10 && fullDate < new Date().toISOString().slice(0, 10)
+    ? 'overdue'
+    : 'pending'
+}
+
+function nextMonth(month) {
+  const [year, value] = String(month || '').split('-').map(Number)
+  if (!year || !value) return ''
+  const date = new Date(year, value, 1)
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+}
+
+function completedTaskHistoryEntries() {
+  const currentMonth = new Date().toISOString().slice(0, 7)
+  return allTasks()
+    .filter(task => isTaskCompleted(task) && task.archiveMonth && task.archiveMonth <= currentMonth)
+    .map(task => buildArchiveDraftFromTask(task, 'published'))
 }
 
 function dateLabel(date) {
@@ -75,12 +119,149 @@ function allArchiveEntries() {
   const imported = importedData()
   const orders = getArchiveOrders()
   const hidden = wx.getStorageSync('hiddenArchiveEntries') || []
-  return imported.archiveEntries.concat(getLocalArchiveEntries())
+  return imported.archiveEntries.concat(getLocalArchiveEntries(), completedTaskHistoryEntries())
     .filter(item => !hidden.includes(item._id))
     .map((item, index) => ({
       ...item,
       order: orders[item._id] === undefined ? index : orders[item._id]
     }))
+}
+
+const MAIN_POSITION_ORDER = ['captain', 'secretary', 'tamer', 'treasurer', 'admin', 'first-vp', 'second-vp', 'third-vp']
+const TOP_POSITION_ORDER = ['captain', 'first-vp', 'second-vp', 'third-vp']
+const CAPTAIN_CHILD_IDS = ['secretary', 'tamer', 'treasurer', 'admin']
+const POSITION_META = {
+  captain: { name: '队长', icon: '队', match: '队长' },
+  secretary: { name: '秘书', icon: '秘', match: '秘书' },
+  tamer: { name: '纠察', icon: '纠', match: '纠察' },
+  treasurer: { name: '司库', icon: '库', match: '司库', restricted: true },
+  admin: { name: '总务', icon: '务', match: '总务' },
+  'first-vp': { name: '第一副队长', icon: '一', match: '第一副队长' },
+  'second-vp': { name: '第二副队长', icon: '二', match: '第二副队长' },
+  'third-vp': { name: '第三副队长', icon: '三', match: '第三副队长' }
+}
+const COMMITTEE_GROUPS = {
+  'first-vp': ['会员', '领导力', '对外交流'],
+  'second-vp': ['服务', '公共关系', '新闻宣传', '筹款'],
+  'third-vp': ['关爱', '联谊', '年会']
+}
+
+function cleanPositionName(name) {
+  return String(name || '')
+    .replace(/^狮友/, '')
+    .replace(/委员会副主席$/, '委员会副主席')
+    .replace(/委员会主席$/, '委员会')
+    .replace(/主席$/, '')
+}
+
+function nestCaptainChildren(categories) {
+  const categoryMap = {}
+  categories.forEach(category => { categoryMap[category.id] = category })
+  if (categoryMap.captain) {
+    categoryMap.captain = {
+      ...categoryMap.captain,
+      children: CAPTAIN_CHILD_IDS
+        .map(id => categoryMap[id])
+        .filter(Boolean)
+        .map(item => ({ ...item, children: undefined, compact: true }))
+    }
+  }
+  return TOP_POSITION_ORDER.map(id => categoryMap[id]).filter(Boolean)
+}
+
+function buildTeamCategories(team) {
+  const roles = team.roles || []
+  const categories = MAIN_POSITION_ORDER.map(id => {
+    const meta = POSITION_META[id]
+    const assignment = id === 'captain'
+      ? { person: team.leader }
+      : roles.find(item => item.position === meta.match)
+    const keywords = COMMITTEE_GROUPS[id] || []
+    const children = roles
+      .filter(item => keywords.some(keyword => item.position.includes(keyword)))
+      .map((item, index) => ({
+        id: `${id}-committee-${index + 1}`,
+        name: cleanPositionName(item.position),
+        person: item.person || '待授权'
+      }))
+    return {
+      id,
+      positionId: `${team.id || ''}:${id}`,
+      name: meta.name,
+      person: assignment && assignment.person ? assignment.person : '待授权',
+      icon: meta.icon,
+      restricted: Boolean(meta.restricted),
+      children
+    }
+  })
+  return nestCaptainChildren(categories)
+}
+
+function buildAreaCategories(term) {
+  const roles = term.district || []
+  const definitions = [
+    ['area-chair', '区域主席', '区执委会主席', '区'],
+    ['area-coordinator', '区域协调长', '协调长', '协'],
+    ['secretary-general', '秘书长', '秘书长', '秘'],
+    ['finance-chief', '财务长', '财务长', '财'],
+    ['gmt', 'GMT', 'GMT', 'G'],
+    ['glt', 'GLT', 'GLT', 'L'],
+    ['gst', 'GST', 'GST', 'S'],
+    ['marketing', '营销宣传', '宣传', '宣'],
+    ['membership', '会员发展', '会员', '会'],
+    ['service-development', '服务发展', '服务', '服'],
+    ['area-other', '其他协作区岗位', '', '其']
+  ]
+  return definitions.map(([id, name, keyword, icon]) => {
+    const assignment = keyword && roles.find(item => item.position.includes(keyword))
+    return { id, positionId: `district:${id}`, name, person: assignment ? assignment.person : '待授权', icon, children: [] }
+  })
+}
+
+function buildArchiveOrganizations() {
+  const term = data.structureTerms[0] || { district: [], teams: [] }
+  const teamMap = {}
+  ;(term.teams || []).forEach(team => { teamMap[team.name] = team })
+  return data.teams.map(organization => {
+    if (organization.id === 'district') {
+      return {
+        ...organization,
+        seal: '区',
+        description: '协作区独立岗位与历史资料空间',
+        photoCount: 0,
+        categories: buildAreaCategories(term)
+      }
+    }
+    const team = teamMap[organization.name] || { name: organization.name, roles: [] }
+    team.id = organization.id
+    const confirmedYuanhang = organization.id === 'yuanhang' && data.archiveOrganizations[0]
+      ? nestCaptainChildren(data.archiveOrganizations[0].categories
+        .slice()
+        .sort((a, b) => MAIN_POSITION_ORDER.indexOf(a.id) - MAIN_POSITION_ORDER.indexOf(b.id))
+        .map(category => ({
+          id: category.id,
+          positionId: `${organization.id}:${category.id}`,
+          name: category.name,
+          person: category.person,
+          icon: category.icon,
+          restricted: Boolean(category.restricted),
+          children: (category.children || []).map(child => ({
+            id: child.id,
+            positionId: `${organization.id}:${child.id}`,
+            name: child.name,
+            person: child.person
+          }))
+        })))
+      : null
+    return {
+      ...organization,
+      seal: organization.shortName.slice(0, 1),
+      captain: confirmedYuanhang ? '张明星' : team.leader || '待授权',
+      description: `${organization.name}独立岗位与历史资料空间`,
+      photoCount: 0,
+      categories: confirmedYuanhang || buildTeamCategories(team)
+    }
+  })
 }
 
 function getLocalMembers() {
@@ -233,80 +414,32 @@ function buildArchiveDraftFromTask(task, status = 'published') {
 
 function archiveOrganizationsCategory(categoryId) {
   const org = data.archiveOrganizations.find(item => item.id === 'yuanhang') || data.archiveOrganizations[0]
-  return org && org.categories ? org.categories.find(item => item.id === categoryId) : null
+  if (!org || !org.categories) return null
+  for (const category of org.categories) {
+    if (category.id === categoryId) return category
+    const child = (category.children || []).find(item => item.id === categoryId)
+    if (child) return child
+  }
+  return null
 }
 
-function knowledgeScore(item, question) {
-  const text = `${item.title}${item.summary}${item.content.join('')}${item.keywords.join('')}`.toLowerCase()
-  const normalized = question.toLowerCase().replace(/[，。？！、\s]/g, '')
-  let score = text.includes(normalized) ? 20 : 0
-  item.keywords.forEach(keyword => {
-    if (question.includes(keyword) || keyword.includes(question)) score += 8
-  })
-  for (let index = 0; index < normalized.length - 1; index += 1) {
-    if (text.includes(normalized.slice(index, index + 2))) score += 1
-  }
-  return score
-}
-
-function cleanAssistantQuestion(value) {
-  return String(value || '').trim().slice(0, 300)
-}
-
-function localAssistantAnswer(question) {
-  if (!question) {
-    return {
-      answer: '请输入你想了解的问题，例如“中国狮子联会章程在哪里查看？”',
-      sources: [],
-      context: [],
-      mode: 'knowledge'
-    }
-  }
-  const sensitiveWords = ['电话', '手机号', '财务明细', '关爱详情', '家庭住址', '身份证']
-  if (sensitiveWords.some(word => question.includes(word))) {
-    return {
-      answer: '这类内容可能涉及成员或服务对象隐私，我不能在 AI 对话中直接展示。请由有权限的管理员进入通讯录或档案页面查看，并遵守内部资料保护要求。',
-      sources: [],
-      context: [],
-      mode: 'privacy'
-    }
-  }
-  const ranked = knowledgeBase.items
-    .map(item => ({ item, score: knowledgeScore(item, question) }))
-    .sort((a, b) => b.score - a.score)
-  const matched = ranked.filter(result => result.score > 0).slice(0, 3).map(result => result.item)
-  const selected = matched.length ? matched : knowledgeBase.items.slice(0, 2)
-  const answer = selected.length === 1
-    ? `${selected[0].title}\n\n${selected[0].content.join('\n')}\n\n具体制度和最新表述请以所列官方来源为准。`
-    : `我在知识库中找到以下相关内容：\n\n${selected.map((item, index) => `${index + 1}. ${item.title}：${item.summary}`).join('\n')}\n\n你可以继续追问其中一项，我会根据知识库进一步说明。`
-  return {
-    answer,
-    sources: selected.map(item => ({
-      title: item.title,
-      sourceName: item.sourceName,
-      sourceUrl: item.sourceUrl
-    })),
-    context: selected.map(item => ({
-      title: item.title,
-      content: item.content,
-      sourceName: item.sourceName,
-      sourceUrl: item.sourceUrl
-    })),
-    mode: 'knowledge'
-  }
-}
-
-function call(action, payload = {}) {
+function localCall(action, payload = {}) {
   let result
   switch (action) {
     case 'getSession':
       result = demoMember
       break
     case 'getHome':
-      const visibleHomeTasks = allTasks().filter(item => item.status !== 'deleted' && (item.status === 'pending' || item.month === '2026-06'))
+      const currentMonth = new Date().toISOString().slice(0, 7)
+      const visibleHomeTasks = allTasks().filter(item => item.status !== 'deleted' && item.month === currentMonth)
+      const pendingHomeTasks = visibleHomeTasks.filter(item => !isTaskCompleted(item))
+      const doneHomeTasks = visibleHomeTasks.filter(isTaskCompleted)
       result = {
-        summary: { pendingCount: visibleHomeTasks.filter(item => item.status !== 'done').length, doneCount: visibleHomeTasks.filter(item => item.status === 'done').length, memberCount: 120, photoCount: 3 },
-        tasks: visibleHomeTasks.slice(0, 4),
+        currentMonth,
+        monthLabel: `${Number(currentMonth.slice(5, 7))}月`,
+        summary: { pendingCount: pendingHomeTasks.length, doneCount: doneHomeTasks.length, memberCount: 120, photoCount: 3 },
+        tasks: pendingHomeTasks.slice(0, 4),
+        completedTasks: doneHomeTasks.slice(0, 4),
         careOverview: { birthdayCount: 8, careCount: 2 },
         notices: data.notices,
         activities: data.activities.slice(0, 3),
@@ -321,16 +454,18 @@ function call(action, payload = {}) {
       }
       break
     case 'listTasks': {
-      const tasks = allTasks().filter(item => {
+      const tasks = allTasks().map(item => ({ ...item, status: effectiveTaskStatus(item) })).filter(item => {
         if (item.status === 'deleted') return false
         const monthMatch = !payload.month || payload.month === 'all' || item.month === payload.month
-        const statusMatch = !payload.status || payload.status === 'all' || item.status === payload.status
+        const statusMatch = !payload.status || payload.status === 'all' ||
+          (payload.status === 'done' ? isTaskCompleted(item) : item.status === payload.status)
         const categoryMatch = !payload.category || payload.category === 'all' || item.category === payload.category
         const dayMatch = !payload.day || payload.day === 'all' || item.day === payload.day
         const teamMatch = !payload.teamId || payload.teamId === 'all' || item.teamId === payload.teamId
         return monthMatch && statusMatch && categoryMatch && dayMatch && teamMatch
       })
-      result = { tasks, months: [{ value: '2026-06', label: '2026年6月' }], categories: ['公益服务', '会议纪要', '对外交流', '狮友关爱', '聚会联谊', '会员发展', '新闻宣传', '司库账目', '总务后勤'] }
+      const selectedMonth = payload.month && payload.month !== 'all' ? payload.month : new Date().toISOString().slice(0, 7)
+      result = { tasks, months: [{ value: selectedMonth, label: `${selectedMonth.slice(0, 4)}年${Number(selectedMonth.slice(5, 7))}月` }], categories: ['公益服务', '会议纪要', '对外交流', '狮友关爱', '聚会联谊', '会员发展', '新闻宣传', '司库账目', '总务后勤'] }
       break
     }
     case 'listActivities':
@@ -349,10 +484,18 @@ function call(action, payload = {}) {
       break
     case 'listArchives':
       const entriesForCount = allArchiveEntries()
-      result = data.archiveOrganizations.map(organization => ({
+      result = buildArchiveOrganizations().map(organization => ({
         ...organization,
         categories: organization.categories.map(category => ({
           ...category,
+          children: (category.children || []).map(child => ({
+            ...child,
+            count: entriesForCount.filter(item =>
+              item.organizationId === organization.id &&
+              item.categoryId === child.id &&
+              item.status === 'published'
+            ).length
+          })),
           count: entriesForCount.filter(item =>
             item.organizationId === organization.id &&
             item.categoryId === category.id &&
@@ -360,6 +503,33 @@ function call(action, payload = {}) {
           ).length
         }))
       }))
+      break
+    case 'listPositions': {
+      const organizations = buildArchiveOrganizations()
+      const organization = organizations.find(item =>
+        item.id === payload.organizationId || item.cloudId === payload.organizationId
+      )
+      result = (organization && organization.categories || []).flatMap(category => [
+        { id: category.positionId || category.id, organizationId: organization.id, code: category.id, name: category.name, sortOrder: 0 },
+        ...(category.children || []).map(child => ({
+          id: child.positionId || child.id,
+          organizationId: organization.id,
+          code: child.id,
+          name: child.name,
+          parentPositionId: category.positionId || category.id,
+          sortOrder: 0
+        }))
+      ])
+      break
+    }
+    case 'listRoleAssignments':
+      result = []
+      break
+    case 'listPlatformUsers':
+      result = allMembers().map(item => ({ id: item._id, name: item.name, defaultOrganizationId: item.teamId }))
+      break
+    case 'listUserRoles':
+      result = []
       break
     case 'listArchiveEntries':
       result = allArchiveEntries()
@@ -369,6 +539,30 @@ function call(action, payload = {}) {
           return organizationMatch && categoryMatch
         })
         .map(archiveListItem)
+      break
+    case 'listLedgerRecords':
+      result = getLocalLedgerRecords()
+        .filter(item => !payload.organizationId || item.organizationId === payload.organizationId)
+        .sort((a, b) => String(b.date).localeCompare(String(a.date)))
+      break
+    case 'saveLedgerRecord': {
+      const records = getLocalLedgerRecords()
+      const record = {
+        ...payload.record,
+        id: payload.record.id || `local-ledger-${Date.now()}`,
+        createdAt: payload.record.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+      const index = records.findIndex(item => item.id === record.id)
+      if (index >= 0) records[index] = record
+      else records.push(record)
+      saveLocalLedgerRecords(records)
+      result = record
+      break
+    }
+    case 'deleteLedgerRecord':
+      saveLocalLedgerRecords(getLocalLedgerRecords().filter(item => item.id !== payload.id))
+      result = true
       break
     case 'getArchiveEntry':
       result = findById(allArchiveEntries(), payload.id) || data.archiveEntries[0]
@@ -404,7 +598,14 @@ function call(action, payload = {}) {
         location: base.location || '',
         status: base.status || 'pending',
         priority: base.priority || 'normal',
-        description: base.description || ''
+        description: base.description || '',
+        positionId: base.positionId || base.categoryId || 'main',
+        organizationId: base.organizationId || base.teamId || 'district',
+        createdBy: base.createdBy || demoMember._id,
+        createdAt: base.createdAt || now.toISOString(),
+        completedAt: base.completedAt || null,
+        completedBy: base.completedBy || null,
+        archiveMonth: base.archiveMonth || ''
       }
       const index = tasks.findIndex(item => item._id === id)
       if (index >= 0) tasks[index] = task
@@ -431,19 +632,19 @@ function call(action, payload = {}) {
         result = false
         break
       }
-      task = { ...task, status: 'done', completedAt: new Date().toISOString() }
+      task = {
+        ...task,
+        status: 'completed',
+        completedAt: new Date().toISOString(),
+        completedBy: demoMember._id,
+        archiveMonth: nextMonth(task.month)
+      }
       const index = localTasks.findIndex(item => item._id === id)
       if (index >= 0) localTasks[index] = task
       else localTasks.push(task)
       saveLocalTasks(localTasks)
 
-      const entries = getLocalArchiveEntries()
-      const entry = buildArchiveDraftFromTask(task, 'published')
-      const entryIndex = entries.findIndex(item => item._id === entry._id)
-      if (entryIndex >= 0) entries[entryIndex] = entry
-      else entries.push(entry)
-      saveLocalArchiveEntries(entries)
-      result = { task, entry }
+      result = { task, entry: null }
       break
     }
     case 'deleteArchiveEntry': {
@@ -481,8 +682,8 @@ function call(action, payload = {}) {
       const member = findById(allMembers(), payload.id) || allMembers()[0]
       result = {
         member,
-        canViewContact: ['superadmin', 'admin'].includes(demoMember.role),
-        canManage: ['superadmin', 'admin'].includes(demoMember.role)
+        canViewContact: permission.canManage(demoMember),
+        canManage: permission.canManage(demoMember)
       }
       break
     }
@@ -509,7 +710,7 @@ function call(action, payload = {}) {
       const permissions = getAdminPermissions()
       const roles = getMemberRoles()
       result = allMembers()
-        .filter(item => ['admin', 'editor'].includes(roles[item._id] || item.role))
+        .filter(item => permission.isAdministrativeRoleValue(roles[item._id] || item.role))
         .map(item => ({
           ...item,
           role: roles[item._id] || item.role,
@@ -520,7 +721,7 @@ function call(action, payload = {}) {
     case 'listAdminCandidates': {
       const roles = getMemberRoles()
       result = allMembers()
-        .filter(item => !['admin', 'editor'].includes(roles[item._id] || item.role))
+        .filter(item => !permission.isAdministrativeRoleValue(roles[item._id] || item.role))
         .map(item => ({
           _id: item._id,
           name: item.name,
@@ -559,9 +760,6 @@ function call(action, payload = {}) {
     case 'getKnowledge':
       result = findById(knowledgeBase.items, payload.id) || {}
       break
-    case 'askAssistant':
-      result = localAssistantAnswer(cleanAssistantQuestion(payload.question))
-      break
     case 'getAdminStats':
       result = { taskCount: 6, orgCount: 8, activityCount: 6, memberCount: 120, photoCount: 1248, hasSeedData: true }
       break
@@ -581,13 +779,52 @@ function call(action, payload = {}) {
       result = findById(payload.type === 'history' ? data.history : data.notices, payload.id) || {}
       break
     default:
-      result = { id: payload.id || `demo-${Date.now()}`, demo: true }
+      result = { id: payload.id || `local-${Date.now()}`, local: true }
   }
   return new Promise(resolve => setTimeout(() => resolve(clone(result)), 60))
 }
 
-function showError(error) {
-  wx.showToast({ title: error && error.message ? error.message : '演示数据加载失败', icon: 'none' })
+function canFallbackToLocal(action) {
+  return [
+    'getSession',
+    'listOrganizations',
+    'listPositions',
+    'listRoleAssignments',
+    'listPlatformUsers',
+    'listUserRoles',
+    'listArchives',
+    'listTeams',
+    'listOrg',
+    'getOrg',
+    'getMember',
+    'listStructure',
+    'listArchiveEntries',
+    'listLedgerRecords',
+    'getArchiveEntry'
+  ].includes(action)
 }
 
-module.exports = { call, showError }
+async function call(action, payload = {}) {
+  const service = [organizationService, eventService, userService, honorService].find(item => item.handles(action))
+  if (!service) return localCall(action, payload)
+  try {
+    return await service.execute(action, payload, localCall)
+  } catch (error) {
+    if (canFallbackToLocal(action)) {
+      console.warn(`[cloud fallback] ${action}`, error)
+      return localCall(action, payload)
+    }
+    console.error(`[cloud write failed] ${action}`, error)
+    throw error
+  }
+}
+
+function initialize(options = {}) {
+  return platformService.initialize(options)
+}
+
+function showError(error) {
+  wx.showToast({ title: error && error.message ? error.message : '数据加载失败', icon: 'none' })
+}
+
+module.exports = { initialize, call, showError }

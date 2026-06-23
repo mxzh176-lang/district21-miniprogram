@@ -15,5 +15,5 @@
     </view>
   </view>
   <view wx:else class="empty">暂无公告，管理员可后续补充</view>
-  <button wx:if="{{canEdit}}" class="primary-button add" bindtap="createItem">发布公告</button>
+  <button wx:if="{{canEdit}}" class="primary-button add" bindtap="createItem">新增内部公告</button>
 </view>

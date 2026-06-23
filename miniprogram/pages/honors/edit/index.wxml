@@ -1,0 +1,21 @@
+<view class="page" wx:if="{{allowed}}">
+  <view class="form-hero"><view class="form-title">录入达成数据</view><view class="form-desc">提交后自动更新荣誉总览，其他狮友可查看达成情况。</view></view>
+  <view class="form-card">
+    <view class="label">岗位 / 委员会</view>
+    <picker mode="selector" range="{{ruleOptions}}" value="{{ruleIndex}}" bindchange="changeRule"><view class="picker-field">{{ruleOptions[ruleIndex]}}<text>⌄</text></view></picker>
+    <view class="label">达成指标</view>
+    <view class="metric-name">{{selectedRule.metric}}</view>
+    <view class="thresholds"><view><text>优秀</text><text class="strong">{{selectedRule.thresholds.good}}{{selectedRule.unit}}</text></view><view><text>杰出</text><text class="strong">{{selectedRule.thresholds.great}}{{selectedRule.unit}}</text></view><view><text>卓越</text><text class="strong">{{selectedRule.thresholds.excellent}}{{selectedRule.unit}}</text></view></view>
+    <view class="label">表彰对象</view>
+    <input class="input" placeholder-class="placeholder" cursor-color="#ffffff" placeholder="狮友姓名、主席或委员会" value="{{recipient}}" data-field="recipient" bindinput="bindField" />
+    <view class="label">当前累计值</view>
+    <view class="value-field"><input type="digit" placeholder-class="placeholder" cursor-color="#ffffff" placeholder="请输入数值" value="{{value}}" data-field="value" bindinput="bindField" /><text>{{selectedRule.unit}}</text></view>
+    <view class="help">填写截至当前的累计值，系统取该指标最高记录计算进度。</view>
+    <view class="label">发生日期</view>
+    <picker mode="date" value="{{date}}" bindchange="bindField" data-field="date"><view class="picker-field">{{date}}<text>⌄</text></view></picker>
+    <view class="label">情况说明</view>
+    <textarea class="textarea" placeholder-class="placeholder" cursor-color="#ffffff" maxlength="120" placeholder="活动名称、参与情况或数据来源" value="{{note}}" data-field="note" bindinput="bindField"></textarea>
+  </view>
+  <view class="requirement"><text class="strong">本岗位履职要求</text><text>{{selectedRule.requirement}}</text></view>
+  <button class="submit" loading="{{saving}}" disabled="{{saving}}" bindtap="submit">确认录入</button>
+</view>

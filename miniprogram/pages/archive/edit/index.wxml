@@ -8,7 +8,7 @@
       <view class="progress-line"></view>
       <view class="progress-item"><text>2</text><view>核对</view></view>
       <view class="progress-line"></view>
-      <view class="progress-item"><text>3</text><view>发布</view></view>
+      <view class="progress-item"><text>3</text><view>归档</view></view>
     </view>
   </view>
 
@@ -16,7 +16,7 @@
     <view class="tip-icon">✓</view>
     <view>
       <view class="tip-title">当前账号可以录入</view>
-      <view class="tip-text">AI 仅协助生成草稿，发布前请核对文字、照片和所属服务队。</view>
+      <view class="tip-text">仅当前有效岗位负责人可录入，归档前请核对文字、附件和所属服务队。</view>
     </view>
   </view>
   <view class="permission-tip denied" wx:else>
@@ -62,10 +62,10 @@
 
     <view class="form-section ai-section">
       <view class="section-heading">
-        <view class="section-number ai-number">AI</view>
+        <view class="section-number ai-number">模</view>
         <view>
-          <view class="section-title">AI 辅助整理</view>
-          <view class="section-desc">输入关键信息，自动生成摘要和详情草稿</view>
+          <view class="section-title">分类记录模板</view>
+          <view class="section-desc">根据档案类别填充固定格式，内容仍由负责人核对</view>
         </view>
       </view>
 
@@ -83,12 +83,12 @@
         </view>
       </view>
 
-      <button class="ai-button" bindtap="generateDraft">
-        <text class="ai-button-icon">AI</text>
-        <text>生成事件草稿</text>
+      <button class="ai-button" bindtap="applyTemplate">
+        <text class="ai-button-icon">模</text>
+        <text>套用分类记录模板</text>
       </button>
-      <view class="ai-note success" wx:if="{{aiGenerated}}">
-        草稿已生成，请继续检查和修改下方内容。
+      <view class="ai-note success" wx:if="{{templateApplied}}">
+        模板已填充，请继续检查和修改下方内容。
       </view>
     </view>
 
@@ -125,7 +125,7 @@
       <view class="section-heading">
         <view class="section-number">03</view>
         <view>
-          <view class="section-title">照片与发布信息</view>
+          <view class="section-title">附件与归档信息</view>
           <view class="section-desc">最多上传 9 张现场照片</view>
         </view>
       </view>
@@ -160,6 +160,6 @@
 
   <view class="footer-actions" wx:if="{{canEdit}}">
     <button class="draft-button" bindtap="saveDraft">保存草稿</button>
-    <button class="publish-button" bindtap="publish">确认并发布</button>
+    <button class="publish-button" bindtap="publish">确认并归档</button>
   </view>
 </view>

@@ -11,7 +11,7 @@
 
   <block wx:if="{{canImport}}">
     <view class="notice">
-      Word 将按“一件事一条档案”拆分，提取日期、标题、正文和图片。AI 只生成草稿，不会自动发布。
+      Word 将按“一件事一条档案”拆分，仅导入为内部草稿，不会自动归档。
     </view>
     <view class="upload-card">
       <text class="step-title">1. 选择 .docx 文件</text>
@@ -31,7 +31,7 @@
         <text class="draft-status">需人工核对</text>
       </view>
       <button class="import-button" bindtap="importDrafts">导入草稿箱</button>
-      <text class="final-note">逐条人工核对并发布后，内容才进入历史事件。</text>
+      <text class="final-note">逐条人工核对并归档后，内容才进入内部历史记录。</text>
     </view>
   </block>
 </view>

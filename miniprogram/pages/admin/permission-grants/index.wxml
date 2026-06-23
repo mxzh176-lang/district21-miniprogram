@@ -1,0 +1,68 @@
+<view class="page" wx:if="{{allowed}}">
+  <view class="grant-hero">
+    <view class="hero-kicker">GRANULAR ACCESS</view>
+    <view class="hero-title">人员精细授权</view>
+    <view class="hero-desc">权限可以重复并自动叠加。每条授权独立设置组织、模块、数据范围、操作和任期。</view>
+  </view>
+
+  <view class="setup-card" wx:if="{{setupRequired}}">
+    <view class="setup-title">需要创建 permission_grant 集合</view>
+    <view class="setup-desc">请在云开发控制台数据库中创建 permission_grant，然后重新部署 api 云函数。</view>
+  </view>
+
+  <view class="form-card" wx:if="{{!loading}}">
+    <view class="field-label">常用权限角色</view>
+    <picker range="{{rolePresets}}" range-key="label" value="{{rolePresetIndex}}" bindchange="onRolePresetChange">
+      <view class="picker-value">{{rolePresets[rolePresetIndex].label}}</view>
+    </picker>
+    <view class="field-label">授权给谁</view>
+    <picker range="{{users}}" range-key="displayName" value="{{userIndex}}" bindchange="onUserChange">
+      <view class="picker-value">{{users.length ? users[userIndex].displayName : '请让对方先用微信打开小程序'}}</view>
+    </picker>
+
+    <view class="field-label">所属组织</view>
+    <picker range="{{organizations}}" range-key="name" value="{{organizationIndex}}" bindchange="onOrganizationChange">
+      <view class="picker-value">{{organizations.length ? organizations[organizationIndex].name : '暂无组织'}}</view>
+    </picker>
+
+    <view class="field-label">管理模块</view>
+    <picker range="{{moduleOptions}}" range-key="label" value="{{moduleIndex}}" bindchange="onModuleChange">
+      <view class="picker-value">{{moduleOptions[moduleIndex].label}}</view>
+    </picker>
+
+    <view class="field-label">数据范围</view>
+    <picker range="{{scopeOptions}}" range-key="label" value="{{scopeIndex}}" bindchange="onScopeChange">
+      <view class="picker-value">{{scopeOptions[scopeIndex].label}}</view>
+    </picker>
+
+    <view wx:if="{{scopeOptions[scopeIndex].value === 'position' || scopeOptions[scopeIndex].value === 'position_tree'}}">
+      <view class="field-label">选择岗位</view>
+      <picker range="{{positions}}" range-key="name" value="{{positionIndex}}" bindchange="onPositionChange">
+        <view class="picker-value">{{positions.length ? positions[positionIndex].name : '当前组织暂无岗位'}}</view>
+      </picker>
+    </view>
+
+    <view class="field-label">允许的操作</view>
+    <checkbox-group class="action-grid" bindchange="onActionsChange">
+      <label wx:for="{{actionOptions}}" wx:key="value">
+        <checkbox value="{{item.value}}" checked="{{item.checked}}" color="#a15be8" />
+        <text>{{item.label}}</text>
+      </label>
+    </checkbox-group>
+
+    <view class="date-row">
+      <view class="date-field"><view class="field-label">开始日期</view><picker mode="date" value="{{startDate}}" bindchange="onStartDateChange"><view class="picker-value">{{startDate}}</view></picker></view>
+      <view class="date-field"><view class="field-label">结束日期</view><picker mode="date" value="{{endDate}}" bindchange="onEndDateChange"><view class="picker-value">{{endDate}}</view></picker></view>
+    </view>
+    <button class="save-button" disabled="{{!users.length || !organizations.length}}" bindtap="saveGrant">保存这条权限</button>
+  </view>
+
+  <view class="section-title">当前精细授权</view>
+  <view class="grant-card" wx:for="{{grants}}" wx:key="id">
+    <view class="grant-head"><view><view class="grant-user">{{item.userName}}</view><view class="grant-org">{{item.organizationName}}</view></view><view class="revoke" data-id="{{item.id}}" bindtap="revokeGrant">取消</view></view>
+    <view class="grant-summary">{{item.moduleLabel}} · {{item.scopeLabel}}</view>
+    <view class="grant-actions">{{item.actionLabel}}</view>
+    <view class="grant-term">{{item.startDate}} 至 {{item.endDate}}</view>
+  </view>
+  <view class="empty" wx:if="{{!loading && !grants.length}}">暂未设置精细权限。</view>
+</view>

@@ -1,0 +1,124 @@
+{
+  "organization": [
+    {
+      "id": "org_federation_china",
+      "name": "中国狮子联会",
+      "shortName": "中国狮子联会",
+      "type": "federation",
+      "parentId": null,
+      "ancestorIds": [],
+      "level": 0,
+      "pathName": "中国狮子联会",
+      "status": "active",
+      "sortOrder": 10
+    },
+    {
+      "id": "org_office_haerbin",
+      "name": "中国狮子联会哈尔滨代表处",
+      "shortName": "哈尔滨代表处",
+      "type": "office",
+      "parentId": "org_federation_china",
+      "ancestorIds": ["org_federation_china"],
+      "level": 1,
+      "pathName": "中国狮子联会/哈尔滨代表处",
+      "status": "active",
+      "sortOrder": 20
+    },
+    {
+      "id": "org_region_21_suihua",
+      "name": "第二十一协作区",
+      "shortName": "二十一协作区",
+      "type": "region",
+      "parentId": "org_office_haerbin",
+      "ancestorIds": ["org_federation_china", "org_office_haerbin"],
+      "level": 2,
+      "pathName": "中国狮子联会/哈尔滨代表处/第二十一协作区",
+      "status": "active",
+      "sortOrder": 30
+    },
+    {
+      "id": "org_team_linghang",
+      "name": "领航服务队",
+      "shortName": "领航",
+      "type": "team",
+      "parentId": "org_region_21_suihua",
+      "ancestorIds": ["org_federation_china", "org_office_haerbin", "org_region_21_suihua"],
+      "level": 3,
+      "pathName": "中国狮子联会/哈尔滨代表处/第二十一协作区/领航服务队",
+      "status": "active",
+      "sortOrder": 40
+    },
+    {
+      "id": "org_team_ailinghang",
+      "name": "爱领航服务队",
+      "shortName": "爱领航",
+      "type": "team",
+      "parentId": "org_region_21_suihua",
+      "ancestorIds": ["org_federation_china", "org_office_haerbin", "org_region_21_suihua"],
+      "level": 3,
+      "pathName": "中国狮子联会/哈尔滨代表处/第二十一协作区/爱领航服务队",
+      "status": "active",
+      "sortOrder": 50
+    },
+    {
+      "id": "org_team_yuanhang",
+      "name": "远航服务队",
+      "shortName": "远航",
+      "type": "team",
+      "parentId": "org_region_21_suihua",
+      "ancestorIds": ["org_federation_china", "org_office_haerbin", "org_region_21_suihua"],
+      "level": 3,
+      "pathName": "中国狮子联会/哈尔滨代表处/第二十一协作区/远航服务队",
+      "status": "active",
+      "sortOrder": 60
+    },
+    {
+      "id": "org_team_jingying",
+      "name": "精英服务队",
+      "shortName": "精英",
+      "type": "team",
+      "parentId": "org_region_21_suihua",
+      "ancestorIds": ["org_federation_china", "org_office_haerbin", "org_region_21_suihua"],
+      "level": 3,
+      "pathName": "中国狮子联会/哈尔滨代表处/第二十一协作区/精英服务队",
+      "status": "active",
+      "sortOrder": 70
+    }
+  ],
+  "event_record": [
+    {
+      "id": "event_demo_yuanhang_service_001",
+      "title": "景辉狮兄带领远航开展暖阳助学走访",
+      "content": "走访困难学生家庭，确认暑期助学物资与学习需求。",
+      "organizationId": "org_team_yuanhang",
+      "organizationAncestorIds": ["org_federation_china", "org_office_haerbin", "org_region_21_suihua"],
+      "category": "公益服务",
+      "eventDate": "2026-06-14",
+      "eventMonth": "2026-06",
+      "location": "绥化市北林区",
+      "creatorId": "",
+      "ownerName": "景辉",
+      "status": "published",
+      "visibility": "organization",
+      "viewCount": 0,
+      "imageCount": 0
+    },
+    {
+      "id": "event_demo_yuanhang_meeting_001",
+      "title": "玲玲狮姐组织召开远航服务队岗位交接会议",
+      "content": "确认新一届岗位任职、系统权限及资料交接。",
+      "organizationId": "org_team_yuanhang",
+      "organizationAncestorIds": ["org_federation_china", "org_office_haerbin", "org_region_21_suihua"],
+      "category": "会议纪要",
+      "eventDate": "2026-06-28",
+      "eventMonth": "2026-06",
+      "location": "远航会议室",
+      "creatorId": "",
+      "ownerName": "玲玲",
+      "status": "published",
+      "visibility": "organization",
+      "viewCount": 0,
+      "imageCount": 0
+    }
+  ]
+}

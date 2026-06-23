@@ -1,4 +1,5 @@
 const api = require('../../utils/api')
+const permission = require('../../utils/permission')
 
 Page({
   data: {
@@ -6,9 +7,9 @@ Page({
     selectedId: 'yuanhang',
     selectedOrganization: {},
     loading: true,
-    loadError: ''
-    ,canManage: false,
-    expandedCategories: {}
+    loadError: '',
+    canManage: false,
+    session: null
   },
 
   async onShow() {
@@ -19,7 +20,8 @@ Page({
       ])
       this.setData({
         organizations,
-        canManage: ['superadmin', 'admin'].includes(session.role),
+        session,
+        canManage: permission.canManage(session),
         loadError: ''
       })
       await this.selectOrganizationById(this.data.selectedId)
@@ -35,14 +37,48 @@ Page({
 
   async selectOrganizationById(id) {
     let selectedOrganization = this.data.organizations.find(item => item.id === id) || this.data.organizations[0] || {}
-    const categoryOrder = wx.getStorageSync(`archiveCategoryOrder:${id}`) || []
-    if (categoryOrder.length) {
-      selectedOrganization = {
-        ...selectedOrganization,
-        categories: selectedOrganization.categories.slice().sort((a, b) =>
-          categoryOrder.indexOf(a.id) - categoryOrder.indexOf(b.id)
-        )
-      }
+    const supportIds = ['secretary', 'tamer', 'treasurer', 'admin']
+    const sourceCategories = selectedOrganization.categories || []
+    const captainCategory = sourceCategories.find(item => item.id === 'captain') || {}
+    const supportMap = {}
+    ;(captainCategory.children || [])
+      .concat(sourceCategories.filter(item => supportIds.includes(item.id)))
+      .filter(item => supportIds.includes(item.id))
+      .forEach(item => { supportMap[item.id] = { ...item, compact: true } })
+    const supportCategories = supportIds.map(item => supportMap[item]).filter(Boolean)
+    const displayCategories = sourceCategories
+      .filter(item => !supportIds.includes(item.id))
+      .map(item => item.id === 'captain'
+        ? { ...item, children: supportCategories }
+        : item)
+    selectedOrganization = {
+      ...selectedOrganization,
+      categories: displayCategories.map(category => ({
+        ...category,
+        canMaintain: category.id === 'treasurer'
+          ? permission.canMaintainLedger(this.data.session, {
+            organizationId: selectedOrganization.id,
+            cloudOrganizationId: selectedOrganization.cloudId,
+            positionId: category.positionId || category.id,
+            person: category.person
+          })
+          : permission.canMaintainPosition(this.data.session, {
+            organizationId: selectedOrganization.id,
+            cloudOrganizationId: selectedOrganization.cloudId,
+            positionId: category.positionId || category.id,
+            person: category.person
+          }),
+        children: (category.children || []).map(child => ({
+          ...child,
+          canMaintain: permission.canMaintainPosition(this.data.session, {
+            organizationId: selectedOrganization.id,
+            cloudOrganizationId: selectedOrganization.cloudId,
+            positionId: child.positionId || child.id,
+            parentPositionId: category.positionId || category.id,
+            person: child.person
+          })
+        }))
+      }))
     }
     this.setData({
       selectedId: id,
@@ -54,36 +90,23 @@ Page({
 
   addContent(event) {
     const category = event.currentTarget.dataset.category
-    if (event.currentTarget.dataset.restricted) {
-      wx.showToast({ title: '仅司库和最高管理员可维护', icon: 'none' })
+    if (category === 'treasurer') {
+      wx.navigateTo({ url: `/pages/archive/ledger/index?organization=${this.data.selectedId}` })
       return
     }
     wx.navigateTo({ url: `/pages/archive/list/index?organization=${this.data.selectedId}&category=${category}` })
   },
 
-  toggleCategory(event) {
-    const id = event.currentTarget.dataset.id
-    this.setData({
-      [`expandedCategories.${id}`]: !this.data.expandedCategories[id]
-    })
+  openSubArchive(event) {
+    const category = event.currentTarget.dataset.category
+    if (category === 'treasurer') {
+      wx.navigateTo({ url: `/pages/archive/ledger/index?organization=${this.data.selectedId}` })
+      return
+    }
+    wx.navigateTo({ url: `/pages/archive/list/index?organization=${this.data.selectedId}&category=${category}` })
   },
 
   uploadPhotos() {
     wx.showToast({ title: '正式版将打开云照片上传', icon: 'none' })
-  },
-
-  moveCategory(event) {
-    const index = Number(event.currentTarget.dataset.index)
-    const direction = event.currentTarget.dataset.direction
-    const categories = this.data.selectedOrganization.categories.slice()
-    const target = direction === 'up' ? index - 1 : index + 1
-    if (target < 0 || target >= categories.length) return
-    ;[categories[index], categories[target]] = [categories[target], categories[index]]
-    const selectedOrganization = { ...this.data.selectedOrganization, categories }
-    const organizations = this.data.organizations.map(item =>
-      item.id === selectedOrganization.id ? selectedOrganization : item
-    )
-    this.setData({ selectedOrganization, organizations })
-    wx.setStorageSync(`archiveCategoryOrder:${selectedOrganization.id}`, categories.map(item => item.id))
   }
 })

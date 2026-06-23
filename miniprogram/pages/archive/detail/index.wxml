@@ -1,7 +1,7 @@
 <view class="page" wx:if="{{entry._id}}">
   <view class="detail-hero tone-{{entry.tone}}">
     <view class="detail-status">
-      {{entry.status === 'draft' ? '待人工确认草稿' : '已发布档案'}}
+      {{entry.status === 'draft' ? '待人工确认草稿' : '已归档记录'}}
     </view>
     <view class="detail-date">{{entry.dateLabel}}</view>
     <view class="detail-title">{{entry.title}}</view>
@@ -29,10 +29,10 @@
   </view>
 
   <view wx:if="{{entry.status === 'draft'}}" class="draft-note">
-    本内容由 Word 或 AI 生成，目前仅为草稿。管理员检查文字与照片后才能正式发布。
+    本内容由内部授权人员录入，目前仅为草稿。管理员核对文字与附件后才能归档。
   </view>
-  <view class="detail-actions" wx:if="{{canEdit}}">
-    <button bindtap="editEntry">编辑档案</button>
-    <button class="delete-button" bindtap="deleteEntry">删除档案</button>
+  <view class="detail-actions" wx:if="{{canEdit || canDelete}}">
+    <button wx:if="{{canEdit}}" bindtap="editEntry">编辑档案</button>
+    <button wx:if="{{canDelete}}" class="delete-button" bindtap="deleteEntry">删除档案</button>
   </view>
 </view>

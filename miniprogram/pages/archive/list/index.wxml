@@ -3,15 +3,16 @@
     <view class="hero-kicker">ARCHIVE EVENTS</view>
     <view class="hero-title">{{categoryName}}</view>
     <view class="hero-desc">{{organization.name}} · 一件事一条档案</view>
-    <view class="action-row" wx:if="{{canEdit}}">
+    <view class="action-row" wx:if="{{canCreate}}">
       <button class="add-button" bindtap="addEntry">＋ 新增事件</button>
       <button wx:if="{{isSuperAdmin}}" class="import-button" bindtap="importWord">导入 Word</button>
     </view>
   </view>
 
   <view class="permission-note">
-    <text wx:if="{{isSuperAdmin}}">只有最高管理员可批量导入 Word；岗位管理员可新增本栏目的单条事件。</text>
-    <text wx:elif="{{canEdit}}">你可以新增本栏目的事件，内容经人工确认后发布。</text>
+    <text wx:if="{{categoryId === 'treasurer'}}">账目公开透明，所有成员可查看；仅管理员和当前有效司库可维护。</text>
+    <text wx:elif="{{isSuperAdmin}}">只有最高管理员可批量导入 Word；岗位管理员可新增本栏目的单条事件。</text>
+    <text wx:elif="{{canEdit}}">你可以维护本岗位的内部记录，核对后归档。</text>
     <text wx:else>当前账号只有查看权限。</text>
   </view>
 
@@ -29,7 +30,7 @@
         <view class="event-heading">
           <view class="event-title">{{item.title}}</view>
           <view class="status {{item.status}}">
-            {{item.status === 'draft' ? '草稿' : '已发布'}}
+            {{item.status === 'draft' ? '草稿' : '已归档'}}
           </view>
         </view>
         <view class="event-summary">{{item.summary}}</view>
@@ -38,11 +39,11 @@
           <text>上传：{{item.uploadedBy}}</text>
         </view>
         <view class="event-team">{{item.team}}</view>
-        <view class="entry-actions" wx:if="{{canEdit}}">
-          <text data-index="{{index}}" data-direction="up" catchtap="moveEntry">上移</text>
-          <text data-index="{{index}}" data-direction="down" catchtap="moveEntry">下移</text>
-          <text data-id="{{item._id}}" catchtap="editEntry">编辑</text>
-          <text class="delete" data-id="{{item._id}}" catchtap="deleteEntry">删除</text>
+        <view class="entry-actions" wx:if="{{canEdit || canDelete}}">
+          <text wx:if="{{canEdit}}" data-index="{{index}}" data-direction="up" catchtap="moveEntry">上移</text>
+          <text wx:if="{{canEdit}}" data-index="{{index}}" data-direction="down" catchtap="moveEntry">下移</text>
+          <text wx:if="{{canEdit}}" data-id="{{item._id}}" catchtap="editEntry">编辑</text>
+          <text wx:if="{{canDelete}}" class="delete" data-id="{{item._id}}" catchtap="deleteEntry">删除</text>
         </view>
       </view>
       <view class="arrow">›</view>
