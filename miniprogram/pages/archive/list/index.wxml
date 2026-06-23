@@ -2,9 +2,9 @@
   <view class="list-hero">
     <view class="hero-kicker">ARCHIVE EVENTS</view>
     <view class="hero-title">{{categoryName}}</view>
-    <view class="hero-desc">{{organization.name}} · 一件事一条档案</view>
+    <view class="hero-desc">{{organization.name}} · 按岗位分类的内部档案</view>
     <view class="action-row" wx:if="{{canCreate}}">
-      <button class="add-button" bindtap="addEntry">＋ 新增事件</button>
+      <button class="add-button" bindtap="addEntry">＋ 新增记录</button>
       <button wx:if="{{isSuperAdmin}}" class="import-button" bindtap="importWord">导入 Word</button>
     </view>
   </view>
@@ -15,6 +15,7 @@
     <text wx:elif="{{canEdit}}">你可以维护本岗位的内部记录，核对后归档。</text>
     <text wx:else>当前账号只有查看权限。</text>
   </view>
+  <view class="permission-note category-notice" wx:if="{{categoryNotice}}">{{categoryNotice}}</view>
 
   <view class="permission-note" wx:if="{{loadError}}">{{loadError}}</view>
 
@@ -36,7 +37,7 @@
         <view class="event-summary">{{item.summary}}</view>
         <view class="event-meta">
           <text>{{item.photoCount}}张照片</text>
-          <text>上传：{{item.uploadedBy}}</text>
+          <text>录入：{{item.uploadedBy}}</text>
         </view>
         <view class="event-team">{{item.team}}</view>
         <view class="entry-actions" wx:if="{{canEdit || canDelete}}">
@@ -49,5 +50,5 @@
       <view class="arrow">›</view>
     </view>
   </view>
-  <view wx:else class="empty">该栏目暂无事件，可点击“新增事件”开始记录。</view>
+  <view wx:else class="empty">该栏目暂无记录，可点击“新增记录”开始归档。</view>
 </view>

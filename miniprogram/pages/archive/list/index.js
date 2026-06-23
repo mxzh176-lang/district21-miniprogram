@@ -33,6 +33,13 @@ const CATEGORY_NAMES = {
   'annual-meeting': '年会委员会——泉宏'
 }
 
+const CATEGORY_NOTICES = {
+  'care-committee': '关爱档案仅记录必要的内部安排和跟进，不填写病情、家庭状况等敏感隐私。',
+  'fellowship-committee': '联谊档案仅用于记录组织内部活动安排，不提供公开发帖、评论或陌生人互动。',
+  'fundraising-plan': '本栏目仅用于内部经费筹备、使用计划和凭证留存，不提供公开募捐、支付或交易功能。',
+  'news-publicity': '本栏目仅用于内部资料整理、审核、报送和留存，不形成面向公众的信息发布平台。'
+}
+
 Page({
   data: {
     organizationId: '',
@@ -44,6 +51,7 @@ Page({
     canEdit: false,
     canDelete: false,
     isSuperAdmin: false,
+    categoryNotice: '',
     loadError: ''
   },
 
@@ -52,7 +60,8 @@ Page({
     this.setData({
       organizationId: options.organization || 'yuanhang',
       categoryId,
-      categoryName: CATEGORY_NAMES[categoryId] || '档案事件'
+      categoryName: CATEGORY_NAMES[categoryId] || '档案事件',
+      categoryNotice: CATEGORY_NOTICES[categoryId] || ''
     })
   },
 

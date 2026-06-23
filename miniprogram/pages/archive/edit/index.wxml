@@ -2,7 +2,7 @@
   <view class="scope-card">
     <view class="scope-badge">{{id ? '编辑' : '新建'}}</view>
     <text class="scope-title">{{organizationName}}</text>
-    <text class="scope-subtitle">{{categoryName}} · 单条事件记录</text>
+    <text class="scope-subtitle">{{categoryName}} · 单条内部记录</text>
     <view class="scope-progress">
       <view class="progress-item active"><text>1</text><view>填写</view></view>
       <view class="progress-line"></view>
@@ -30,13 +30,13 @@
         <view class="section-number">01</view>
         <view>
           <view class="section-title">基本信息</view>
-          <view class="section-desc">先填写时间和事件名称</view>
+          <view class="section-desc">先填写时间和记录名称</view>
         </view>
       </view>
 
       <view class="field">
         <view class="field-head">
-          <text class="label">事件日期</text>
+          <text class="label">记录日期</text>
           <text class="required">必填</text>
         </view>
         <picker mode="date" value="{{form.date}}" bindchange="onDateChange">
@@ -49,13 +49,13 @@
 
       <view class="field">
         <view class="field-head">
-          <text class="label">事件标题</text>
+          <text class="label">记录标题</text>
           <text class="required">必填</text>
         </view>
         <input class="input wide-input" style="color:#000000;-webkit-text-fill-color:#000000;font-weight:700;opacity:1;"
           cursor-color="#7447c8" value="{{form.title}}" data-field="title" bindinput="onInput"
           placeholder-class="form-placeholder" placeholder-style="color:#626d82;font-weight:500;"
-          placeholder="请输入事件名称，例如：慰问困难家庭公益服务" />
+          placeholder="{{formCopy.titlePlaceholder}}" />
         <view class="field-help">标题建议控制在 10 至 30 个字，方便历史事件列表展示。</view>
       </view>
     </view>
@@ -70,16 +70,14 @@
       </view>
 
       <view class="field">
-        <text class="label">事件提示词</text>
+        <text class="label">{{formCopy.keywordLabel}}</text>
         <input class="input wide-input" style="color:#000000;-webkit-text-fill-color:#000000;font-weight:700;opacity:1;"
           cursor-color="#7447c8" value="{{form.keywords}}" data-field="keywords" bindinput="onInput"
           placeholder-class="form-placeholder" placeholder-style="color:#626d82;font-weight:500;"
-          placeholder="请输入地点、服务对象、活动内容和参与人员" />
+          placeholder="{{formCopy.keywordPlaceholder}}" />
         <view class="keyword-examples">
           <text>示例：</text>
-          <text class="keyword-chip">服务地点</text>
-          <text class="keyword-chip">服务对象</text>
-          <text class="keyword-chip">参与人员</text>
+          <text class="keyword-chip" wx:for="{{formCopy.keywordExamples}}" wx:key="*this">{{item}}</text>
         </view>
       </view>
 
@@ -111,13 +109,13 @@
 
       <view class="field">
         <view class="field-head">
-          <text class="label">事件详情</text>
+          <text class="label">详细记录</text>
           <text class="required">必填</text>
         </view>
         <textarea class="textarea" style="color:#000000;-webkit-text-fill-color:#000000;font-weight:700;opacity:1;"
           cursor-color="#7447c8" value="{{form.content}}" data-field="content" bindinput="onInput"
           placeholder-class="form-placeholder" placeholder-style="color:#626d82;font-weight:500;"
-          placeholder="请输入活动过程、服务结果、参与人员及其他说明" />
+          placeholder="{{formCopy.detailPlaceholder}}" />
       </view>
     </view>
 
@@ -126,15 +124,15 @@
         <view class="section-number">03</view>
         <view>
           <view class="section-title">附件与归档信息</view>
-          <view class="section-desc">最多上传 9 张现场照片</view>
+          <view class="section-desc">最多上传 9 张与本条内部档案相关的图片</view>
         </view>
       </view>
 
       <view class="photo-upload" bindtap="choosePhotos">
         <view class="upload-icon">＋</view>
         <view class="upload-copy">
-          <view class="upload-title">{{form.photoCount ? '继续添加照片' : '选择现场照片'}}</view>
-          <view class="upload-desc">{{form.photoCount ? '已选择 ' + form.photoCount + ' 张' : '支持相册或相机拍摄'}}</view>
+          <view class="upload-title">{{form.photoCount ? '继续添加附件' : formCopy.photoTitle}}</view>
+          <view class="upload-desc">{{form.photoCount ? '已选择 ' + form.photoCount + ' 张' : formCopy.photoDescription}}</view>
         </view>
         <view class="upload-arrow">›</view>
       </view>
@@ -149,7 +147,7 @@
 
       <view class="uploader-row">
         <view>
-          <view class="uploader-label">上传人</view>
+          <view class="uploader-label">录入人</view>
           <view class="uploader-desc">自动记录当前操作账号</view>
         </view>
         <input class="uploader-name" style="color:#5b6476;-webkit-text-fill-color:#5b6476;font-weight:700;opacity:1;"

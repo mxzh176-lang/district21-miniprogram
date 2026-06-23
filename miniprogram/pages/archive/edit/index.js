@@ -33,6 +33,40 @@ const CATEGORY_NAMES = {
   'annual-meeting': '年会委员会——泉宏'
 }
 
+const DEFAULT_FORM_COPY = {
+  titlePlaceholder: '请输入本岗位工作记录名称',
+  keywordLabel: '记录主题',
+  keywordPlaceholder: '请输入本次工作的主题和必要提示',
+  keywordExamples: ['工作主题', '参与人员', '完成情况'],
+  detailPlaceholder: '请记录工作背景、执行过程、完成情况和后续安排',
+  photoTitle: '记录附件',
+  photoDescription: '仅上传与本条内部档案直接相关的图片'
+}
+
+const FORM_COPY = {
+  'member-retention': copy('例如：六月会员保留沟通记录', '会员工作主题', '请输入会员发展或保留工作主题', ['沟通主题', '负责人', '后续安排'], '仅记录必要的内部沟通与跟进情况，不填写身份证、手机号等非必要个人信息'),
+  'leadership-training': copy('例如：逢五相约培训记录', '培训主题', '请输入培训名称或学习主题', ['培训主题', '讲师', '学习成果'], '请记录培训目标、参与情况、主要内容、学习成果和后续实践安排'),
+  'external-exchange': copy('例如：服务队交流访问记录', '交流主题', '请输入交流对象和交流主题', ['交流对象', '交流主题', '后续事项'], '请记录交流目的、参与人员、主要内容、达成事项和后续负责人'),
+  'service-plan': copy('例如：六月助学走访服务记录', '服务主题', '请输入服务项目、地点和参与情况', ['服务项目', '服务地点', '参与人员'], '请记录服务需求、参与分工、执行过程、完成情况和后续安排'),
+  'news-publicity': copy('例如：六月服务资料报送记录', '资料主题', '请输入资料名称和内部报送事项', ['资料名称', '整理人', '报送情况'], '请记录资料来源、内部审核、素材清单、报送范围和留存位置'),
+  'fundraising-plan': copy('例如：助学项目经费筹备记录', '经费事项', '请输入内部经费筹备或使用计划', ['经费用途', '预算安排', '凭证位置'], '仅记录组织内部经费筹备、使用计划和凭证留存，不提供公开募捐、支付或交易功能'),
+  'care-committee': copy('例如：六月生日关爱记录', '关爱主题', '请输入关爱类型、时间和参与方式', ['关爱类型', '参与方式', '后续跟进'], '请记录关爱安排、参与方式和后续跟进；不填写病情、家庭状况等敏感隐私'),
+  'fellowship-committee': copy('例如：六月内部联谊记录', '联谊主题', '请输入内部联谊名称和活动安排', ['联谊主题', '参与人员', '活动安排'], '请记录内部联谊的时间、安排、参与情况、完成情况和后续事项'),
+  'annual-meeting': copy('例如：年度会议筹备记录', '年会主题', '请输入年会或年度会议主题', ['会议主题', '流程分工', '总结事项'], '请记录内部年度会议的筹备分工、流程、参与情况和总结事项'),
+  secretary: copy('例如：六月服务队例会纪要', '会议主题', '请输入会议名称和主要议题', ['会议主题', '参会人员', '会议决议'], '请记录会议议题、参会人员、会议决议和后续待办'),
+  tamer: copy('例如：六月例会纪律执行记录', '纠察事项', '请输入纪律、礼仪或会场秩序事项', ['纪律事项', '执行情况', '改进事项'], '请记录纪律与礼仪要求、现场执行情况和后续改进事项'),
+  treasurer: copy('例如：六月财务资料归档记录', '财务事项', '请输入报表、凭证或财务工作主题', ['财务主题', '凭证范围', '核对情况'], '请记录内部财务资料的核对和归档情况；具体收支请使用司库账目模块'),
+  admin: copy('例如：六月例会后勤保障记录', '后勤事项', '请输入物资、场地或后勤保障主题', ['保障事项', '物资清单', '完成情况'], '请记录物资、场地、车辆或其他内部后勤工作的准备和完成情况'),
+  captain: copy('例如：年度重点工作推进记录', '统筹主题', '请输入年度方向或重点工作主题', ['工作主题', '岗位分工', '推进结果'], '请记录年度方向、岗位分工、推进情况、决议和后续安排'),
+  'first-vp': copy('例如：第一副队长团队月度工作记录', '团队工作主题', '请输入会员、培训或交流工作主题', ['工作主题', '责任岗位', '完成情况'], '请按实际工作记录会员发展、培训或交流事项，不混用其他委员会模板'),
+  'second-vp': copy('例如：第二副队长团队月度工作记录', '团队工作主题', '请输入服务、资料或经费工作主题', ['工作主题', '责任岗位', '完成情况'], '请按实际工作记录服务计划、资料报送或内部经费事项，不默认套用公益服务模板'),
+  'third-vp': copy('例如：第三副队长团队月度工作记录', '团队工作主题', '请输入关爱、联谊或年会工作主题', ['工作主题', '责任岗位', '完成情况'], '请按实际工作记录关爱、联谊或年会事项，不在同一记录中混写不同类别')
+}
+
+function copy(titlePlaceholder, keywordLabel, keywordPlaceholder, keywordExamples, detailPlaceholder) {
+  return { ...DEFAULT_FORM_COPY, titlePlaceholder, keywordLabel, keywordPlaceholder, keywordExamples, detailPlaceholder }
+}
+
 Page({
   data: {
     id: '',
@@ -51,7 +85,8 @@ Page({
       photoCount: 0,
       photos: []
     },
-    templateApplied: false
+    templateApplied: false,
+    formCopy: DEFAULT_FORM_COPY
   },
 
   async onLoad(options) {
@@ -71,6 +106,7 @@ Page({
       organizationName: organization.name,
       categoryName: position ? position.name : CATEGORY_NAMES[options.category] || '档案事件',
       canEdit: permission.canMaintainArchive(member, organization, categoryId, options.id ? 'update' : 'create'),
+      formCopy: FORM_COPY[categoryId] || DEFAULT_FORM_COPY,
       'form.date': this.formatDate(new Date()),
       'form.uploadedBy': member.nickname || '当前管理员'
     }
@@ -176,14 +212,14 @@ Page({
         content: `服务日期：${form.date}\n服务项目：${keywords}\n负责人：${owner}\n\n一、服务对象与需求：请补充\n二、服务地点：请补充\n三、参与狮友与分工：请补充\n四、服务过程：请补充\n五、服务成果：请补充\n六、后续计划：请补充\n七、嘉许记录：请补充。`
       },
       'news-publicity': {
-        title: `${owner}狮兄狮姐完成远航${keywords}宣传记录`,
-        summary: `${organizationName}完成“${keywords}”新闻宣传和素材归档。`,
-        content: `发布日期：${form.date}\n宣传主题：${keywords}\n负责人：${owner}\n\n一、信息来源与审核人：请补充\n二、发布渠道：请补充\n三、核心内容：请补充\n四、照片与素材清单：请补充\n五、传播结果：请补充\n六、后续改进：请补充。`
+        title: `${owner}狮兄狮姐完成远航${keywords}资料整理`,
+        summary: `${organizationName}完成“${keywords}”资料整理、内部审核和报送留存。`,
+        content: `归档日期：${form.date}\n资料主题：${keywords}\n负责人：${owner}\n\n一、资料来源：请补充\n二、内部审核人：请补充\n三、文字与图片清单：请补充\n四、报送对象与范围：请补充\n五、资料留存位置：请补充\n六、后续改进：请补充。`
       },
       'fundraising-plan': {
-        title: `${owner}狮兄狮姐组织远航开展${keywords}筹款工作`,
-        summary: `${organizationName}记录“${keywords}”筹款计划、执行和结果。`,
-        content: `记录日期：${form.date}\n筹款事项：${keywords}\n负责人：${owner}\n\n一、筹款目的：请补充\n二、预算与目标：请补充\n三、执行方式：请补充\n四、参与人员：请补充\n五、结果与凭证归档位置：请补充\n六、风险和后续事项：请补充。`
+        title: `${owner}狮兄狮姐完成远航${keywords}经费筹备记录`,
+        summary: `${organizationName}形成“${keywords}”内部经费筹备与使用计划档案。`,
+        content: `记录日期：${form.date}\n经费事项：${keywords}\n负责人：${owner}\n\n一、内部工作用途：请补充\n二、预算与资金安排：请补充\n三、内部审批情况：请补充\n四、经办与核对人员：请补充\n五、凭证归档位置：请补充\n六、后续事项：请补充\n\n说明：本模块仅用于组织内部档案留存，不提供公开募捐、支付或交易功能。`
       },
       'care-committee': {
         title: `${owner}狮兄狮姐组织远航开展${keywords}关爱`,
@@ -201,9 +237,9 @@ Page({
         content: `记录日期：${form.date}\n年会主题：${keywords}\n负责人：${owner}\n\n一、时间地点：请补充\n二、流程与分工：请补充\n三、参与人员：请补充\n四、预算与物资：请补充\n五、现场成果：请补充\n六、嘉许名单与后续总结：请补充。`
       },
       'second-vp': {
-        title: `${owner}狮兄狮姐带领远航做了${keywords}`,
-        summary: `${organizationName}围绕“${keywords}”完成公益服务并形成服务档案。`,
-        content: `事件日期：${form.date}\n所属组织：${organizationName}\n档案分类：${categoryName}\n负责人：${owner}\n\n${owner}狮兄狮姐带领远航做了“${keywords}”。\n\n一、服务对象：请补充\n二、服务地点：请补充\n三、参与狮友：请补充\n四、服务过程：请补充\n五、服务成果：请补充\n六、嘉许记录：请补充本次值得表扬的狮兄狮姐。`
+        title: `${owner}狮兄狮姐推进远航${keywords}工作`,
+        summary: `${organizationName}形成“${keywords}”第二副队长团队工作档案。`,
+        content: `记录日期：${form.date}\n所属组织：${organizationName}\n档案分类：${categoryName}\n负责人：${owner}\n\n一、工作类别：服务计划／资料报送／经费筹备\n二、工作目标：请补充\n三、责任岗位与参与人员：请补充\n四、执行情况：请补充\n五、完成结果：请补充\n六、后续事项：请补充。`
       },
       secretary: {
         title: `${owner}狮姐组织召开远航服务队${keywords}`,
@@ -211,14 +247,34 @@ Page({
         content: `会议日期：${form.date}\n会议组织：${organizationName}\n档案分类：${categoryName}\n记录人：${owner}\n\n一、会议主题：${keywords}\n二、参会人员：请补充\n三、会议议题：请补充\n四、会议决议：请补充\n五、后续待办：请补充\n六、嘉许记录：请补充本次推动会议和落实事项的狮兄狮姐。`
       },
       'first-vp': {
-        title: `${owner}狮兄狮姐开展远航对外交流`,
-        summary: `${organizationName}围绕“${keywords}”开展会员发展、领导力或对外交流工作。`,
-        content: `事件日期：${form.date}\n所属组织：${organizationName}\n档案分类：${categoryName}\n负责人：${owner}\n\n${owner}狮兄狮姐开展“${keywords}”。请补充交流对象、交流主题、达成共识、后续跟进和嘉许对象。`
+        title: `${owner}狮兄狮姐推进远航${keywords}工作`,
+        summary: `${organizationName}形成“${keywords}”第一副队长团队工作档案。`,
+        content: `记录日期：${form.date}\n所属组织：${organizationName}\n档案分类：${categoryName}\n负责人：${owner}\n\n一、工作类别：会员发展／培训／对外交流\n二、工作目标：请补充\n三、责任岗位与参与人员：请补充\n四、执行情况：请补充\n五、完成结果：请补充\n六、后续事项：请补充。`
       },
       'third-vp': {
         title: `${owner}狮兄狮姐组织远航开展${keywords}`,
         summary: `${organizationName}围绕“${keywords}”开展关爱、联谊或年会相关工作。`,
-        content: `事件日期：${form.date}\n所属组织：${organizationName}\n档案分类：${categoryName}\n负责人：${owner}\n\n${owner}狮兄狮姐组织远航开展“${keywords}”。请补充关爱对象、联谊主题、参与人员、现场成果和后续跟进。`
+        content: `记录日期：${form.date}\n所属组织：${organizationName}\n档案分类：${categoryName}\n负责人：${owner}\n\n一、工作类别：关爱／联谊／年会\n二、工作目标：请补充\n三、责任岗位与参与人员：请补充\n四、执行情况：请补充\n五、完成结果：请补充\n六、后续事项：请补充。`
+      },
+      captain: {
+        title: `${owner}狮兄狮姐推进远航${keywords}`,
+        summary: `${organizationName}形成“${keywords}”队长统筹工作记录。`,
+        content: `记录日期：${form.date}\n统筹主题：${keywords}\n负责人：${owner}\n\n一、工作背景与目标：请补充\n二、岗位分工：请补充\n三、推进情况：请补充\n四、形成决议：请补充\n五、后续安排：请补充\n六、嘉许记录：请补充。`
+      },
+      tamer: {
+        title: `${owner}狮兄狮姐完成远航${keywords}纠察记录`,
+        summary: `${organizationName}形成“${keywords}”纪律、礼仪与会场秩序档案。`,
+        content: `记录日期：${form.date}\n纠察事项：${keywords}\n负责人：${owner}\n\n一、纪律与礼仪要求：请补充\n二、现场执行情况：请补充\n三、提醒事项：请补充\n四、完成结果：请补充\n五、后续改进：请补充。`
+      },
+      treasurer: {
+        title: `${owner}狮兄狮姐完成远航${keywords}财务资料归档`,
+        summary: `${organizationName}形成“${keywords}”财务资料核对与归档记录。`,
+        content: `记录日期：${form.date}\n财务事项：${keywords}\n负责人：${owner}\n\n一、资料范围：请补充\n二、核对人员：请补充\n三、核对结果：请补充\n四、凭证留存位置：请补充\n五、后续事项：请补充\n\n说明：具体收支记录请使用司库账目模块。`
+      },
+      admin: {
+        title: `${owner}狮兄狮姐完成远航${keywords}后勤保障`,
+        summary: `${organizationName}形成“${keywords}”物资与后勤保障记录。`,
+        content: `记录日期：${form.date}\n保障事项：${keywords}\n负责人：${owner}\n\n一、场地与时间：请补充\n二、物资清单：请补充\n三、人员分工：请补充\n四、完成情况：请补充\n五、后续补充事项：请补充。`
       }
     }
     const fallback = {

@@ -336,23 +336,23 @@ const categoryTemplates = {
   'first-vp': {
     role: '第一副队长',
     tone: 'purple',
-    title: (owner, org, topic) => `${owner}狮兄狮姐开展${org}会员发展与对外交流`,
-    summary: (org, topic) => `${org}围绕“${topic || '会员发展与对外交流'}”形成工作记录。`,
-    content: (date, org, category, owner, topic) => `事件日期：${date}\n所属组织：${org}\n档案分类：${category}\n负责人：${owner}\n\n${owner}狮兄狮姐开展“${topic || '会员发展与对外交流'}”，请补充参与人员、交流对象、达成共识、后续跟进和嘉许对象。`
+    title: (owner, org, topic) => `${owner}狮兄狮姐推进${org}${topic || '第一副队长团队工作'}`,
+    summary: (org, topic) => `${org}围绕“${topic || '第一副队长团队工作'}”形成内部岗位记录。`,
+    content: (date, org, category, owner, topic) => `记录日期：${date}\n所属组织：${org}\n档案分类：${category}\n负责人：${owner}\n\n工作类别：会员发展／培训／对外交流\n工作主题：${topic || '请补充'}\n请补充工作目标、责任岗位、参与人员、执行情况、完成结果和后续事项。`
   },
   'second-vp': {
     role: '第二副队长',
     tone: 'green',
-    title: (owner, org, topic) => `${owner}狮兄狮姐带领${org}做了${topic || '一项公益服务'}`,
-    summary: (org, topic) => `${org}完成“${topic || '公益服务'}”并形成服务档案。`,
-    content: (date, org, category, owner, topic) => `事件日期：${date}\n所属组织：${org}\n档案分类：${category}\n负责人：${owner}\n\n${owner}狮兄狮姐带领${org}做了“${topic || '一项公益服务'}”。请补充服务对象、服务地点、参与狮友、服务过程、服务成果和嘉许说明。`
+    title: (owner, org, topic) => `${owner}狮兄狮姐推进${org}${topic || '第二副队长团队工作'}`,
+    summary: (org, topic) => `${org}围绕“${topic || '第二副队长团队工作'}”形成内部岗位记录。`,
+    content: (date, org, category, owner, topic) => `记录日期：${date}\n所属组织：${org}\n档案分类：${category}\n负责人：${owner}\n\n工作类别：服务计划／资料报送／经费筹备\n工作主题：${topic || '请补充'}\n请补充工作目标、责任岗位、参与人员、执行情况、完成结果和后续事项。`
   },
   'third-vp': {
     role: '第三副队长',
     tone: 'red',
-    title: (owner, org, topic) => `${owner}狮兄狮姐组织${org}开展${topic || '关爱联谊活动'}`,
-    summary: (org, topic) => `${org}围绕“${topic || '关爱联谊'}”开展成员关怀与团队凝聚。`,
-    content: (date, org, category, owner, topic) => `事件日期：${date}\n所属组织：${org}\n档案分类：${category}\n负责人：${owner}\n\n${owner}狮兄狮姐组织${org}开展“${topic || '关爱联谊活动'}”。请补充关爱对象、联谊主题、参与人员、现场成果和后续跟进。`
+    title: (owner, org, topic) => `${owner}狮兄狮姐推进${org}${topic || '第三副队长团队工作'}`,
+    summary: (org, topic) => `${org}围绕“${topic || '第三副队长团队工作'}”形成内部岗位记录。`,
+    content: (date, org, category, owner, topic) => `记录日期：${date}\n所属组织：${org}\n档案分类：${category}\n负责人：${owner}\n\n工作类别：关爱／联谊／年会\n工作主题：${topic || '请补充'}\n请按实际类别补充工作目标、责任岗位、参与人员、执行情况、完成结果和后续事项，不混写其他类别。`
   },
   secretary: {
     role: '会议纪要',
@@ -372,8 +372,8 @@ const categoryTemplates = {
     role: '司库',
     tone: 'blue',
     title: (owner, org, topic) => `${owner}狮兄整理${org}${topic || '司库账目记录'}`,
-    summary: (org, topic) => `${org}完成“${topic || '司库账目'}”记录，敏感明细仅授权人员查看。`,
-    content: (date, org, category, owner, topic) => `记录日期：${date}\n所属组织：${org}\n档案分类：${category}\n负责人：${owner}\n\n${owner}狮兄整理${org}“${topic || '司库账目记录'}”。请补充收支摘要、凭证情况、物资价值和审核说明，敏感明细请按权限维护。`
+    summary: (org, topic) => `${org}完成“${topic || '财务资料'}”核对与内部归档。`,
+    content: (date, org, category, owner, topic) => `记录日期：${date}\n所属组织：${org}\n档案分类：${category}\n负责人：${owner}\n\n${owner}狮兄整理${org}“${topic || '财务资料'}”。请补充资料范围、核对人员、核对结果、凭证留存位置和后续事项；具体收支请使用司库账目模块。`
   },
   admin: {
     role: '总务',
