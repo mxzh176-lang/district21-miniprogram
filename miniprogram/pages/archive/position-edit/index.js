@@ -5,6 +5,9 @@ Page({
     organizationId: '',
     positionId: '',
     name: '',
+    memberName: '',
+    memberId: '',
+    inputMode: 'member',
     users: [],
     userIndex: 0,
     startDate: '2026-07-01',
@@ -16,7 +19,8 @@ Page({
   async onLoad(options) {
     const organizationId = decodeURIComponent(options.organizationId || '')
     const positionId = decodeURIComponent(options.positionId || '')
-    this.setData({ organizationId, positionId })
+    const inputMode = options.inputMode === 'manual' ? 'manual' : 'member'
+    this.setData({ organizationId, positionId, inputMode })
     try {
       const [directory, platformUsers] = await Promise.all([
         api.call('listPositionDirectory', { organizationId }),
@@ -34,9 +38,15 @@ Page({
           ...item,
           displayName: `${item.name} · ${item.memberCode || item.accountSuffix || String(item.id).slice(-6)}`
         }))
-      const userIndex = Math.max(0, users.findIndex(item => item.id === position.userId))
+      const matchedUserIndex = users.findIndex(item => item.id === position.userId)
+      const userIndex = Math.max(0, matchedUserIndex)
+      const selectedUser = inputMode === 'member' && users[userIndex]
       this.setData({
         name: position.name,
+        memberName: selectedUser
+          ? selectedUser.name
+          : position.person === '待授权' ? '' : position.person,
+        memberId: selectedUser ? selectedUser.id : '',
         users,
         userIndex,
         startDate: position.startDate || this.data.startDate,
@@ -50,15 +60,26 @@ Page({
   },
 
   onNameInput(event) { this.setData({ name: event.detail.value }) },
-  onUserChange(event) { this.setData({ userIndex: Number(event.detail.value) }) },
+  onMemberNameInput(event) {
+    this.setData({ memberName: event.detail.value, memberId: '' })
+  },
+  onUserChange(event) {
+    const userIndex = Number(event.detail.value)
+    const user = this.data.users[userIndex]
+    this.setData({
+      userIndex,
+      memberId: user && user.id || '',
+      memberName: user && user.name || this.data.memberName
+    })
+  },
   onStartDateChange(event) { this.setData({ startDate: event.detail.value }) },
   onEndDateChange(event) { this.setData({ endDate: event.detail.value }) },
 
   async save() {
     const name = this.data.name.trim()
-    const user = this.data.users[this.data.userIndex]
-    if (!name || !user) {
-      wx.showToast({ title: '请填写职务并选择负责人', icon: 'none' })
+    const memberName = this.data.memberName.trim()
+    if (!name || !memberName) {
+      wx.showToast({ title: '请填写职务和负责人姓名', icon: 'none' })
       return
     }
     this.setData({ saving: true })
@@ -68,13 +89,14 @@ Page({
           id: this.data.positionId,
           organizationId: this.data.organizationId,
           name,
-          userId: user.id,
+          memberName,
+          memberId: this.data.memberId,
           startDate: this.data.startDate,
           endDate: this.data.endDate
         }
       })
       wx.showToast({ title: '岗位资料已更新', icon: 'success' })
-      setTimeout(() => wx.navigateBack(), 600)
+      setTimeout(() => wx.navigateBack(), 300)
     } catch (error) {
       api.showError(error)
     } finally {

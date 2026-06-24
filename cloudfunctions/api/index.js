@@ -214,10 +214,31 @@ async function canAdministerOrganization(userId, organizationId) {
   const organization = organizationResult.data[0]
   if (!organization) return false
   const scopeIds = [organization.id].concat(organization.ancestorIds || [])
-  return roles.some(item =>
+  if (roles.some(item =>
     item.status === 'active' &&
     ['federation_admin', 'office_admin', 'region_admin', 'area_admin', 'team_admin'].includes(item.role) &&
     scopeIds.includes(item.organizationId)
+  )) return true
+  if (organization.type !== 'team') return false
+  const assignments = await activeRoleAssignments(userId)
+  return assignments.some(item =>
+    item.organizationId === organization.id &&
+    ['captain', 'secretary'].some(code => positionIdMatches(item.positionId, code))
+  )
+}
+
+async function canEditServiceTeamPositions(userId, organizationId) {
+  organizationId = canonicalOrganizationId(organizationId)
+  const organization = await requireActiveOrganization(organizationId)
+  if (organization.type !== 'team') return false
+  const roles = await platformRoles(userId)
+  if (roles.some(item => item.role === 'super_admin')) return true
+  const ancestorIds = organization.ancestorIds || []
+  return roles.some(item =>
+    item.role === 'team_admin'
+      ? item.organizationId === organizationId
+      : item.role === 'area_admin' &&
+        (item.organizationId === organizationId || ancestorIds.includes(item.organizationId))
   )
 }
 
@@ -275,6 +296,63 @@ async function activeRoleAssignments(userId) {
     console.warn('role_assignment unavailable', error.message)
     return []
   }
+}
+
+async function checkActiveRoleManager(openid, organizationId, positionId) {
+  const user = await findPlatformUser(openid)
+  organizationId = canonicalOrganizationId(organizationId)
+  positionId = cleanText(positionId, 140)
+  if (!user || !organizationId || !positionId) return false
+  const today = new Date().toISOString().slice(0, 10)
+  const result = await db.collection(COLLECTIONS.roleAssignment)
+    .where({ organizationId, status: 'active' })
+    .limit(500)
+    .get()
+  return result.data.some(assignment =>
+    (assignment.memberId === user.id || assignment.userId === user.id) &&
+    positionIdMatches(assignment.positionId, positionId) &&
+    Boolean(assignment.startDate) && assignment.startDate <= today &&
+    (!assignment.endDate || assignment.endDate >= today)
+  )
+}
+
+const TEAM_ROLE_SUPERVISORS = {
+  secretary: ['captain', 'secretary'],
+  treasurer: ['captain', 'secretary'],
+  admin: ['captain', 'secretary'],
+  tamer: ['captain', 'secretary'],
+  'member-retention': ['captain', 'secretary', 'first-vp'],
+  'leadership-training': ['captain', 'secretary', 'first-vp'],
+  'external-exchange': ['captain', 'secretary', 'first-vp'],
+  'service-plan': ['captain', 'secretary', 'second-vp'],
+  'news-publicity': ['captain', 'secretary', 'second-vp'],
+  'fundraising-plan': ['captain', 'secretary', 'second-vp'],
+  'care-committee': ['captain', 'secretary', 'third-vp'],
+  'fellowship-committee': ['captain', 'secretary', 'third-vp'],
+  'annual-meeting': ['captain', 'secretary', 'third-vp']
+}
+
+async function canConfirmPersonnelRole(openid, organizationId, targetPositionId) {
+  const user = await findPlatformUser(openid)
+  organizationId = canonicalOrganizationId(organizationId)
+  targetPositionId = cleanText(targetPositionId, 140)
+  if (!user || !organizationId || !targetPositionId) return false
+  const roles = await platformRoles(user.id)
+  if (roles.some(item => item.role === 'super_admin')) return true
+  const organization = await requireActiveOrganization(organizationId)
+  const scopeIds = [organization.id].concat(organization.ancestorIds || [])
+  if (roles.some(item =>
+    (item.role === 'team_admin' && item.organizationId === organization.id) ||
+    (item.role === 'area_admin' && scopeIds.includes(item.organizationId)))) return true
+  const assignments = await activeRoleAssignments(user.id)
+  if (assignments.some(item =>
+    (organization.ancestorIds || []).includes(item.organizationId) &&
+    ['area-coordinator', 'area-officer'].some(code => positionIdMatches(item.positionId, code)))) return true
+  const supervisors = TEAM_ROLE_SUPERVISORS[targetPositionId] || ['captain', 'secretary']
+  return assignments.some(item =>
+    item.organizationId === organization.id &&
+    supervisors.some(code => positionIdMatches(item.positionId, code))
+  )
 }
 
 async function activePermissionGrants(userId) {
@@ -340,6 +418,15 @@ function portScopeMatches(grant, userId, context = {}) {
 async function portPermissionState(userId, module, action, context = {}) {
   const roles = await platformRoles(userId)
   if (roles.some(item => item.role === 'super_admin')) return { configured: true, allowed: true }
+  const organizationId = canonicalOrganizationId(context.organizationId || context.teamId)
+  if (organizationId) {
+    const assignments = await activeRoleAssignments(userId)
+    if (assignments.some(item =>
+      item.organizationId === organizationId &&
+      ['captain', 'secretary'].some(code => positionIdMatches(item.positionId, code)))) {
+      return { configured: true, allowed: true }
+    }
+  }
   const grants = await activeUserPermissions(userId)
   const allowed = portPermissionAllowed(grants, userId, module, action, context)
   return { configured: grants.length > 0, allowed }
@@ -906,6 +993,7 @@ async function revokeUserRole(openid, event = {}) {
 const AREA_POSITIONS = [
   ['area-chair', '区域主席'],
   ['area-coordinator', '区域协调长'],
+  ['area-officer', '干事'],
   ['secretary-general', '秘书长'],
   ['finance-chief', '财务长'],
   ['gmt', 'GMT'],
@@ -919,13 +1007,13 @@ const AREA_POSITIONS = [
 
 const TEAM_POSITIONS = [
   ['captain', '队长'],
-  ['secretary', '秘书'],
-  ['tamer', '纠察'],
-  ['treasurer', '司库'],
-  ['admin', '总务'],
-  ['first-vp', '第一副队长'],
-  ['second-vp', '第二副队长'],
-  ['third-vp', '第三副队长'],
+  ['secretary', '秘书', 'captain'],
+  ['tamer', '纠察', 'captain'],
+  ['treasurer', '司库', 'captain'],
+  ['admin', '总务', 'captain'],
+  ['first-vp', '第一副队长', 'captain'],
+  ['second-vp', '第二副队长', 'captain'],
+  ['third-vp', '第三副队长', 'captain'],
   ['member-retention', '会员与保留委员会', 'first-vp'],
   ['leadership-training', '领导力培训委员会', 'first-vp'],
   ['external-exchange', '对外交流委员会', 'first-vp'],
@@ -936,6 +1024,11 @@ const TEAM_POSITIONS = [
   ['fellowship-committee', '联谊委员会', 'third-vp'],
   ['annual-meeting', '年会委员会', 'third-vp']
 ]
+const TEAM_COMMITTEE_CODES = new Set([
+  'member-retention', 'leadership-training', 'external-exchange',
+  'service-plan', 'news-publicity', 'fundraising-plan',
+  'care-committee', 'fellowship-committee', 'annual-meeting'
+])
 
 async function requireSuperAdmin(openid) {
   const user = await requirePlatformUser(openid)
@@ -953,7 +1046,8 @@ async function bootstrapGovernance(openid) {
     .limit(500)
     .get()
   const existing = await db.collection(COLLECTIONS.position).limit(100).get()
-  const existingIds = new Set(existing.data.map(item => item.id))
+  const existingMap = {}
+  existing.data.forEach(item => { existingMap[item.id] = item })
   let created = 0
   for (const organization of organizations.data) {
     if (!['region', 'team'].includes(organization.type)) continue
@@ -961,15 +1055,24 @@ async function bootstrapGovernance(openid) {
     for (let index = 0; index < definitions.length; index += 1) {
       const [code, name, parentCode] = definitions[index]
       const id = `position_${organization.id}_${code}`
-      if (existingIds.has(id)) continue
+      const parentPositionId = parentCode ? `position_${organization.id}_${parentCode}` : null
+      const type = organization.type === 'region'
+        ? 'area'
+        : TEAM_COMMITTEE_CODES.has(code) ? 'committee' : 'team'
+      if (existingMap[id]) {
+        await db.collection(COLLECTIONS.position).doc(existingMap[id]._id).update({
+          data: { name, type, parentPositionId, sortOrder: (index + 1) * 10, updatedAt: now() }
+        })
+        continue
+      }
       await db.collection(COLLECTIONS.position).add({
         data: {
           id,
           organizationId: organization.id,
           code,
           name,
-          type: parentCode ? 'committee' : organization.type === 'region' ? 'area' : 'team',
-          parentPositionId: parentCode ? `position_${organization.id}_${parentCode}` : null,
+          type,
+          parentPositionId,
           responsibilities: '',
           sortOrder: (index + 1) * 10,
           status: 'active',
@@ -1000,7 +1103,7 @@ async function listPositions(openid, event = {}) {
 async function listPositionDirectory(openid, event = {}) {
   const user = await requirePlatformUser(openid)
   const organizationId = canonicalOrganizationId(event.organizationId)
-  await requireActiveOrganization(organizationId)
+  const organization = await requireActiveOrganization(organizationId)
   const [positionResult, assignmentResult, userResult] = await Promise.all([
     db.collection(COLLECTIONS.position).where({ organizationId, status: 'active' }).orderBy('sortOrder', 'asc').limit(500).get(),
     db.collection(COLLECTIONS.roleAssignment).where({ organizationId, status: 'active' }).limit(500).get(),
@@ -1012,8 +1115,8 @@ async function listPositionDirectory(openid, event = {}) {
   const activeAssignments = assignmentResult.data.filter(item =>
     (!item.startDate || item.startDate <= today) && (!item.endDate || item.endDate >= today)
   )
-  const administrator = await canAdministerOrganization(user.id, organizationId)
-  const configuredPortPermissions = await activeUserPermissions(user.id)
+  const administrator = organization.type === 'team' &&
+    await canEditServiceTeamPositions(user.id, organizationId)
   return Promise.all(positionResult.data.map(async position => {
     const assignment = activeAssignments.find(item => item.positionId === position.id)
     return {
@@ -1022,20 +1125,11 @@ async function listPositionDirectory(openid, event = {}) {
       organizationId,
       name: position.name,
       parentPositionId: position.parentPositionId || '',
-      person: assignment ? userMap[assignment.userId] || '待完善姓名' : '待授权',
-      userId: assignment ? assignment.userId : '',
+      person: assignment ? assignment.memberName || userMap[assignment.memberId || assignment.userId] || '待完善姓名' : '待授权',
+      userId: assignment ? assignment.memberId || assignment.userId || '' : '',
       startDate: assignment ? assignment.startDate || '' : '',
       endDate: assignment ? assignment.endDate || '' : '',
-      canEdit: configuredPortPermissions.length
-        ? (await portPermissionState(user.id, 'archive', 'update', {
-            organizationId,
-            positionId: position.id
-          })).allowed
-        : administrator || await hasPlatformGrant(user.id, 'archives', 'update', {
-            organizationId,
-            positionId: position.id,
-            parentPositionId: position.parentPositionId || ''
-          })
+      canEdit: administrator
     }
   }))
 }
@@ -1046,10 +1140,11 @@ async function savePositionDirectory(openid, event = {}) {
   const organizationId = canonicalOrganizationId(input.organizationId)
   const positionId = cleanText(input.id, 140)
   const name = cleanText(input.name, 100)
-  const userId = cleanText(input.userId, 100)
+  const memberName = cleanText(input.memberName, 40)
+  const memberId = cleanText(input.memberId || input.userId, 100)
   const startDate = cleanText(input.startDate, 10)
   const endDate = cleanText(input.endDate, 10)
-  if (!organizationId || !positionId || !name || !userId || !startDate || !endDate) {
+  if (!organizationId || !positionId || !name || !memberName || !startDate || !endDate) {
     throw Object.assign(new Error('岗位、负责人和授权日期不能为空'), { code: 'INVALID_POSITION_DIRECTORY' })
   }
   if (startDate > endDate) {
@@ -1061,19 +1156,16 @@ async function savePositionDirectory(openid, event = {}) {
     .get()
   const position = result.data[0]
   if (!position) throw Object.assign(new Error('所选岗位不存在'), { code: 'POSITION_NOT_FOUND' })
-  const portState = await portPermissionState(operator.id, 'archive', 'update', { organizationId, positionId })
-  const allowed = portState.allowed || (!portState.configured && (
-    await canAdministerOrganization(operator.id, organizationId) ||
-    await hasPlatformGrant(operator.id, 'archives', 'update', {
-      organizationId,
-      positionId,
-      parentPositionId: position.parentPositionId || ''
-    })
-  ))
-  if (!allowed) {
+  if (!await canEditServiceTeamPositions(operator.id, organizationId)) {
     throw Object.assign(new Error('无权限操作'), { code: 'PERMISSION_DENIED' })
   }
-  await requireAuthorizationTarget(userId)
+  const organization = await requireActiveOrganization(organizationId)
+  if (memberId) {
+    const member = await requireAuthorizationTarget(memberId)
+    if (member.name !== memberName) {
+      throw Object.assign(new Error('所选成员与负责人姓名不一致'), { code: 'POSITION_MEMBER_MISMATCH' })
+    }
+  }
   await db.collection(COLLECTIONS.position).doc(position._id).update({ data: { name, updatedAt: now() } })
   const assignments = await db.collection(COLLECTIONS.roleAssignment)
     .where({ organizationId, positionId, status: 'active' })
@@ -1088,21 +1180,34 @@ async function savePositionDirectory(openid, event = {}) {
     id: businessId('assignment'),
     areaId: 'org_region_21_suihua',
     teamId: organizationId.includes('_team_') ? organizationId : null,
+    serviceTeamId: organizationId,
+    serviceTeamName: organization.name,
     organizationId,
     positionId,
-    userId,
-    memberId: userId,
+    positionKey: position.code,
+    positionName: name,
+    memberName,
+    userId: memberId,
+    memberId,
     roleType: 'role_manager',
     startDate,
     endDate,
     status: 'active',
     createdBy: operator.id,
+    updatedBy: operator.id,
     createdAt: now(),
     updatedAt: now()
   }
   await db.collection(COLLECTIONS.roleAssignment).add({ data: assignment })
   await writePlatformLog(operator, 'update', 'position_directory', positionId, {
-    organizationId, positionId, name, userId, startDate, endDate
+    serviceTeamId: organizationId,
+    serviceTeamName: organization.name,
+    positionKey: position.code,
+    positionName: name,
+    memberName,
+    memberId,
+    updatedBy: operator.id,
+    updatedAt: assignment.updatedAt
   })
   return { ...assignment, name }
 }
