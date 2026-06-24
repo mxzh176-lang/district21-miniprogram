@@ -27,20 +27,11 @@
     </view>
   </view>
 
-  <view class="structure-entry" bindtap="goStructure">
-    <view class="structure-icon">构</view>
-    <view class="structure-copy">
-      <view class="structure-title">组织架构</view>
-      <view class="structure-desc">二十一协作区 · 四个服务队 · 队长团队 · 各委员会</view>
-    </view>
-    <view class="arrow">›</view>
-  </view>
-
-  <view class="structure-entry honor-entry" bindtap="goHonors">
-    <view class="structure-icon honor-icon">誉</view>
-    <view class="structure-copy">
-      <view class="structure-title">远航荣誉与表彰</view>
-      <view class="structure-desc">总览目标、达成进度与表彰记录</view>
+  <view class="feature-entry honor-entry" bindtap="goHonors">
+    <view class="feature-icon honor-icon">誉</view>
+    <view class="feature-copy">
+      <view class="feature-title">远航荣誉与表彰</view>
+      <view class="feature-desc">总览目标、达成进度与表彰记录</view>
     </view>
     <view class="arrow">›</view>
   </view>

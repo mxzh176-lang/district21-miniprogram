@@ -129,6 +129,7 @@
 
 - 业务主键使用独立 `id`，不把 CloudBase `_id` 当作跨平台唯一业务键；
 - 图片保存在 `event_image`，纪事主表不内嵌图片数据；
+- 所有业务图片和文件必须通过统一的 `uploadOrgFile(params)` 上传，按组织、服务队、岗位端口和事件名称归档，并在 `file_records` 保存云路径、文件标识和上传人；
 - 图片同时保存 `provider`、`fileId/imageUrl` 和可迁移的 `objectKey`；
 - 时间、状态、组织和操作人字段保持明确；
 - 页面只依赖统一 API 返回模型，不依赖 CloudBase 查询语法；

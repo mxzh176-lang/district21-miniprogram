@@ -7,7 +7,8 @@ Page({
     organizationIndex: 0,
     accountId: '',
     accountSuffix: '',
-    saving: false
+    saving: false,
+    focusedField: ''
   },
 
   async onLoad() {
@@ -36,8 +37,24 @@ Page({
     this.setData({ name: event.detail.value })
   },
 
+  onFieldFocus(event) {
+    this.setData({ focusedField: event.currentTarget.dataset.field || '' })
+  },
+
+  onFieldBlur() {
+    this.setData({ focusedField: '' })
+  },
+
+  onPickerOpen() {
+    this.setData({ focusedField: 'organization' })
+  },
+
+  onPickerCancel() {
+    this.setData({ focusedField: '' })
+  },
+
   onOrganizationChange(event) {
-    this.setData({ organizationIndex: Number(event.detail.value) })
+    this.setData({ organizationIndex: Number(event.detail.value), focusedField: '' })
   },
 
   async save() {

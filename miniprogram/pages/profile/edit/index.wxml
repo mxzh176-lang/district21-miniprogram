@@ -11,13 +11,38 @@
   </view>
 
   <view class="form-card">
-    <view class="field-label">姓名</view>
-    <input class="input" maxlength="30" value="{{name}}" bindinput="onNameInput" placeholder="例如：大奇" />
+    <view class="field-group">
+      <view class="field-label">姓名</view>
+      <input
+        class="input {{focusedField === 'name' ? 'is-focused' : ''}}"
+        data-field="name"
+        maxlength="30"
+        value="{{name}}"
+        bindinput="onNameInput"
+        bindfocus="onFieldFocus"
+        bindblur="onFieldBlur"
+        placeholder="例如：大奇"
+        placeholder-style="color: rgba(255,255,255,0.4); -webkit-text-fill-color: rgba(255,255,255,0.4);"
+        cursor-color="#8B5CF6"
+        confirm-type="done"
+        always-embed="true"
+      />
+    </view>
 
-    <view class="field-label">所属协作区或服务队</view>
-    <picker range="{{organizations}}" range-key="name" value="{{organizationIndex}}" bindchange="onOrganizationChange">
-      <view class="picker-value">{{organizations.length ? organizations[organizationIndex].name : '暂无组织数据'}}</view>
-    </picker>
+    <view class="field-group">
+      <view class="field-label">所属协作区或服务队</view>
+      <picker
+        class="picker-control {{focusedField === 'organization' ? 'is-focused' : ''}}"
+        range="{{organizations}}"
+        range-key="name"
+        value="{{organizationIndex}}"
+        bindtap="onPickerOpen"
+        bindchange="onOrganizationChange"
+        bindcancel="onPickerCancel"
+      >
+        <view class="picker-value">{{organizations.length ? organizations[organizationIndex].name : '暂无组织数据'}}</view>
+      </picker>
+    </view>
 
     <view class="account-row"><text>账号尾号</text><text>{{accountSuffix}}</text></view>
     <button class="save-button" loading="{{saving}}" disabled="{{saving || !organizations.length}}" bindtap="save">提交内部资料</button>

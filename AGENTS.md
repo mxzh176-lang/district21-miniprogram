@@ -13,6 +13,7 @@ Non-negotiable priorities, in order:
 7. Do not delete audit logs, weaken permissions or broaden data visibility merely to make a feature work.
 8. Whenever files under `cloudfunctions/` change, explicitly tell the user that the affected cloud function must be redeployed before testing the feature.
 9. Dark-theme forms must keep typed text visible on real devices and in WeChat DevTools. Inputs and textareas need explicit text color, placeholder color, cursor color and stable native rendering settings.
+10. All image and file uploads must use `miniprogram/services/file-upload-service.js` through `uploadOrgFile(params)`. Pages and feature services must not construct `cloudPath` themselves. Every successful upload must create a `file_records` entry.
 
 ## WeChat Review Gate
 

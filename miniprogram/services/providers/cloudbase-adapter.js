@@ -47,4 +47,11 @@ function uploadFile(cloudPath, filePath) {
   return wx.cloud.uploadFile({ cloudPath, filePath })
 }
 
-module.exports = { initialize, invoke, uploadFile }
+function deleteFiles(fileList) {
+  if (!wx.cloud || !wx.cloud.deleteFile) {
+    return Promise.reject(new Error('当前基础库不支持删除云文件'))
+  }
+  return wx.cloud.deleteFile({ fileList })
+}
+
+module.exports = { initialize, invoke, uploadFile, deleteFiles }

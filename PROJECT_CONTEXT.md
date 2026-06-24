@@ -32,6 +32,7 @@
 - 组织、纪事、用户分别经 service 层处理，CloudBase 细节留在 service、adapter 或云函数层。
 - 数据按协作区、服务队、岗位和任期隔离，支持同一用户拥有多个可叠加权限。
 - 图片独立存储并通过 `event_image` 关联事件，不直接塞进纪事记录。
+- 所有图片和文件统一通过 `miniprogram/services/file-upload-service.js` 的 `uploadOrgFile(params)` 上传，并同步写入 `file_records`；页面不得自行拼接 `cloudPath`。
 - 数据结构须可迁移到独立服务器、阿里云 RDS MySQL 和 OSS。
 - 修改任何 `cloudfunctions/` 文件后，必须明确提醒重新部署对应云函数；修改纯前端文件不需要部署 API。
 
@@ -61,6 +62,7 @@
 - `user_role`
 - `event_record`
 - `event_image`
+- `file_records`
 - `operation_log`
 
 扩展模型包括岗位授权、档案、待办和账目；新增集合前先检查现有实现，避免重复模型。

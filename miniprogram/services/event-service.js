@@ -1,4 +1,5 @@
 const cloudbase = require('./providers/cloudbase-adapter')
+const { uploadOrgFile, archivePort } = require('./file-upload-service')
 
 const ORGANIZATION_IDS = {
   district: 'org_region_21_suihua',
@@ -142,11 +143,19 @@ async function execute(action, payload, localFallback) {
         images.push({ imageUrl: photo, objectKey: '' })
         continue
       }
-      const suffixMatch = String(photo).match(/\.([a-zA-Z0-9]+)(?:\?|$)/)
-      const suffix = suffixMatch ? suffixMatch[1].toLowerCase() : 'jpg'
-      const objectKey = `events/${toCloudOrganizationId(payload.entry.organizationId)}/${response.id}/${Date.now()}-${index}.${suffix}`
-      const uploaded = await cloudbase.uploadFile(objectKey, photo)
-      images.push({ fileId: uploaded.fileID, objectKey })
+      const port = archivePort(payload.entry.categoryId, payload.entry.uploaderRole)
+      const uploaded = await uploadOrgFile({
+        filePath: photo,
+        organizationId: payload.entry.organizationId,
+        leaderRole: port.leaderRole,
+        departmentName: port.departmentName,
+        eventName: payload.entry.title,
+        sequence: index,
+        resourceType: 'event_record',
+        resourceId: response.id,
+        module: 'archives'
+      })
+      images.push({ fileId: uploaded.fileID, objectKey: uploaded.cloudPath })
     }
     await cloudbase.invoke('saveEventImages', { eventId: response.id, images })
     return {
@@ -165,4 +174,9 @@ async function execute(action, payload, localFallback) {
   return localFallback(action, payload)
 }
 
-module.exports = { handles, execute, toCloudOrganizationId, toLocalOrganizationId }
+module.exports = {
+  handles,
+  execute,
+  toCloudOrganizationId,
+  toLocalOrganizationId
+}

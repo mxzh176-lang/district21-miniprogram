@@ -105,7 +105,7 @@
   font-size: 18rpx;
 }
 
-.structure-entry {
+.feature-entry {
   display: flex;
   align-items: center;
   margin-top: 16rpx;
@@ -114,7 +114,7 @@
   background: #1b153b;
 }
 
-.structure-icon {
+.feature-icon {
   display: flex;
   flex: 0 0 58rpx;
   align-items: center;
@@ -132,16 +132,16 @@
 .honor-entry { border-left: 5rpx solid #c39a3a; }
 .honor-icon { color: #2b210c; background: #d4ad4f; }
 
-.structure-copy {
+.feature-copy {
   flex: 1;
 }
 
-.structure-title {
+.feature-title {
   font-size: 25rpx;
   font-weight: 700;
 }
 
-.structure-desc {
+.feature-desc {
   margin-top: 5rpx;
   color: #7c8984;
   font-size: 18rpx;
@@ -498,7 +498,7 @@
 }
 
 .team-strip,
-.structure-entry,
+.feature-entry,
 .task-focus,
 .notice-bar {
   border: 1rpx solid rgba(201, 130, 255, 0.16);
@@ -506,7 +506,7 @@
   box-shadow: 0 14rpx 38rpx rgba(4, 4, 22, 0.22);
 }
 
-.structure-icon,
+.feature-icon,
 .date-box {
   background: linear-gradient(145deg, #a25ee9, #367fdc);
   box-shadow: 0 8rpx 22rpx rgba(123, 78, 211, 0.3);

@@ -131,10 +131,6 @@ Page({
     wx.navigateTo({ url: '/pages/admin/index' })
   },
 
-  goStructure() {
-    wx.navigateTo({ url: '/pages/structure/index' })
-  },
-
   goHonors() {
     wx.navigateTo({ url: '/pages/honors/index' })
   }

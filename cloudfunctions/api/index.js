@@ -13,6 +13,7 @@ const COLLECTIONS = {
   roleAssignment: 'role_assignment',
   eventRecord: 'event_record',
   eventImage: 'event_image',
+  fileRecord: 'file_records',
   operationLog: 'operation_log',
   ledgerRecord: 'ledger_record',
   honorRecord: 'honor_record',
@@ -1380,6 +1381,95 @@ async function saveEventImages(openid, event = {}) {
   return { eventId, imageCount: images.length }
 }
 
+async function ensureFileRecordCollection() {
+  try {
+    await db.collection(COLLECTIONS.fileRecord).limit(1).get()
+  } catch (error) {
+    if (typeof db.createCollection !== 'function') throw error
+    try {
+      await db.createCollection(COLLECTIONS.fileRecord)
+    } catch (createError) {
+      if (!/exist|already/i.test(createError.message || '')) throw createError
+    }
+  }
+}
+
+async function saveFileRecord(openid, event = {}) {
+  const user = await requirePlatformUser(openid)
+  const input = event.record || {}
+  const organizationId = canonicalOrganizationId(input.organizationId)
+  const resourceType = cleanText(input.resourceType, 40) || 'event_record'
+  const resourceId = cleanText(input.resourceId, 100)
+  const module = cleanText(input.module, 40) || 'archives'
+  if (resourceType === 'event_record') {
+    const result = await db.collection(COLLECTIONS.eventRecord)
+      .where({ id: resourceId })
+      .limit(1)
+      .get()
+    const record = result.data[0]
+    if (!record) throw Object.assign(new Error('文件关联的事件不存在'), { code: 'FILE_RESOURCE_NOT_FOUND' })
+    if (record.organizationId !== organizationId) {
+      throw Object.assign(new Error('文件组织与事件组织不一致'), { code: 'FILE_ORGANIZATION_MISMATCH' })
+    }
+    await requireEventEditor(openid, record, 'update')
+  } else {
+    const allowed = await canAdministerOrganization(user.id, organizationId) ||
+      await hasPlatformGrant(user.id, module, 'create', { organizationId })
+    if (!allowed) {
+      throw Object.assign(new Error('当前用户没有该组织的文件上传权限'), { code: 'FILE_UPLOAD_PERMISSION_REQUIRED' })
+    }
+  }
+  const fixedPath = '中国狮子联会/哈尔滨代表处/二十一协作区/'
+  const cloudPath = cleanText(input.cloudPath, 1000).replace(/^\/+/, '')
+  const fileID = cleanText(input.fileID, 1000)
+  const serviceTeamName = cleanText(input.serviceTeamName, 40)
+  const leaderRole = cleanText(input.leaderRole, 40)
+  const departmentName = cleanText(input.departmentName, 60)
+  const eventName = cleanText(input.eventName, 100)
+  const serviceTeamNames = {
+    org_region_21_suihua: '协作区公共档案',
+    org_team_linghang: '领航服务队',
+    org_team_ailinghang: '爱领航服务队',
+    org_team_yuanhang: '远航服务队',
+    org_team_jingying: '精英服务队'
+  }
+  const expectedTeamName = serviceTeamNames[organizationId]
+  if (!expectedTeamName || serviceTeamName !== expectedTeamName ||
+      !cloudPath.startsWith(`${fixedPath}${serviceTeamName}/`) || !fileID || !leaderRole || !eventName) {
+    throw Object.assign(new Error('文件归档路径或必填信息不完整'), { code: 'INVALID_FILE_RECORD' })
+  }
+  await ensureFileRecordCollection()
+  const data = {
+    id: businessId('file'),
+    organizationId,
+    orgLevel: '中国狮子联会',
+    representativeOffice: '哈尔滨代表处',
+    cooperationArea: '二十一协作区',
+    serviceTeamName,
+    leaderRole,
+    departmentName,
+    eventName,
+    cloudPath,
+    fileID,
+    fileType: cleanText(input.fileType, 100) || 'application/octet-stream',
+    originalFileName: cleanText(input.originalFileName, 200),
+    uploaderOpenid: user.openid,
+    uploaderName: user.name,
+    resourceType,
+    resourceId,
+    module,
+    provider: 'cloudbase',
+    status: 'active',
+    createdAt: now(),
+    updatedAt: now()
+  }
+  await db.collection(COLLECTIONS.fileRecord).add({ data })
+  await writePlatformLog(user, 'upload', 'file_record', data.id, {
+    organizationId, cloudPath, resourceType, resourceId
+  })
+  return data
+}
+
 async function listLedgerRecords(openid, event = {}) {
   await requirePlatformUser(openid)
   const organizationId = cleanText(event.organizationId, 100)
@@ -1999,6 +2089,7 @@ const handlers = {
   archiveEventRecord,
   listEventImages,
   saveEventImages,
+  saveFileRecord,
   listLedgerRecords,
   saveLedgerRecord,
   deleteLedgerRecord,
