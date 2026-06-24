@@ -221,6 +221,21 @@ async function canAdministerOrganization(userId, organizationId) {
   )
 }
 
+async function canEditServiceTeamPositions(userId, organizationId) {
+  organizationId = canonicalOrganizationId(organizationId)
+  const organization = await requireActiveOrganization(organizationId)
+  if (organization.type !== 'team') return false
+  const roles = await platformRoles(userId)
+  if (roles.some(item => item.role === 'super_admin')) return true
+  const ancestorIds = organization.ancestorIds || []
+  return roles.some(item =>
+    item.role === 'team_admin'
+      ? item.organizationId === organizationId
+      : item.role === 'area_admin' &&
+        (item.organizationId === organizationId || ancestorIds.includes(item.organizationId))
+  )
+}
+
 async function requireEventEditor(openid, record = {}, action = 'update') {
   const user = await requirePlatformUser(openid)
   const permissionContext = {
@@ -1000,7 +1015,7 @@ async function listPositions(openid, event = {}) {
 async function listPositionDirectory(openid, event = {}) {
   const user = await requirePlatformUser(openid)
   const organizationId = canonicalOrganizationId(event.organizationId)
-  await requireActiveOrganization(organizationId)
+  const organization = await requireActiveOrganization(organizationId)
   const [positionResult, assignmentResult, userResult] = await Promise.all([
     db.collection(COLLECTIONS.position).where({ organizationId, status: 'active' }).orderBy('sortOrder', 'asc').limit(500).get(),
     db.collection(COLLECTIONS.roleAssignment).where({ organizationId, status: 'active' }).limit(500).get(),
@@ -1012,8 +1027,8 @@ async function listPositionDirectory(openid, event = {}) {
   const activeAssignments = assignmentResult.data.filter(item =>
     (!item.startDate || item.startDate <= today) && (!item.endDate || item.endDate >= today)
   )
-  const administrator = await canAdministerOrganization(user.id, organizationId)
-  const configuredPortPermissions = await activeUserPermissions(user.id)
+  const administrator = organization.type === 'team' &&
+    await canEditServiceTeamPositions(user.id, organizationId)
   return Promise.all(positionResult.data.map(async position => {
     const assignment = activeAssignments.find(item => item.positionId === position.id)
     return {
@@ -1022,20 +1037,11 @@ async function listPositionDirectory(openid, event = {}) {
       organizationId,
       name: position.name,
       parentPositionId: position.parentPositionId || '',
-      person: assignment ? userMap[assignment.userId] || '待完善姓名' : '待授权',
-      userId: assignment ? assignment.userId : '',
+      person: assignment ? assignment.memberName || userMap[assignment.memberId || assignment.userId] || '待完善姓名' : '待授权',
+      userId: assignment ? assignment.memberId || assignment.userId || '' : '',
       startDate: assignment ? assignment.startDate || '' : '',
       endDate: assignment ? assignment.endDate || '' : '',
-      canEdit: configuredPortPermissions.length
-        ? (await portPermissionState(user.id, 'archive', 'update', {
-            organizationId,
-            positionId: position.id
-          })).allowed
-        : administrator || await hasPlatformGrant(user.id, 'archives', 'update', {
-            organizationId,
-            positionId: position.id,
-            parentPositionId: position.parentPositionId || ''
-          })
+      canEdit: administrator
     }
   }))
 }
@@ -1046,10 +1052,11 @@ async function savePositionDirectory(openid, event = {}) {
   const organizationId = canonicalOrganizationId(input.organizationId)
   const positionId = cleanText(input.id, 140)
   const name = cleanText(input.name, 100)
-  const userId = cleanText(input.userId, 100)
+  const memberName = cleanText(input.memberName, 40)
+  const memberId = cleanText(input.memberId || input.userId, 100)
   const startDate = cleanText(input.startDate, 10)
   const endDate = cleanText(input.endDate, 10)
-  if (!organizationId || !positionId || !name || !userId || !startDate || !endDate) {
+  if (!organizationId || !positionId || !name || !memberName || !startDate || !endDate) {
     throw Object.assign(new Error('岗位、负责人和授权日期不能为空'), { code: 'INVALID_POSITION_DIRECTORY' })
   }
   if (startDate > endDate) {
@@ -1061,19 +1068,16 @@ async function savePositionDirectory(openid, event = {}) {
     .get()
   const position = result.data[0]
   if (!position) throw Object.assign(new Error('所选岗位不存在'), { code: 'POSITION_NOT_FOUND' })
-  const portState = await portPermissionState(operator.id, 'archive', 'update', { organizationId, positionId })
-  const allowed = portState.allowed || (!portState.configured && (
-    await canAdministerOrganization(operator.id, organizationId) ||
-    await hasPlatformGrant(operator.id, 'archives', 'update', {
-      organizationId,
-      positionId,
-      parentPositionId: position.parentPositionId || ''
-    })
-  ))
-  if (!allowed) {
+  if (!await canEditServiceTeamPositions(operator.id, organizationId)) {
     throw Object.assign(new Error('无权限操作'), { code: 'PERMISSION_DENIED' })
   }
-  await requireAuthorizationTarget(userId)
+  const organization = await requireActiveOrganization(organizationId)
+  if (memberId) {
+    const member = await requireAuthorizationTarget(memberId)
+    if (member.name !== memberName) {
+      throw Object.assign(new Error('所选成员与负责人姓名不一致'), { code: 'POSITION_MEMBER_MISMATCH' })
+    }
+  }
   await db.collection(COLLECTIONS.position).doc(position._id).update({ data: { name, updatedAt: now() } })
   const assignments = await db.collection(COLLECTIONS.roleAssignment)
     .where({ organizationId, positionId, status: 'active' })
@@ -1088,21 +1092,34 @@ async function savePositionDirectory(openid, event = {}) {
     id: businessId('assignment'),
     areaId: 'org_region_21_suihua',
     teamId: organizationId.includes('_team_') ? organizationId : null,
+    serviceTeamId: organizationId,
+    serviceTeamName: organization.name,
     organizationId,
     positionId,
-    userId,
-    memberId: userId,
+    positionKey: position.code,
+    positionName: name,
+    memberName,
+    userId: memberId,
+    memberId,
     roleType: 'role_manager',
     startDate,
     endDate,
     status: 'active',
     createdBy: operator.id,
+    updatedBy: operator.id,
     createdAt: now(),
     updatedAt: now()
   }
   await db.collection(COLLECTIONS.roleAssignment).add({ data: assignment })
   await writePlatformLog(operator, 'update', 'position_directory', positionId, {
-    organizationId, positionId, name, userId, startDate, endDate
+    serviceTeamId: organizationId,
+    serviceTeamName: organization.name,
+    positionKey: position.code,
+    positionName: name,
+    memberName,
+    memberId,
+    updatedBy: operator.id,
+    updatedAt: assignment.updatedAt
   })
   return { ...assignment, name }
 }

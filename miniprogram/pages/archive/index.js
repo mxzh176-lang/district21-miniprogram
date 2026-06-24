@@ -53,8 +53,11 @@ Page({
         : item)
     selectedOrganization = {
       ...selectedOrganization,
+      canEditTeamPositions: permission.canEditServiceTeamPositions(this.data.session, selectedOrganization),
       categories: displayCategories.map(category => ({
         ...category,
+        canEditDirectory: Boolean(category.canEditDirectory) &&
+          permission.canEditServiceTeamPositions(this.data.session, selectedOrganization),
         canMaintain: category.id === 'treasurer'
           ? permission.canMaintainLedger(this.data.session, {
             organizationId: selectedOrganization.id,
@@ -70,6 +73,8 @@ Page({
           }),
         children: (category.children || []).map(child => ({
           ...child,
+          canEditDirectory: Boolean(child.canEditDirectory) &&
+            permission.canEditServiceTeamPositions(this.data.session, selectedOrganization),
           canMaintain: permission.canMaintainPosition(this.data.session, {
             organizationId: selectedOrganization.id,
             cloudOrganizationId: selectedOrganization.cloudId,
@@ -109,8 +114,14 @@ Page({
   editPosition(event) {
     const positionId = event.currentTarget.dataset.position
     const organizationId = this.data.selectedOrganization.cloudId || this.data.selectedOrganization.id
-    wx.navigateTo({
-      url: `/pages/archive/position-edit/index?organizationId=${encodeURIComponent(organizationId)}&positionId=${encodeURIComponent(positionId)}`
+    wx.showActionSheet({
+      itemList: ['选择成员', '输入姓名'],
+      success: result => {
+        const inputMode = result.tapIndex === 1 ? 'manual' : 'member'
+        wx.navigateTo({
+          url: `/pages/archive/position-edit/index?organizationId=${encodeURIComponent(organizationId)}&positionId=${encodeURIComponent(positionId)}&inputMode=${inputMode}`
+        })
+      }
     })
   },
 
