@@ -31,6 +31,21 @@ const ORGANIZATION_ANCESTORS = {
   org_team_yuanhang: ['org_region_21_suihua'],
   org_team_jingying: ['org_region_21_suihua']
 }
+const TEAM_ROLE_SUPERVISORS = {
+  secretary: ['captain', 'secretary'],
+  treasurer: ['captain', 'secretary'],
+  admin: ['captain', 'secretary'],
+  tamer: ['captain', 'secretary'],
+  'member-retention': ['captain', 'secretary', 'first-vp'],
+  'leadership-training': ['captain', 'secretary', 'first-vp'],
+  'external-exchange': ['captain', 'secretary', 'first-vp'],
+  'service-plan': ['captain', 'secretary', 'second-vp'],
+  'news-publicity': ['captain', 'secretary', 'second-vp'],
+  'fundraising-plan': ['captain', 'secretary', 'second-vp'],
+  'care-committee': ['captain', 'secretary', 'third-vp'],
+  'fellowship-committee': ['captain', 'secretary', 'third-vp'],
+  'annual-meeting': ['captain', 'secretary', 'third-vp']
+}
 
 function roleNames(user) {
   if (!user) return []
@@ -76,6 +91,7 @@ function canAccessOrganization(user, organization) {
 
 function canAccessMenu(user, menu) {
   if (isSuperAdmin(user)) return true
+  if (hasAnyTeamFullAccess(user)) return true
   if (hasPortPermission(user, MODULE_ALIASES[menu] || menu, 'read')) return true
   if (hasGrant(user, menu, 'read')) return true
   if ((user.permissions || []).includes(menu)) return true
@@ -113,6 +129,8 @@ function portScopeMatches(grant, user, context = {}) {
 
 function hasPortPermission(user, module, action = 'read', context = {}) {
   module = MODULE_ALIASES[module] || module
+  const organizationId = context.cloudOrganizationId || context.organizationId || context.teamId
+  if (organizationId && isTeamFullAccessManager(user, organizationId)) return true
   const hasScopeContext = Boolean(
     context.organizationId || context.cloudOrganizationId || context.teamId ||
     context.positionId || context.categoryId || context.creatorId || context.createdBy
@@ -168,6 +186,8 @@ function hasGrant(user, module, action = 'read', context = {}) {
 function canPerform(user, module, action = 'read', context = {}) {
   if (isSuperAdmin(user)) return true
   if (activePortPermissions(user).length) return hasPortPermission(user, module, action, context)
+  if (hasAnyTeamFullAccess(user) &&
+    !(context.organizationId || context.cloudOrganizationId || context.teamId)) return true
   const organization = {
     id: context.organizationId || context.teamId,
     cloudId: context.cloudOrganizationId,
@@ -230,6 +250,40 @@ function isActiveRoleManager(user, organizationId, positionId) {
   })
 }
 
+function isTeamFullAccessManager(user, organizationId) {
+  return ['captain', 'secretary'].some(positionId =>
+    isActiveRoleManager(user, organizationId, positionId)
+  )
+}
+
+function hasAnyTeamFullAccess(user) {
+  if (!user) return false
+  return (user.roles || []).some(role =>
+    role && typeof role === 'object' &&
+    normalizeRole(role.role) === 'role_manager' &&
+    role.status === 'active' &&
+    ['captain', 'secretary'].some(positionId =>
+      role.positionId === positionId || String(role.positionId || '').endsWith(`_${positionId}`)) &&
+    Boolean(role.startDate) && role.startDate <= new Date().toISOString().slice(0, 10) &&
+    (!role.endDate || role.endDate >= new Date().toISOString().slice(0, 10))
+  )
+}
+
+function canConfirmPersonnelRole(user, organizationId, targetPositionId) {
+  if (!user || !organizationId || !targetPositionId) return false
+  if (isSuperAdmin(user)) return true
+  const canonicalOrganizationId = ORGANIZATION_ALIASES[organizationId] || organizationId
+  const ancestorIds = ORGANIZATION_ANCESTORS[canonicalOrganizationId] || []
+  if ((user.roles || []).some(role => role && typeof role === 'object' &&
+    isActiveAssignment(role) &&
+    ((normalizeRole(role.role) === 'team_admin' && role.organizationId === canonicalOrganizationId) ||
+      (normalizeRole(role.role) === 'area_admin' && ancestorIds.includes(role.organizationId))))) return true
+  if (['area-coordinator', 'area-officer'].some(positionId =>
+    ancestorIds.some(areaId => isActiveRoleManager(user, areaId, positionId)))) return true
+  return (TEAM_ROLE_SUPERVISORS[targetPositionId] || ['captain', 'secretary'])
+    .some(positionId => isActiveRoleManager(user, canonicalOrganizationId, positionId))
+}
+
 function canMaintainPosition(user, context = {}, action = 'update') {
   if (!user) return false
   if (hasGrant(user, 'archives', action, context)) return true
@@ -242,6 +296,7 @@ function canMaintainPosition(user, context = {}, action = 'update') {
   const userId = user.id || user._id
   const nickname = user.name || user.nickname
   const organizationIds = [context.organizationId, context.cloudOrganizationId].filter(Boolean)
+  if (organizationIds.some(organizationId => isTeamFullAccessManager(user, organizationId))) return true
   if (context.person && nickname && context.person === nickname) return true
   return (user.roles || []).some(role =>
     typeof role === 'object' &&
@@ -360,6 +415,9 @@ module.exports = {
   canEditServiceTeamPositions,
   isActiveAssignment,
   isActiveRoleManager,
+  isTeamFullAccessManager,
+  hasAnyTeamFullAccess,
+  canConfirmPersonnelRole,
   canMaintainPosition,
   canMaintainLedger,
   canMaintainHonors,
