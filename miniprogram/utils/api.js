@@ -543,7 +543,8 @@ function localCall(action, payload = {}) {
         .filter(item => {
           const organizationMatch = !payload.organizationId || item.organizationId === payload.organizationId
           const categoryMatch = !payload.categoryId || item.categoryId === payload.categoryId
-          return organizationMatch && categoryMatch
+          const monthMatch = !payload.eventMonth || String(item.date || '').slice(0, 7) === payload.eventMonth
+          return organizationMatch && categoryMatch && monthMatch
         })
         .map(archiveListItem)
       break

@@ -59,6 +59,74 @@
   font-size: 18rpx;
 }
 
+.filter-card {
+  margin: 18rpx 0;
+  padding: 22rpx;
+  border: 1rpx solid rgba(201, 130, 255, 0.18);
+  border-radius: 21rpx;
+  background: #1b153b;
+}
+
+.filter-title-row,
+.filter-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14rpx;
+}
+
+.filter-title {
+  color: #f7f3ff;
+  font-size: 24rpx;
+  font-weight: 700;
+}
+
+.filter-reset {
+  color: #7be4ff;
+  font-size: 19rpx;
+}
+
+.filter-row {
+  margin-top: 18rpx;
+}
+
+.filter-picker {
+  flex: 1;
+  min-width: 0;
+}
+
+.filter-value {
+  padding: 17rpx 18rpx;
+  border-radius: 16rpx;
+  background: #2a2050;
+}
+
+.filter-label,
+.filter-selection {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filter-label {
+  color: #9189a9;
+  font-size: 16rpx;
+}
+
+.filter-selection {
+  margin-top: 5rpx;
+  color: #fff;
+  font-size: 21rpx;
+}
+
+.filter-result {
+  margin-top: 14rpx;
+  color: #b4acc6;
+  font-size: 17rpx;
+  text-align: right;
+}
+
 .archive-event {
   display: flex;
   align-items: center;

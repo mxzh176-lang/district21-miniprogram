@@ -125,6 +125,7 @@ async function execute(action, payload, localFallback) {
     const records = await cloudbase.invoke('listEventRecords', {
       organizationId: toCloudOrganizationId(payload.organizationId),
       categoryId: payload.categoryId,
+      eventMonth: payload.eventMonth,
       status: payload.status || 'published',
       limit: 100
     })

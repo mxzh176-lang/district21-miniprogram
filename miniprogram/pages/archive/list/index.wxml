@@ -19,7 +19,29 @@
 
   <view class="permission-note" wx:if="{{loadError}}">{{loadError}}</view>
 
-  <view wx:if="{{entries.length}}" class="event-list">
+  <view class="filter-card">
+    <view class="filter-title-row">
+      <view class="filter-title">查找历史事件</view>
+      <text class="filter-reset" wx:if="{{eventMonth}}" bindtap="resetFilters">重置时间</text>
+    </view>
+    <view class="filter-row">
+      <picker class="filter-picker" range="{{categoryOptions}}" range-key="name" value="{{categoryIndex}}" bindchange="changeCategory">
+        <view class="filter-value">
+          <text class="filter-label">事件类目</text>
+          <text class="filter-selection">{{categoryOptions[categoryIndex].name || categoryName}}⌄</text>
+        </view>
+      </picker>
+      <picker class="filter-picker" mode="date" fields="month" value="{{eventMonth}}" bindchange="changeEventMonth">
+        <view class="filter-value">
+          <text class="filter-label">时间</text>
+          <text class="filter-selection">{{eventMonthLabel}}⌄</text>
+        </view>
+      </picker>
+    </view>
+    <view class="filter-result">{{loading ? '正在查找…' : '找到 ' + entries.length + ' 条事件'}}</view>
+  </view>
+
+  <view wx:if="{{!loading && entries.length}}" class="event-list">
     <view class="archive-event" wx:for="{{entries}}" wx:key="_id"
       data-id="{{item._id}}" bindtap="openDetail">
       <image wx:if="{{item.coverImage}}" class="event-cover" src="{{item.coverImage}}" mode="aspectFill" />
@@ -36,6 +58,7 @@
         </view>
         <view class="event-summary">{{item.summary}}</view>
         <view class="event-meta">
+          <text>{{item.uploaderRole}}</text>
           <text>{{item.photoCount}}张照片</text>
           <text>录入：{{item.uploadedBy}}</text>
         </view>
@@ -50,5 +73,5 @@
       <view class="arrow">›</view>
     </view>
   </view>
-  <view wx:else class="empty">该栏目暂无记录，可点击“新增记录”开始归档。</view>
+  <view wx:elif="{{!loading}}" class="empty">没有符合当前时间和类目的事件，请调整筛选条件。</view>
 </view>
