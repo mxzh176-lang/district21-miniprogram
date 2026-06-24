@@ -46,6 +46,8 @@ function recordToArchiveEntry(record) {
     categoryId: record.categoryId || record.category,
     date: record.eventDate || '',
     dateLabel: record.eventDate || '',
+    location: record.location || '',
+    participantCount: Number(record.participantCount) || 0,
     title: record.title || '',
     team: '',
     uploadedBy: record.ownerName || '',
@@ -85,6 +87,7 @@ function archiveEntryToRecord(entry) {
     archiveId: `archive_${organizationId}_${positionId || 'main'}`,
     eventDate: entry.date,
     location: entry.location || '',
+    participantCount: Number(entry.participantCount) || 0,
     ownerName: entry.uploadedBy || '',
     status: entry.status || 'draft',
     visibility: 'organization',
@@ -125,6 +128,7 @@ async function execute(action, payload, localFallback) {
     const records = await cloudbase.invoke('listEventRecords', {
       organizationId: toCloudOrganizationId(payload.organizationId),
       categoryId: payload.categoryId,
+      eventMonth: payload.eventMonth,
       status: payload.status || 'published',
       limit: 100
     })

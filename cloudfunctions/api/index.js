@@ -1605,6 +1605,7 @@ async function saveEventRecord(openid, event = {}) {
     eventDate,
     eventMonth: eventDate && eventDate.length >= 7 ? eventDate.slice(0, 7) : '',
     location: cleanText(record.location, 120),
+    participantCount: Math.max(0, Math.floor(Number(record.participantCount) || 0)),
     creatorId: member.id,
     ownerName: cleanText(record.ownerName || member.name, 40),
     status: ['draft', 'pending_review', 'published', 'rejected', 'archived'].includes(record.status)

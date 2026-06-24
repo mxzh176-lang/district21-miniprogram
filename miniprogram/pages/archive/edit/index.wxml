@@ -6,9 +6,9 @@
     <view class="scope-progress">
       <view class="progress-item active"><text>1</text><view>填写</view></view>
       <view class="progress-line"></view>
-      <view class="progress-item"><text>2</text><view>核对</view></view>
+      <view class="progress-item"><text>2</text><view>内容</view></view>
       <view class="progress-line"></view>
-      <view class="progress-item"><text>3</text><view>归档</view></view>
+      <view class="progress-item"><text>3</text><view>保存</view></view>
     </view>
   </view>
 
@@ -16,7 +16,7 @@
     <view class="tip-icon">✓</view>
     <view>
       <view class="tip-title">当前账号可以录入</view>
-      <view class="tip-text">仅当前有效岗位负责人可录入，归档前请核对文字、附件和所属服务队。</view>
+      <view class="tip-text">事件自动关联当前服务队、岗位和录入账号。</view>
     </view>
   </view>
   <view class="permission-tip denied" wx:else>
@@ -57,6 +57,22 @@
           placeholder-class="form-placeholder" placeholder-style="color:#626d82;font-weight:500;"
           placeholder="{{formCopy.titlePlaceholder}}" />
         <view class="field-help">标题建议控制在 10 至 30 个字，方便历史事件列表展示。</view>
+      </view>
+
+      <view class="field">
+        <view class="field-head"><text class="label">地点</text><text class="required">必填</text></view>
+        <input class="input wide-input" style="color:#000000;-webkit-text-fill-color:#000000;font-weight:700;opacity:1;"
+          cursor-color="#7447c8" value="{{form.location}}" data-field="location" bindinput="onInput"
+          placeholder-class="form-placeholder" placeholder-style="color:#626d82;font-weight:500;"
+          placeholder="请输入事件地点" />
+      </view>
+
+      <view class="field">
+        <view class="field-head"><text class="label">参与人数</text><text class="required">必填</text></view>
+        <input class="input wide-input" type="number" style="color:#000000;-webkit-text-fill-color:#000000;font-weight:700;opacity:1;"
+          cursor-color="#7447c8" value="{{form.participantCount}}" data-field="participantCount" bindinput="onInput"
+          placeholder-class="form-placeholder" placeholder-style="color:#626d82;font-weight:500;"
+          placeholder="请输入参与人数，例如 20" />
       </view>
     </view>
 
@@ -123,7 +139,7 @@
       <view class="section-heading">
         <view class="section-number">03</view>
         <view>
-          <view class="section-title">附件与归档信息</view>
+          <view class="section-title">图片与关联信息</view>
           <view class="section-desc">最多上传 9 张与本条内部档案相关的图片</view>
         </view>
       </view>
@@ -157,7 +173,6 @@
   </block>
 
   <view class="footer-actions" wx:if="{{canEdit}}">
-    <button class="draft-button" bindtap="saveDraft">保存草稿</button>
-    <button class="publish-button" bindtap="publish">确认并归档</button>
+    <button class="publish-button" bindtap="saveEvent">保存事件</button>
   </view>
 </view>

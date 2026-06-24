@@ -82,6 +82,7 @@ Page({
     id: '',
     organizationId: '',
     categoryId: '',
+    positionId: '',
     organizationName: '',
     categoryName: '',
     canEdit: false,
@@ -89,6 +90,8 @@ Page({
     form: {
       date: '',
       title: '',
+      location: '',
+      participantCount: '',
       keywords: '',
       summary: '',
       content: '',
@@ -114,6 +117,7 @@ Page({
       id: options.id || '',
       organizationId: organization.id,
       categoryId,
+      positionId: position && (position.positionId || position.id) || categoryId,
       organizationName: organization.name,
       categoryName: position ? position.name : CATEGORY_NAMES[options.category] || '档案事件',
       canEdit: permission.canMaintainArchive(member, organization, categoryId, options.id ? 'update' : 'create'),
@@ -124,7 +128,7 @@ Page({
       }) || (!permission.activePortPermissions(member).length && permission.canMaintainArchive(member, organization, categoryId, 'update')),
       formCopy: FORM_COPY[categoryId] || DEFAULT_FORM_COPY,
       'form.date': this.formatDate(new Date()),
-      'form.uploadedBy': member.nickname || '当前管理员'
+      'form.uploadedBy': member.name || member.nickname || '当前岗位负责人'
     }
     this.setData(baseData)
     if (options.id) {
@@ -133,6 +137,8 @@ Page({
         form: {
           date: entry.date || '',
           title: entry.title || '',
+          location: entry.location || '',
+          participantCount: entry.participantCount === undefined ? '' : String(entry.participantCount),
           keywords: (entry.keywords || []).join(' '),
           summary: entry.summary || '',
           content: entry.content || '',
@@ -215,17 +221,17 @@ Page({
       'leadership-training': {
         title: `${owner}狮兄狮姐组织远航开展${keywords}培训`,
         summary: `${organizationName}围绕“${keywords}”形成领导力培训记录。`,
-        content: `培训日期：${form.date}\n培训主题：${keywords}\n组织人：${owner}\n\n一、培训目标：请补充\n二、讲师与参与人员：请补充\n三、课程内容：请补充\n四、学习成果：请补充\n五、后续实践计划：请补充\n六、嘉许记录：请补充。`
+        content: `培训日期：${form.date}\n培训主题：${keywords}\n组织人：${owner}\n\n一、培训目标：请补充\n二、讲师与参与人员：请补充\n三、课程内容：请补充\n四、学习成果：请补充\n五、后续实践计划：请补充。`
       },
       'external-exchange': {
         title: `${owner}狮兄狮姐开展远航${keywords}对外交流`,
         summary: `${organizationName}围绕“${keywords}”开展对外交流并形成后续合作清单。`,
-        content: `交流日期：${form.date}\n交流对象：请补充\n负责人：${owner}\n\n一、交流背景与目的：请补充\n二、参与人员：请补充\n三、交流内容：请补充\n四、达成共识：请补充\n五、后续合作与负责人：请补充\n六、嘉许记录：请补充。`
+        content: `交流日期：${form.date}\n交流对象：请补充\n负责人：${owner}\n\n一、交流背景与目的：请补充\n二、参与人员：请补充\n三、交流内容：请补充\n四、达成共识：请补充\n五、后续合作与负责人：请补充。`
       },
       'service-plan': {
         title: `${owner}狮兄狮姐带领远航开展${keywords}服务`,
         summary: `${organizationName}完成“${keywords}”公益服务并形成服务档案。`,
-        content: `服务日期：${form.date}\n服务项目：${keywords}\n负责人：${owner}\n\n一、服务对象与需求：请补充\n二、服务地点：请补充\n三、参与狮友与分工：请补充\n四、服务过程：请补充\n五、服务成果：请补充\n六、后续计划：请补充\n七、嘉许记录：请补充。`
+        content: `服务日期：${form.date}\n服务项目：${keywords}\n负责人：${owner}\n\n一、服务对象与需求：请补充\n二、服务地点：请补充\n三、参与狮友与分工：请补充\n四、服务过程：请补充\n五、服务成果：请补充\n六、后续计划：请补充。`
       },
       'news-publicity': {
         title: `${owner}狮兄狮姐完成远航${keywords}资料整理`,
@@ -245,12 +251,12 @@ Page({
       'fellowship-committee': {
         title: `${owner}狮兄狮姐组织远航开展${keywords}联谊`,
         summary: `${organizationName}完成“${keywords}”团队联谊记录。`,
-        content: `活动日期：${form.date}\n联谊主题：${keywords}\n负责人：${owner}\n\n一、参与人员：请补充\n二、活动安排：请补充\n三、现场情况：请补充\n四、团队反馈：请补充\n五、后续安排与嘉许：请补充。`
+        content: `活动日期：${form.date}\n联谊主题：${keywords}\n负责人：${owner}\n\n一、参与人员：请补充\n二、活动安排：请补充\n三、现场情况：请补充\n四、团队反馈：请补充\n五、后续安排：请补充。`
       },
       'annual-meeting': {
         title: `${owner}狮兄狮姐组织远航召开${keywords}年会`,
         summary: `${organizationName}形成“${keywords}”年会筹备与执行记录。`,
-        content: `记录日期：${form.date}\n年会主题：${keywords}\n负责人：${owner}\n\n一、时间地点：请补充\n二、流程与分工：请补充\n三、参与人员：请补充\n四、预算与物资：请补充\n五、现场成果：请补充\n六、嘉许名单与后续总结：请补充。`
+        content: `记录日期：${form.date}\n年会主题：${keywords}\n负责人：${owner}\n\n一、时间地点：请补充\n二、流程与分工：请补充\n三、参与人员：请补充\n四、预算与物资：请补充\n五、现场成果：请补充\n六、后续总结：请补充。`
       },
       'second-vp': {
         title: `${owner}狮兄狮姐推进远航${keywords}工作`,
@@ -260,7 +266,7 @@ Page({
       secretary: {
         title: `${owner}狮姐组织召开远航服务队${keywords}`,
         summary: `${organizationName}召开“${keywords}”，形成会议纪要、会议决议和后续待办。`,
-        content: `会议日期：${form.date}\n会议组织：${organizationName}\n档案分类：${categoryName}\n记录人：${owner}\n\n一、会议主题：${keywords}\n二、参会人员：请补充\n三、会议议题：请补充\n四、会议决议：请补充\n五、后续待办：请补充\n六、嘉许记录：请补充本次推动会议和落实事项的狮兄狮姐。`
+        content: `会议日期：${form.date}\n会议组织：${organizationName}\n档案分类：${categoryName}\n记录人：${owner}\n\n一、会议主题：${keywords}\n二、参会人员：请补充\n三、会议议题：请补充\n四、会议决议：请补充\n五、后续待办：请补充。`
       },
       'first-vp': {
         title: `${owner}狮兄狮姐推进远航${keywords}工作`,
@@ -275,7 +281,7 @@ Page({
       captain: {
         title: `${owner}狮兄狮姐推进远航${keywords}`,
         summary: `${organizationName}形成“${keywords}”队长统筹工作记录。`,
-        content: `记录日期：${form.date}\n统筹主题：${keywords}\n负责人：${owner}\n\n一、工作背景与目标：请补充\n二、岗位分工：请补充\n三、推进情况：请补充\n四、形成决议：请补充\n五、后续安排：请补充\n六、嘉许记录：请补充。`
+        content: `记录日期：${form.date}\n统筹主题：${keywords}\n负责人：${owner}\n\n一、工作背景与目标：请补充\n二、岗位分工：请补充\n三、推进情况：请补充\n四、形成决议：请补充\n五、后续安排：请补充。`
       },
       tamer: {
         title: `${owner}狮兄狮姐完成远航${keywords}纠察记录`,
@@ -296,7 +302,7 @@ Page({
     const fallback = {
       title: `${owner}狮兄狮姐完成远航${categoryName}：${keywords}`,
       summary: `${organizationName}围绕“${keywords}”完成${categoryName}相关记录。`,
-      content: `事件日期：${form.date}\n所属组织：${organizationName}\n档案分类：${categoryName}\n负责人：${owner}\n\n请补充工作背景、执行过程、完成情况、后续改进和嘉许记录。`
+      content: `事件日期：${form.date}\n所属组织：${organizationName}\n档案分类：${categoryName}\n负责人：${owner}\n\n请补充工作背景、执行过程、完成情况和后续改进。`
     }
     const draft = templates[categoryId] || fallback
     this.setData({
@@ -309,38 +315,36 @@ Page({
   },
 
   validate() {
-    const { date, title, content } = this.data.form
-    if (!date || !title.trim() || !content.trim()) {
-      wx.showToast({ title: '请填写日期、标题和详情', icon: 'none' })
+    const { date, title, location, participantCount, content } = this.data.form
+    if (!date || !title.trim() || !location.trim() || participantCount === '' || !content.trim()) {
+      wx.showToast({ title: '请完整填写事件必填项', icon: 'none' })
+      return false
+    }
+    const count = Number(participantCount)
+    if (!Number.isInteger(count) || count < 0) {
+      wx.showToast({ title: '参与人数须为非负整数', icon: 'none' })
       return false
     }
     return true
   },
 
-  async saveDraft() {
-    if (!this.validate()) return
-    try {
-      await this.saveEntry('draft')
-      wx.showToast({ title: '草稿已保存', icon: 'success' })
-    } catch (error) {
-      api.showError(error)
-    }
-  },
-
-  async saveEntry(status) {
-    const { id, form, organizationId, categoryId, organizationName, categoryName } = this.data
+  async saveEntry() {
+    const { id, form, organizationId, categoryId, positionId, organizationName, categoryName } = this.data
     const entry = await api.call('saveArchiveEntry', {
       entry: {
         _id: id || undefined,
         organizationId,
         categoryId,
+        positionId,
         date: form.date,
         dateLabel: form.date,
         title: form.title.trim(),
+        location: form.location.trim(),
+        participantCount: Number(form.participantCount),
         team: organizationName,
         uploadedBy: form.uploadedBy,
         uploaderRole: categoryName,
-        status,
+        status: 'published',
         photoCount: form.photoCount,
         photos: uniquePhotos(form.photos),
         tone: 'blue',
@@ -360,22 +364,14 @@ Page({
     return entry
   },
 
-  publish() {
+  async saveEvent() {
     if (!this.validate()) return
-    wx.showModal({
-      title: '确认内部归档',
-      content: '归档后将进入组织内部历史记录。请确认文字、附件和所属服务队均已核对。',
-      confirmText: '确认归档',
-      success: async (result) => {
-        if (!result.confirm) return
-        try {
-          await this.saveEntry('published')
-          wx.showToast({ title: '归档成功', icon: 'success' })
-          setTimeout(() => wx.navigateBack(), 800)
-        } catch (error) {
-          api.showError(error)
-        }
-      }
-    })
+    try {
+      await this.saveEntry()
+      wx.showToast({ title: '事件已保存', icon: 'success' })
+      setTimeout(() => wx.navigateBack(), 800)
+    } catch (error) {
+      api.showError(error)
+    }
   }
 })

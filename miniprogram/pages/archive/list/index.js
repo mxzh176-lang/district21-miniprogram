@@ -40,6 +40,20 @@ const CATEGORY_NOTICES = {
   'news-publicity': '本栏目仅用于内部资料整理、审核、报送和留存，不形成面向公众的信息发布平台。'
 }
 
+function flattenCategories(organization) {
+  const seen = new Set()
+  return (organization.categories || []).flatMap(category => [category].concat(category.children || []))
+    .filter(category => {
+      if (!category.id || seen.has(category.id) || category.id === 'treasurer') return false
+      seen.add(category.id)
+      return true
+    })
+    .map(category => ({
+      id: category.id,
+      name: category.name || CATEGORY_NAMES[category.id] || '未命名类目'
+    }))
+}
+
 Page({
   data: {
     organizationId: '',
@@ -47,6 +61,13 @@ Page({
     categoryName: '',
     organization: {},
     entries: [],
+    totalEventCount: 0,
+    positionPerson: '',
+    categoryOptions: [],
+    categoryIndex: 0,
+    eventMonth: '',
+    eventMonthLabel: '全部时间',
+    loading: false,
     canCreate: false,
     canEdit: false,
     canDelete: false,
@@ -67,18 +88,44 @@ Page({
 
   async onShow() {
     try {
-      const [organizations, entries, member] = await Promise.all([
+      this.setData({ loading: true })
+      const [organizations, member] = await Promise.all([
         api.call('listArchives'),
-        api.call('listArchiveEntries', {
-          organizationId: this.data.organizationId,
-          categoryId: this.data.categoryId
-        }),
         api.call('getSession')
       ])
       const organization = organizations.find(
         (item) => item.id === this.data.organizationId
       ) || organizations[0]
-      const position = permission.findArchivePosition(organization, this.data.categoryId)
+      const categoryOptions = flattenCategories(organization)
+      const categoryIndex = Math.max(categoryOptions.findIndex(item => item.id === this.data.categoryId), 0)
+      const selectedCategory = categoryOptions[categoryIndex] || {
+        id: this.data.categoryId,
+        name: this.data.categoryName
+      }
+      this.setData({ organization, member, categoryOptions, categoryIndex })
+      await this.loadEntries(selectedCategory.id)
+    } catch (error) {
+      this.setData({ loading: false, loadError: '档案列表加载失败，请重新编译后重试。' })
+      api.showError(error)
+    }
+  },
+
+  async loadEntries(categoryId = this.data.categoryId) {
+    try {
+      this.setData({ loading: true })
+      const query = {
+        organizationId: this.data.organizationId,
+        categoryId,
+        eventMonth: this.data.eventMonth
+      }
+      const [entries, allEntries] = await Promise.all([
+        api.call('listArchiveEntries', query),
+        this.data.eventMonth
+          ? api.call('listArchiveEntries', { organizationId: this.data.organizationId, categoryId })
+          : Promise.resolve(null)
+      ])
+      const position = permission.findArchivePosition(this.data.organization, categoryId)
+      const categoryName = position ? position.name : (CATEGORY_NAMES[categoryId] || '档案事件')
       const sortedEntries = entries
         .slice()
         .sort((a, b) => (a.order || 0) - (b.order || 0) || b.date.localeCompare(a.date))
@@ -89,20 +136,46 @@ Page({
           coverImage: item.photos && item.photos.length ? item.photos[0] : ''
         }))
       this.setData({
-        organization,
-        categoryName: position ? position.name : this.data.categoryName,
+        categoryId,
+        categoryName,
+        positionPerson: position && position.person ? position.person : '负责人待绑定',
+        categoryNotice: CATEGORY_NOTICES[categoryId] || '',
         entries: sortedEntries,
-        canCreate: permission.canMaintainArchive(member, organization, this.data.categoryId, 'create'),
-        canEdit: permission.canMaintainArchive(member, organization, this.data.categoryId, 'update'),
-        canDelete: permission.canMaintainArchive(member, organization, this.data.categoryId, 'delete'),
-        isSuperAdmin: permission.isSuperAdmin(member),
+        totalEventCount: (allEntries || entries).length,
+        canCreate: permission.canMaintainArchive(this.data.member, this.data.organization, categoryId, 'create'),
+        canEdit: permission.canMaintainArchive(this.data.member, this.data.organization, categoryId, 'update'),
+        canDelete: permission.canMaintainArchive(this.data.member, this.data.organization, categoryId, 'delete'),
+        isSuperAdmin: permission.isSuperAdmin(this.data.member),
+        loading: false,
         loadError: ''
       })
-      wx.setNavigationBarTitle({ title: `${organization.shortName} · ${position ? position.name : this.data.categoryName}` })
+      wx.setNavigationBarTitle({ title: `${this.data.organization.shortName} · ${categoryName}` })
     } catch (error) {
-      this.setData({ loadError: '档案列表加载失败，请重新编译后重试。' })
+      this.setData({ loading: false, loadError: '档案列表加载失败，请重新编译后重试。' })
       api.showError(error)
     }
+  },
+
+  async changeCategory(event) {
+    const categoryIndex = Number(event.detail.value)
+    const category = this.data.categoryOptions[categoryIndex]
+    if (!category) return
+    this.setData({ categoryIndex })
+    await this.loadEntries(category.id)
+  },
+
+  async changeEventMonth(event) {
+    const eventMonth = event.detail.value
+    this.setData({
+      eventMonth,
+      eventMonthLabel: `${eventMonth.slice(0, 4)}年${Number(eventMonth.slice(5, 7))}月`
+    })
+    await this.loadEntries()
+  },
+
+  async resetFilters() {
+    this.setData({ eventMonth: '', eventMonthLabel: '全部时间' })
+    await this.loadEntries()
   },
 
   openDetail(event) {

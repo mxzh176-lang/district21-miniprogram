@@ -313,6 +313,8 @@ function archiveListItem(item) {
     date: item.date,
     dateLabel: item.dateLabel,
     title: item.title,
+    location: item.location || '',
+    participantCount: Number(item.participantCount) || 0,
     team: item.team,
     uploadedBy: item.uploadedBy,
     uploaderRole: item.uploaderRole,
@@ -543,7 +545,8 @@ function localCall(action, payload = {}) {
         .filter(item => {
           const organizationMatch = !payload.organizationId || item.organizationId === payload.organizationId
           const categoryMatch = !payload.categoryId || item.categoryId === payload.categoryId
-          return organizationMatch && categoryMatch
+          const monthMatch = !payload.eventMonth || String(item.date || '').slice(0, 7) === payload.eventMonth
+          return organizationMatch && categoryMatch && monthMatch
         })
         .map(archiveListItem)
       break
