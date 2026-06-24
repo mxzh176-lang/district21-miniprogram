@@ -1,79 +1,110 @@
-<view class="page">
+<view class="page tasks-page">
   <view class="task-hero">
-    <view>
-      <view class="hero-kicker">MONTHLY PLAN</view>
-    <view class="hero-title">{{monthLabel}}协作待办</view>
-      <view class="hero-desc">完成后自动进入历史事件与对应档案</view>
+    <view class="hero-copy">
+      <view class="hero-kicker">二十一协作区</view>
+      <view class="hero-title">重点待办</view>
+      <view class="hero-desc">重要活动不错过，服务协作更清晰</view>
     </view>
     <view class="hero-actions">
-      <view class="progress-ring">
-        <view class="progress-number">{{doneCount}}/{{totalCount}}</view>
-        <view class="progress-label">已完成</view>
+      <view class="progress-summary">
+        <text class="progress-number">{{doneCount}}</text>
+        <text class="progress-divider">/</text>
+        <text>{{totalCount}}</text>
+        <view class="progress-label">本月完成</view>
       </view>
-      <button wx:if="{{canCreate}}" class="create-button" bindtap="createTask">创建待办</button>
+      <button wx:if="{{canCreate}}" class="create-button" bindtap="createTask"><text class="plus">＋</text>新增</button>
     </view>
   </view>
 
-  <view class="calendar-card">
-    <view class="calendar-head">
-      <view>
-        <view class="calendar-title">{{monthLabel}}事项日期</view>
-        <view class="calendar-subtitle">只显示有待办事项的日期</view>
-      </view>
-      <view class="today">{{taskDates.length}}个日期</view>
+  <view class="filter-panel">
+    <view class="status-row">
+      <view class="status-chip {{status === 'all' ? 'active' : ''}}" data-status="all" bindtap="selectStatus">全部 {{totalCount}}</view>
+      <view class="status-chip {{status === 'pending' ? 'active' : ''}}" data-status="pending" bindtap="selectStatus">待完成 {{totalCount - doneCount}}</view>
+      <view class="status-chip {{status === 'done' ? 'active' : ''}}" data-status="done" bindtap="selectStatus">已完成 {{doneCount}}</view>
     </view>
-    <scroll-view scroll-x class="date-scroll">
+
+    <scroll-view scroll-x class="team-scroll" enable-flex>
+      <view class="team-list">
+        <view class="team-chip {{teamId === item.id ? 'active' : ''}}" wx:for="{{teams}}" wx:key="id" data-team-id="{{item.id}}" bindtap="selectTeam">
+          <view class="team-mark team-{{item.id}}">{{item.initial}}</view>
+          <text>{{item.name}}</text>
+        </view>
+      </view>
+    </scroll-view>
+
+    <scroll-view scroll-x class="category-scroll" enable-flex>
+      <view class="categories">
+        <view class="category {{category === 'all' ? 'active' : ''}}" data-category="all" bindtap="selectCategory">全部分类</view>
+        <view class="category {{category === item ? 'active' : ''}}" wx:for="{{categories}}" wx:key="*this" data-category="{{item}}" bindtap="selectCategory">{{item}}</view>
+      </view>
+    </scroll-view>
+
+    <scroll-view scroll-x class="date-scroll" wx:if="{{taskDates.length}}" enable-flex>
       <view class="date-list">
-        <view class="date-chip {{selectedDay === 'all' ? 'active' : ''}}" data-day="all" bindtap="selectDay">
-          <view class="chip-day">全部</view>
-          <view class="chip-count">本月</view>
-        </view>
-        <view class="date-chip {{selectedDay === item.day ? 'active' : ''}}" wx:for="{{taskDates}}" wx:key="day" data-day="{{item.day}}" bindtap="selectDay">
-          <view class="chip-day">{{item.day}}</view>
-          <view class="chip-count">{{item.count}}项</view>
-        </view>
+        <view class="date-chip {{selectedDay === 'all' ? 'active' : ''}}" data-day="all" bindtap="selectDay">本月全部</view>
+        <view class="date-chip {{selectedDay === item.day ? 'active' : ''}}" wx:for="{{taskDates}}" wx:key="day" data-day="{{item.day}}" bindtap="selectDay">{{item.day}}日 <text>{{item.count}}</text></view>
       </view>
     </scroll-view>
   </view>
 
-  <scroll-view scroll-x class="category-scroll">
-    <view class="categories">
-      <view class="category {{category === 'all' ? 'active' : ''}}" data-category="all" bindtap="selectCategory">全部</view>
-      <view class="category {{category === item ? 'active' : ''}}" wx:for="{{categories}}" wx:key="*this" data-category="{{item}}" bindtap="selectCategory">{{item}}</view>
+  <block wx:for="{{taskGroups}}" wx:key="key" wx:for-item="group">
+    <view class="group-heading group-{{group.key}}">
+      <view class="group-title"><text class="group-dot"></text>{{group.title}}</view>
+      <view class="group-count">{{group.count}}项活动</view>
     </view>
-  </scroll-view>
-
-  <view class="status-row">
-    <view class="status-chip {{status === 'all' ? 'active' : ''}}" data-status="all" bindtap="selectStatus">全部事项</view>
-    <view class="status-chip {{status === 'pending' ? 'active' : ''}}" data-status="pending" bindtap="selectStatus">待完成</view>
-    <view class="status-chip {{status === 'done' ? 'active' : ''}}" data-status="done" bindtap="selectStatus">已完成</view>
-  </view>
-
-  <view wx:if="{{tasks.length}}">
-    <view class="task-card {{item.completed ? 'done' : ''}}" wx:for="{{tasks}}" wx:key="_id" data-id="{{item._id}}" bindtap="openTask">
-      <view class="date-column">
-        <view class="day">{{item.day}}</view>
-        <view class="month">{{item.monthShort}}</view>
+    <view class="task-card tone-{{item.tone}}" wx:for="{{group.tasks}}" wx:key="_id" wx:for-item="item" data-id="{{item._id}}" bindtap="openTask">
+      <view class="category-rail">
+        <view class="category-icon">
+          <text wx:if="{{item.tone === 'service'}}">益</text>
+          <text wx:elif="{{item.tone === 'meeting'}}">会</text>
+          <text wx:elif="{{item.tone === 'birthday'}}">生</text>
+          <text wx:elif="{{item.tone === 'social'}}">联</text>
+          <text wx:elif="{{item.tone === 'visit'}}">访</text>
+          <text wx:elif="{{item.tone === 'training'}}">训</text>
+          <text wx:else>待</text>
+        </view>
+        <view class="category-name">{{item.categoryLabel}}</view>
       </view>
       <view class="task-body">
-        <view class="task-heading">
-          <view class="tag">{{item.category}}</view>
-          <view class="state">{{item.completed ? '已完成' : '待完成'}}</view>
-        </view>
         <view class="title">{{item.title}}</view>
-        <view class="description">{{item.description}}</view>
-        <view class="meta-row">
-          <view>负责人：{{item.owner}}</view>
-          <view>{{item.location}}</view>
-        </view>
-        <view class="organization-label">{{item.team}}</view>
+        <view class="info-row"><text class="info-icon">◷</text><text>{{item.dateLabel}} · {{item.timeLabel}}</text></view>
+        <view class="info-row"><text class="info-icon location-icon">⌖</text><text class="ellipsis">{{item.locationLabel}}</text></view>
+        <view class="team-label"><text class="team-label-dot"></text>{{item.teamLabel}}</view>
       </view>
-      <view class="check-wrap" data-id="{{item._id}}" catchtap="completeTask">
-        <view class="check-box {{item.completed ? 'checked' : ''}} {{item.canComplete ? '' : 'disabled'}}">
-          <text wx:if="{{item.completed}}">✓</text>
+      <view class="task-side">
+        <view class="countdown {{item.countdownCompact ? 'compact' : ''}}"><text class="countdown-prefix">{{item.countdownPrefix}}</text><text class="countdown-value">{{item.countdownValue}}</text><text class="countdown-unit">{{item.countdownUnit}}</text></view>
+        <view class="check-wrap" data-id="{{item._id}}" catchtap="completeTask">
+          <view class="check-box {{item.canComplete ? '' : 'disabled'}}"></view>
         </view>
       </view>
     </view>
+  </block>
+
+  <view class="completed-section" wx:if="{{completedTasks.length}}">
+    <view class="completed-head" bindtap="toggleCompleted">
+      <view class="group-title"><text class="group-dot"></text>已完成（{{completedTasks.length}}）</view>
+      <view class="fold-icon {{completedExpanded ? 'expanded' : ''}}">⌄</view>
+    </view>
+    <view wx:if="{{completedExpanded}}">
+      <view class="task-card done tone-{{item.tone}}" wx:for="{{completedTasks}}" wx:key="_id" data-id="{{item._id}}" bindtap="openTask">
+        <view class="category-rail">
+          <view class="category-icon">✓</view>
+          <view class="category-name">{{item.categoryLabel}}</view>
+        </view>
+        <view class="task-body">
+          <view class="title">{{item.title}}</view>
+          <view class="info-row"><text class="info-icon">◷</text><text>{{item.dateLabel}} · {{item.timeLabel}}</text></view>
+          <view class="info-row"><text class="info-icon location-icon">⌖</text><text class="ellipsis">{{item.locationLabel}}</text></view>
+          <view class="team-label"><text class="team-label-dot"></text>{{item.teamLabel}}</view>
+        </view>
+        <view class="task-side"><view class="check-box checked">✓</view></view>
+      </view>
+    </view>
   </view>
-  <view wx:else class="empty">当前筛选下暂无待办</view>
+
+  <view wx:if="{{!taskGroups.length && !completedTasks.length}}" class="empty">
+    <view class="empty-icon">待</view>
+    <view class="empty-title">当前筛选下暂无待办</view>
+    <view class="empty-desc">换个服务队或日期看看</view>
+  </view>
 </view>
