@@ -4,7 +4,6 @@ Page({
   data: {
     id: '',
     member: {},
-    canViewContact: false,
     canManage: false
   },
 
@@ -20,14 +19,5 @@ Page({
 
   editMember() {
     wx.navigateTo({ url: `/pages/org/edit/index?id=${this.data.id}` })
-  },
-
-  callMember() {
-    const phone = this.data.member.phone
-    if (!phone) {
-      wx.showToast({ title: '暂未录入联系电话', icon: 'none' })
-      return
-    }
-    wx.makePhoneCall({ phoneNumber: phone })
   }
 })

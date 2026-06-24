@@ -28,6 +28,7 @@ const ACTION_OPTIONS = [
 ]
 
 const ROLE_PRESETS = [
+  { label: '岗位职务与负责人维护', module: 'archives', scopeType: 'position', actions: ['read', 'update'] },
   { label: '单岗位档案负责人', module: 'archives', scopeType: 'position' },
   { label: '副队长团队负责人', module: 'archives', scopeType: 'position_tree' },
   { label: '服务队档案管理员', module: 'archives', scopeType: 'organization' },
@@ -43,7 +44,9 @@ const ROLE_PRESETS = [
 Page({
   data: {
     allowed: false,
+    canEdit: false,
     users: [],
+    incompleteUserCount: 0,
     userIndex: 0,
     organizations: [],
     organizationIndex: 0,
@@ -66,12 +69,7 @@ Page({
 
   async onLoad() {
     const session = await api.call('getSession')
-    if (!permission.canManageAssignments(session)) {
-      wx.showToast({ title: '仅协作区管理员可分配权限', icon: 'none' })
-      setTimeout(() => wx.navigateBack(), 600)
-      return
-    }
-    this.setData({ allowed: true })
+    this.setData({ allowed: true, canEdit: permission.canManageAssignments(session) })
     await this.loadData()
   },
 
@@ -86,11 +84,15 @@ Page({
       users.forEach(item => { userMap[item.id] = item.name })
       const organizationMap = {}
       organizations.forEach(item => { organizationMap[item.cloudId || item.id] = item.name })
+      const eligibleUsers = users.filter(item =>
+        item.profileCompleted && item.defaultOrganizationId && item.name && !item.name.startsWith('待认证用户')
+      )
       this.setData({
-        users: users.map(item => ({
+        users: eligibleUsers.map(item => ({
           ...item,
-          displayName: `${item.name} · ${organizationMap[item.defaultOrganizationId] || '未选组织'} · ${item.accountSuffix || String(item.id).slice(-6)}`
+          displayName: `${item.name} · ${organizationMap[item.defaultOrganizationId]} · ${item.memberCode || item.accountSuffix || String(item.id).slice(-6)}`
         })),
+        incompleteUserCount: users.length - eligibleUsers.length,
         organizations,
         grants: grants.map(item => ({
           ...item,
@@ -142,13 +144,13 @@ Page({
     const preset = this.data.rolePresets[rolePresetIndex]
     const moduleIndex = Math.max(0, this.data.moduleOptions.findIndex(item => item.value === preset.module))
     const scopeIndex = Math.max(0, this.data.scopeOptions.findIndex(item => item.value === preset.scopeType))
-    const actions = ['read', 'create', 'update', 'delete']
+    const actions = preset.actions || ['read', 'create', 'update', 'delete']
     this.setData({
       rolePresetIndex,
       moduleIndex,
       scopeIndex,
       actions,
-      actionOptions: this.data.actionOptions.map(item => ({ ...item, checked: true }))
+      actionOptions: this.data.actionOptions.map(item => ({ ...item, checked: actions.includes(item.value) }))
     })
   },
   onModuleChange(event) { this.setData({ moduleIndex: Number(event.detail.value) }) },

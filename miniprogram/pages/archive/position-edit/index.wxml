@@ -1,0 +1,29 @@
+<view class="page">
+  <view class="edit-hero">
+    <view class="hero-kicker">POSITION DIRECTORY</view>
+    <view class="hero-title">编辑职务与负责人</view>
+    <view class="hero-desc">仅超级管理员或得到该岗位修改授权的成员可保存。</view>
+  </view>
+
+  <view class="form-card" wx:if="{{!loading}}">
+    <view class="field-label">职务名称</view>
+    <input class="input" value="{{name}}" maxlength="100" bindinput="onNameInput" placeholder="请填写职务名称" placeholder-class="input-placeholder" cursor-color="#d391ff" />
+
+    <view class="field-label">负责人姓名</view>
+    <picker range="{{users}}" range-key="displayName" value="{{userIndex}}" bindchange="onUserChange">
+      <view class="picker-value">{{users.length ? users[userIndex].displayName : '暂无资料完整的成员'}}</view>
+    </picker>
+
+    <view class="date-row">
+      <view class="date-field">
+        <view class="field-label">任期开始</view>
+        <picker mode="date" value="{{startDate}}" bindchange="onStartDateChange"><view class="picker-value">{{startDate}}</view></picker>
+      </view>
+      <view class="date-field">
+        <view class="field-label">任期结束</view>
+        <picker mode="date" value="{{endDate}}" bindchange="onEndDateChange"><view class="picker-value">{{endDate}}</view></picker>
+      </view>
+    </view>
+    <button class="save-button" loading="{{saving}}" disabled="{{saving || !users.length}}" bindtap="save">保存岗位资料</button>
+  </view>
+</view>

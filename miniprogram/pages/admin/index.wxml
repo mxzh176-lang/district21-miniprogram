@@ -38,7 +38,7 @@
 
   <view class="section-title">页面内容管理</view>
   <view class="manage-grid">
-    <view class="manage-item" bindtap="goUserRoles"><view class="manage-icon blue">权</view><view>用户与管理员</view><text>设置管理范围</text></view>
+    <view class="manage-item" bindtap="goUserRoles"><view class="manage-icon blue">权</view><view>用户与权限</view><text>角色、组织与期限</text></view>
     <view class="manage-item" bindtap="goPermissionGrants"><view class="manage-icon blue">授</view><view>人员精细授权</view><text>模块、范围和任期</text></view>
     <view class="manage-item" bindtap="goTasks"><view class="manage-icon green">待</view><view>待办与服务</view><text>修改事项</text></view>
     <view class="manage-item" bindtap="goArchives"><view class="manage-icon red">档</view><view>档案与照片</view><text>编辑排序</text></view>

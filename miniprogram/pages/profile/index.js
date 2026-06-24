@@ -2,7 +2,7 @@ const api = require('../../utils/api')
 const permission = require('../../utils/permission')
 
 Page({
-  data: { member: {}, canManage: false },
+  data: { member: {}, canManage: false, needsProfile: false },
 
   async onShow() {
     const member = await api.call('getSession')
@@ -12,12 +12,17 @@ Page({
         displayRole: permission.displayRole(member),
         displayCode: member.memberCode || member.accountSuffix || String(member.id || member._id || '').slice(-6)
       },
-      canManage: permission.canManage(member)
+      canManage: permission.canManage(member),
+      needsProfile: !member.profileCompleted || !member.organizationId
     })
   },
 
   goAdmin() {
     wx.navigateTo({ url: '/pages/admin/index' })
+  },
+
+  goUserPermissions() {
+    wx.navigateTo({ url: '/pages/admin/user-roles/index' })
   },
 
   editProfile() {

@@ -9,6 +9,7 @@
     "pages/archive/edit/index",
     "pages/archive/import/index",
     "pages/archive/ledger/index",
+    "pages/archive/position-edit/index",
     "pages/activities/index",
     "pages/activities/detail/index",
     "pages/org/index",
@@ -59,7 +60,7 @@
       },
       {
         "pagePath": "pages/org/index",
-        "text": "通讯录"
+        "text": "成员名册"
       },
       {
         "pagePath": "pages/profile/index",

@@ -158,6 +158,36 @@ async function requirePlatformUser(openid) {
   return user
 }
 
+function hasCompleteAuthorizationProfile(user) {
+  const name = cleanText(user && user.name, 30)
+  return Boolean(
+    user && user.status !== 'disabled' && name &&
+    !name.startsWith('待认证用户-') && cleanText(user.defaultOrganizationId, 100)
+  )
+}
+
+async function requireAuthorizationTarget(userId) {
+  const result = await db.collection(COLLECTIONS.user).where({ id: userId }).limit(1).get()
+  const user = result.data[0]
+  if (!hasCompleteAuthorizationProfile(user)) {
+    throw Object.assign(new Error('该用户尚未填写姓名和所属组织，暂不能授权'), { code: 'USER_PROFILE_INCOMPLETE' })
+  }
+  await requireActiveOrganization(user.defaultOrganizationId)
+  return user
+}
+
+async function requireActiveOrganization(organizationId) {
+  const result = await db.collection(COLLECTIONS.organization)
+    .where({ id: organizationId, status: 'active' })
+    .limit(1)
+    .get()
+  const organization = result.data[0]
+  if (!organization) {
+    throw Object.assign(new Error('所选组织不存在或已停用'), { code: 'INVALID_AUTHORIZATION_ORGANIZATION' })
+  }
+  return organization
+}
+
 async function requirePlatformEditor(openid) {
   const user = await requirePlatformUser(openid)
   const result = await db.collection(COLLECTIONS.userRole)
@@ -214,7 +244,12 @@ async function platformRoles(userId) {
     .where({ userId, status: 'active' })
     .limit(100)
     .get()
-  return result.data
+  const today = new Date().toISOString().slice(0, 10)
+  return result.data.filter(item =>
+    (!item.startDate || item.startDate <= today) &&
+    (!item.endDate || item.endDate >= today) &&
+    (!item.expiresAt || item.expiresAt >= today)
+  )
 }
 
 async function activeRoleAssignments(userId) {
@@ -454,7 +489,7 @@ async function requirePermissionGrantAdmin(openid) {
 }
 
 async function listPermissionGrants(openid, event = {}) {
-  await requirePermissionGrantAdmin(openid)
+  await requirePlatformUser(openid)
   const organizationId = cleanText(event.organizationId, 100)
   const query = organizationId
     ? { organizationId, status: 'active' }
@@ -495,6 +530,20 @@ async function savePermissionGrant(openid, event = {}) {
   if (['position', 'position_tree'].includes(scopeType) && !data.scopeId) {
     throw Object.assign(new Error('岗位权限必须选择具体岗位'), { code: 'POSITION_SCOPE_REQUIRED' })
   }
+  await requireAuthorizationTarget(data.userId)
+  await requireActiveOrganization(data.organizationId)
+  if (!await canAdministerOrganization(operator.id, data.organizationId)) {
+    throw Object.assign(new Error('不能超出管理范围授予权限'), { code: 'AUTHORIZATION_SCOPE_DENIED' })
+  }
+  if (['position', 'position_tree'].includes(scopeType)) {
+    const positionResult = await db.collection(COLLECTIONS.position)
+      .where({ id: data.scopeId, organizationId: data.organizationId, status: 'active' })
+      .limit(1)
+      .get()
+    if (!positionResult.data[0]) {
+      throw Object.assign(new Error('所选岗位不属于授权组织'), { code: 'INVALID_AUTHORIZATION_POSITION' })
+    }
+  }
   const operatorRoles = await platformRoles(operator.id)
   const isSuperAdmin = operatorRoles.some(item => item.status === 'active' && item.role === 'super_admin')
   if (!isSuperAdmin && (scopeType === 'global' || module === 'all')) {
@@ -531,7 +580,7 @@ async function revokePermissionGrant(openid, event = {}) {
 }
 
 async function listUserRoles(openid, event = {}) {
-  await requireAssignmentAdmin(openid)
+  await requirePlatformUser(openid)
   const userId = cleanText(event.userId, 100)
   const query = userId ? { userId, status: 'active' } : { status: 'active' }
   const result = await db.collection(COLLECTIONS.userRole).where(query).limit(500).get()
@@ -548,9 +597,15 @@ async function saveUserRole(openid, event = {}) {
   }
   const userId = cleanText(input.userId, 100)
   const organizationId = cleanText(input.organizationId, 100)
-  if (!userId || !organizationId) {
-    throw Object.assign(new Error('用户和管理组织不能为空'), { code: 'INVALID_USER_ROLE' })
+  const startDate = cleanText(input.startDate, 10)
+  const endDate = cleanText(input.endDate, 10)
+  if (!userId || !organizationId || !startDate || !endDate) {
+    throw Object.assign(new Error('用户、管理组织和授权日期不能为空'), { code: 'INVALID_USER_ROLE' })
   }
+  if (startDate > endDate) {
+    throw Object.assign(new Error('授权开始时间不能晚于结束时间'), { code: 'INVALID_USER_ROLE_DATE' })
+  }
+  await requireAuthorizationTarget(userId)
   const organizationResult = await db.collection(COLLECTIONS.organization)
     .where({ id: organizationId, status: 'active' })
     .limit(1)
@@ -575,10 +630,12 @@ async function saveUserRole(openid, event = {}) {
     userId,
     organizationId,
     role,
+    startDate,
+    endDate,
     status: 'active',
     grantedBy: operator.id,
     grantedAt: now(),
-    expiresAt: null,
+    expiresAt: endDate,
     updatedAt: now()
   }
   if (existing.data[0]) {
@@ -588,7 +645,7 @@ async function saveUserRole(openid, event = {}) {
     await db.collection(COLLECTIONS.userRole).add({ data })
   }
   await db.collection(COLLECTIONS.user).where({ id: userId }).update({
-    data: { status: 'active', defaultOrganizationId: organizationId, updatedAt: now() }
+    data: { status: 'active', updatedAt: now() }
   })
   await writePlatformLog(operator, 'grant_role', 'user_role', data.id, { userId, organizationId, role })
   return data
@@ -713,6 +770,107 @@ async function listPositions(openid, event = {}) {
   return result.data
 }
 
+async function listPositionDirectory(openid, event = {}) {
+  const user = await requirePlatformUser(openid)
+  const organizationId = canonicalOrganizationId(event.organizationId)
+  await requireActiveOrganization(organizationId)
+  const [positionResult, assignmentResult, userResult] = await Promise.all([
+    db.collection(COLLECTIONS.position).where({ organizationId, status: 'active' }).orderBy('sortOrder', 'asc').limit(500).get(),
+    db.collection(COLLECTIONS.roleAssignment).where({ organizationId, status: 'active' }).limit(500).get(),
+    db.collection(COLLECTIONS.user).limit(500).get()
+  ])
+  const today = new Date().toISOString().slice(0, 10)
+  const userMap = {}
+  userResult.data.forEach(item => { userMap[item.id] = item.name })
+  const activeAssignments = assignmentResult.data.filter(item =>
+    (!item.startDate || item.startDate <= today) && (!item.endDate || item.endDate >= today)
+  )
+  const administrator = await canAdministerOrganization(user.id, organizationId)
+  return Promise.all(positionResult.data.map(async position => {
+    const assignment = activeAssignments.find(item => item.positionId === position.id)
+    return {
+      id: position.id,
+      code: position.code,
+      organizationId,
+      name: position.name,
+      parentPositionId: position.parentPositionId || '',
+      person: assignment ? userMap[assignment.userId] || '待完善姓名' : '待授权',
+      userId: assignment ? assignment.userId : '',
+      startDate: assignment ? assignment.startDate || '' : '',
+      endDate: assignment ? assignment.endDate || '' : '',
+      canEdit: administrator || await hasPlatformGrant(user.id, 'archives', 'update', {
+        organizationId,
+        positionId: position.id,
+        parentPositionId: position.parentPositionId || ''
+      })
+    }
+  }))
+}
+
+async function savePositionDirectory(openid, event = {}) {
+  const operator = await requirePlatformUser(openid)
+  const input = event.position || {}
+  const organizationId = canonicalOrganizationId(input.organizationId)
+  const positionId = cleanText(input.id, 140)
+  const name = cleanText(input.name, 100)
+  const userId = cleanText(input.userId, 100)
+  const startDate = cleanText(input.startDate, 10)
+  const endDate = cleanText(input.endDate, 10)
+  if (!organizationId || !positionId || !name || !userId || !startDate || !endDate) {
+    throw Object.assign(new Error('岗位、负责人和授权日期不能为空'), { code: 'INVALID_POSITION_DIRECTORY' })
+  }
+  if (startDate > endDate) {
+    throw Object.assign(new Error('授权开始时间不能晚于结束时间'), { code: 'INVALID_ASSIGNMENT_DATE' })
+  }
+  const result = await db.collection(COLLECTIONS.position)
+    .where({ id: positionId, organizationId, status: 'active' })
+    .limit(1)
+    .get()
+  const position = result.data[0]
+  if (!position) throw Object.assign(new Error('所选岗位不存在'), { code: 'POSITION_NOT_FOUND' })
+  const allowed = await canAdministerOrganization(operator.id, organizationId) ||
+    await hasPlatformGrant(operator.id, 'archives', 'update', {
+      organizationId,
+      positionId,
+      parentPositionId: position.parentPositionId || ''
+    })
+  if (!allowed) {
+    throw Object.assign(new Error('当前用户没有修改该岗位和负责人的权限'), { code: 'POSITION_DIRECTORY_PERMISSION_REQUIRED' })
+  }
+  await requireAuthorizationTarget(userId)
+  await db.collection(COLLECTIONS.position).doc(position._id).update({ data: { name, updatedAt: now() } })
+  const assignments = await db.collection(COLLECTIONS.roleAssignment)
+    .where({ organizationId, positionId, status: 'active' })
+    .limit(100)
+    .get()
+  for (const item of assignments.data) {
+    await db.collection(COLLECTIONS.roleAssignment).doc(item._id).update({
+      data: { status: 'revoked', updatedAt: now() }
+    })
+  }
+  const assignment = {
+    id: businessId('assignment'),
+    areaId: 'org_region_21_suihua',
+    teamId: organizationId.includes('_team_') ? organizationId : null,
+    organizationId,
+    positionId,
+    userId,
+    memberId: userId,
+    roleType: 'role_manager',
+    startDate,
+    endDate,
+    status: 'active',
+    createdBy: operator.id,
+    createdAt: now(),
+    updatedAt: now()
+  }
+  await db.collection(COLLECTIONS.roleAssignment).add({ data: assignment })
+  await writePlatformLog(operator, 'update', 'position_directory', positionId, {
+    organizationId, positionId, name, userId, startDate, endDate
+  })
+  return { ...assignment, name }
+}
+
 async function listRoleAssignments(openid, event = {}) {
   await requirePlatformUser(openid)
   const organizationId = cleanText(event.organizationId, 100)
@@ -725,7 +883,7 @@ async function listRoleAssignments(openid, event = {}) {
 }
 
 async function listPlatformUsers(openid) {
-  await requirePlatformEditor(openid)
+  await requirePlatformUser(openid)
   const result = await db.collection(COLLECTIONS.user)
     .limit(500)
     .get()
@@ -764,6 +922,18 @@ async function saveRoleAssignment(openid, event = {}) {
   }
   if (data.startDate > data.endDate) {
     throw Object.assign(new Error('授权开始时间不能晚于结束时间'), { code: 'INVALID_ASSIGNMENT_DATE' })
+  }
+  await requireAuthorizationTarget(data.userId)
+  await requireActiveOrganization(data.organizationId)
+  if (!await canAdministerOrganization(operator.id, data.organizationId)) {
+    throw Object.assign(new Error('不能超出管理范围设置岗位'), { code: 'AUTHORIZATION_SCOPE_DENIED' })
+  }
+  const positionResult = await db.collection(COLLECTIONS.position)
+    .where({ id: data.positionId, organizationId: data.organizationId, status: 'active' })
+    .limit(1)
+    .get()
+  if (!positionResult.data[0]) {
+    throw Object.assign(new Error('所选岗位不属于授权组织'), { code: 'INVALID_AUTHORIZATION_POSITION' })
   }
   const overlapping = await db.collection(COLLECTIONS.roleAssignment)
     .where({ organizationId: data.organizationId, positionId: data.positionId, status: 'active' })
@@ -1623,6 +1793,7 @@ async function setMemberRole(openid, event) {
   const member = await requireSuperAdmin(openid)
   const role = ['member', 'editor', 'admin'].includes(event.role) ? event.role : 'member'
   const id = cleanText(event.id, 80)
+  if (role !== 'member') await requireLegacyAuthorizationTarget(id)
   await db.collection(COLLECTIONS.members).doc(id).update({ data: { role, updatedAt: new Date() } })
   await writeAudit(member, 'role', 'member', id, role)
   return true
@@ -1652,7 +1823,10 @@ async function listAdminCandidates(openid) {
     .limit(200)
     .get()
   return result.data
-    .filter(item => !['superadmin', 'admin', 'editor'].includes(item.role))
+    .filter(item =>
+      !['superadmin', 'admin', 'editor'].includes(item.role) &&
+      cleanText(item.nickname, 40) && item.nickname !== '微信成员' && cleanText(item.team, 100)
+    )
     .map(item => ({
       _id: item._id,
       name: item.nickname,
@@ -1669,11 +1843,21 @@ async function saveAdminPermissions(openid, event) {
     ? event.permissions.filter(value => allowed.includes(value))
     : []
   const id = cleanText(event.id, 80)
+  if (permissions.length) await requireLegacyAuthorizationTarget(id)
   await db.collection(COLLECTIONS.members).doc(id).update({
     data: { permissions, updatedAt: new Date() }
   })
   await writeAudit(member, 'role', 'member', id, `permissions:${permissions.join(',')}`)
   return true
+}
+
+async function requireLegacyAuthorizationTarget(id) {
+  const result = await db.collection(COLLECTIONS.members).doc(id).get()
+  const target = result.data
+  if (!target || !cleanText(target.nickname, 40) || target.nickname === '微信成员' || !cleanText(target.team, 100)) {
+    throw Object.assign(new Error('该用户尚未填写姓名和所属组织，暂不能授权'), { code: 'USER_PROFILE_INCOMPLETE' })
+  }
+  return target
 }
 
 async function getAdminStats(openid) {
@@ -1797,6 +1981,8 @@ const handlers = {
   listProfileOrganizations,
   bootstrapGovernance,
   listPositions,
+  listPositionDirectory,
+  savePositionDirectory,
   listRoleAssignments,
   listPlatformUsers,
   listUserRoles,

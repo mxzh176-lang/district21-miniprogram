@@ -48,7 +48,7 @@ Page({
     const filteredMembers = this.data.members
       .filter(item => {
         const teamMatch = this.data.teamId === 'all' || item.teamId === this.data.teamId
-        const text = `${item.name}${item.team}${item.position}${item.company}${item.industry}${item.resource}`.toLowerCase()
+        const text = `${item.name}${item.team}${item.position}`.toLowerCase()
         return teamMatch && (!keyword || text.includes(keyword))
       })
       .sort((a, b) =>

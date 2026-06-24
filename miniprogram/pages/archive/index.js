@@ -106,6 +106,14 @@ Page({
     wx.navigateTo({ url: `/pages/archive/list/index?organization=${this.data.selectedId}&category=${category}` })
   },
 
+  editPosition(event) {
+    const positionId = event.currentTarget.dataset.position
+    const organizationId = this.data.selectedOrganization.cloudId || this.data.selectedOrganization.id
+    wx.navigateTo({
+      url: `/pages/archive/position-edit/index?organizationId=${encodeURIComponent(organizationId)}&positionId=${encodeURIComponent(positionId)}`
+    })
+  },
+
   uploadPhotos() {
     wx.showToast({ title: '正式版将打开云照片上传', icon: 'none' })
   }

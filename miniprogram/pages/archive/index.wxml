@@ -53,6 +53,7 @@
       <view class="category-heading">
         <view class="category-name">{{item.name}}</view>
         <view class="category-person">{{item.person}}</view>
+        <view wx:if="{{item.canEditDirectory}}" class="position-edit" data-position="{{item.positionId}}" catchtap="editPosition">编辑</view>
       </view>
       <view wx:if="{{item.children && item.children.length}}" class="committee-list">
         <view
@@ -67,6 +68,7 @@
             <view class="committee-role">{{item.person}}</view>
           </view>
           <view class="committee-arrow">›</view>
+          <view wx:if="{{item.canEditDirectory}}" class="position-edit child-edit" data-position="{{item.positionId}}" catchtap="editPosition">编辑</view>
         </view>
       </view>
       <view class="category-footer">

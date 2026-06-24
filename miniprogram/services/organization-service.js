@@ -11,6 +11,8 @@ const LOCAL_IDS = {
 const READ_ACTIONS = [
   'listOrganizations',
   'listPositions',
+  'listPositionDirectory',
+  'savePositionDirectory',
   'listArchives',
   'listTeams',
   'listOrg',
@@ -25,6 +27,8 @@ function handles(action) {
 async function execute(action, payload, localFallback) {
   if (action === 'listOrganizations') return listCanonicalOrganizations(payload)
   if (action === 'listPositions') return cloudbase.invoke('listPositions', payload)
+  if (action === 'listPositionDirectory') return cloudbase.invoke('listPositionDirectory', payload)
+  if (action === 'savePositionDirectory') return cloudbase.invoke('savePositionDirectory', payload)
   if (action === 'listTeams') {
     const organizations = await listCanonicalOrganizations(payload)
     return organizations
@@ -77,7 +81,47 @@ async function execute(action, payload, localFallback) {
           }
         }
       })
-    return Object.values(views)
+    const results = await Promise.all(Object.values(views).map(async view => {
+      if (!view.cloudId) return view
+      try {
+        const directory = await cloudbase.invoke('listPositionDirectory', { organizationId: view.cloudId })
+        const byCode = {}
+        directory.forEach(item => { byCode[item.code] = item })
+        return {
+          ...view,
+          categories: (view.categories || []).map(category => {
+            const position = byCode[category.id] || {}
+            return {
+              ...category,
+              positionId: position.id || category.positionId,
+              name: position.name || category.name,
+              person: position.person || category.person,
+              userId: position.userId || '',
+              startDate: position.startDate || '',
+              endDate: position.endDate || '',
+              canEditDirectory: Boolean(position.canEdit),
+              children: (category.children || []).map(child => {
+                const childPosition = byCode[child.id] || {}
+                return {
+                  ...child,
+                  positionId: childPosition.id || child.positionId,
+                  name: childPosition.name || child.name,
+                  person: childPosition.person || child.person,
+                  userId: childPosition.userId || '',
+                  startDate: childPosition.startDate || '',
+                  endDate: childPosition.endDate || '',
+                  canEditDirectory: Boolean(childPosition.canEdit)
+                }
+              })
+            }
+          })
+        }
+      } catch (error) {
+        console.warn('[position directory fallback]', view.id, error.message)
+        return view
+      }
+    }))
+    return results
   }
   return localFallback(action, payload)
 }

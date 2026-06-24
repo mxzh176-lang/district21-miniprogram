@@ -10,7 +10,9 @@ const ROLE_OPTIONS = [
 
 Page({
   data: {
+    canEdit: false,
     users: [],
+    incompleteUserCount: 0,
     userIndex: 0,
     organizations: [],
     organizationIndex: 0,
@@ -19,16 +21,14 @@ Page({
     roles: [],
     userMap: {},
     organizationMap: {},
-    memberCode: ''
+    memberCode: '',
+    startDate: '2026-07-01',
+    endDate: '2027-06-30'
   },
 
   async onLoad() {
     const session = await api.call('getSession')
-    if (!permission.isSuperAdmin(session)) {
-      wx.showToast({ title: '仅超级管理员可设置管理员角色', icon: 'none' })
-      setTimeout(() => wx.navigateBack(), 600)
-      return
-    }
+    this.setData({ canEdit: permission.isSuperAdmin(session) })
     await this.loadData()
   },
 
@@ -51,21 +51,26 @@ Page({
       users.forEach(user => { userMap[user.id] = user.name })
       const organizationMap = {}
       organizations.forEach(item => { organizationMap[item.id] = item.name })
+      const eligibleUsers = users.filter(item =>
+        item.profileCompleted && item.defaultOrganizationId && item.name && !item.name.startsWith('待认证用户')
+      )
       this.setData({
-        users: users.map(item => ({
+        users: eligibleUsers.map(item => ({
           ...item,
-          displayName: `${item.name} · ${organizationMap[item.defaultOrganizationId] || '未选组织'} · ${item.memberCode || item.accountSuffix || String(item.id).slice(-6)} · ${item.status === 'pending' ? '待授权' : '已启用'}`
+          displayName: `${item.name} · ${organizationMap[item.defaultOrganizationId]} · ${item.memberCode || item.accountSuffix || String(item.id).slice(-6)} · ${item.status === 'pending' ? '待授权' : '已启用'}`
         })),
+        incompleteUserCount: users.length - eligibleUsers.length,
         organizations,
         roles: roles.map(item => ({
           ...item,
           userName: userMap[item.userId] || item.userId,
           organizationName: organizationMap[item.organizationId] || item.organizationId,
-          roleLabel: this.roleLabel(item.role)
+          roleLabel: this.roleLabel(item.role),
+          termLabel: `${item.startDate || '长期'} 至 ${item.endDate || item.expiresAt || '长期'}`
         })),
         userMap,
         organizationMap,
-        memberCode: users[0] ? users[0].memberCode || '' : ''
+        memberCode: eligibleUsers[0] ? eligibleUsers[0].memberCode || '' : ''
       })
       this.syncOrganizationForRole(0)
     } catch (error) {
@@ -112,6 +117,17 @@ Page({
     this.setData({ organizationIndex: Number(event.detail.value) })
   },
 
+  onStartDateChange(event) { this.setData({ startDate: event.detail.value }) },
+  onEndDateChange(event) { this.setData({ endDate: event.detail.value }) },
+
+  goRoleAssignments() {
+    wx.navigateTo({ url: '/pages/admin/role-assignments/index' })
+  },
+
+  goPermissionGrants() {
+    wx.navigateTo({ url: '/pages/admin/permission-grants/index' })
+  },
+
   syncOrganizationForRole(roleIndex) {
     const role = ROLE_OPTIONS[roleIndex].value
     let organizationIndex = 0
@@ -136,7 +152,9 @@ Page({
         userRole: {
           userId: user.id,
           role: role.value,
-          organizationId: organization.id
+          organizationId: organization.id,
+          startDate: this.data.startDate,
+          endDate: this.data.endDate
         }
       })
       wx.showToast({ title: '管理员角色已保存', icon: 'success' })

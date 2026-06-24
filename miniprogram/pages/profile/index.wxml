@@ -6,7 +6,11 @@
     <view class="organization">{{member.team}}</view>
     <view class="organization" bindtap="copyUserId">成员编号：{{member.displayCode}}</view>
   </view>
-  <button class="reconnect-button" bindtap="editProfile">完善内部身份资料</button>
+  <view class="identity-warning" wx:if="{{needsProfile}}">
+    <view class="identity-warning-title">尚未完成内部身份资料</view>
+    <view class="identity-warning-text">填写姓名和所属组织后，管理员才能识别你并分配权限。</view>
+  </view>
+  <button class="reconnect-button" bindtap="editProfile">{{needsProfile ? '立即完善内部身份资料' : '修改内部身份资料'}}</button>
 
   <view class="demo-note">
     <view class="demo-icon">内</view>
@@ -33,6 +37,11 @@
     <view class="menu-copy"><view class="menu-title">协作区与四队发展历史</view><view class="menu-desc">按年份保存重要服务与里程碑</view></view>
     <view class="arrow">›</view>
   </view>
+  <view wx:if="{{!needsProfile && member.status === 'approved'}}" class="menu-card" bindtap="goUserPermissions">
+    <view class="menu-icon blue">管</view>
+    <view class="menu-copy"><view class="menu-title">用户与权限</view><view class="menu-desc">查看角色、岗位、模块和授权期限</view></view>
+    <view class="arrow">›</view>
+  </view>
   <view wx:if="{{canManage}}" class="menu-card" bindtap="goAdmin">
     <view class="menu-icon blue">管</view>
     <view class="menu-copy"><view class="menu-title">权限中心</view><view class="menu-desc">届次岗位、内部内容和操作日志</view></view>
@@ -41,7 +50,7 @@
 
   <view class="privacy-card">
     <view class="privacy-title">内部资料保护</view>
-    <view class="privacy-text">正式版将通过成员名单或授权码绑定身份。关爱详情、手机号码和企业联系方式按服务队、岗位和任期分级显示。</view>
+    <view class="privacy-text">系统仅保存内部成员识别与岗位授权所需资料；关爱隐私、电话、企业与地址等非必要信息不在成员页面收集或展示。</view>
   </view>
 
   <view class="version">21纪事本 v1.0</view>

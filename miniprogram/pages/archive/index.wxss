@@ -253,6 +253,18 @@
   gap: 14rpx;
 }
 
+.position-edit {
+  flex: 0 0 auto;
+  padding: 7rpx 10rpx;
+  border: 1rpx solid rgba(201, 130, 255, 0.38);
+  border-radius: 8rpx;
+  color: #deb2ff;
+  background: #2d2050;
+  font-size: 18rpx;
+}
+
+.child-edit { margin-left: 8rpx; }
+
 .category-name {
   color: #f8f4ff;
   font-size: 27rpx;

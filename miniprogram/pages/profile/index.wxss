@@ -98,6 +98,9 @@
 .menu-icon.assistant { background: linear-gradient(145deg, #c35ef0, #267dd5); font-family: sans-serif; font-size: 20rpx; font-weight: 800; }
 
 .reconnect-button { margin: 18rpx 0; color: #fff; background: linear-gradient(135deg, #a15be8, #377ddd); }
+.identity-warning { margin-top: 18rpx; padding: 22rpx; border: 1rpx solid rgba(226, 197, 141, 0.28); border-radius: 18rpx; background: #302542; }
+.identity-warning-title { color: #f4deb0; font-weight: 700; }
+.identity-warning-text { margin-top: 8rpx; color: #c7bdd4; font-size: 20rpx; line-height: 1.65; }
 .ai-card{border-color:rgba(123,228,255,.25)}
 
 .menu-copy {

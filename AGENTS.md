@@ -14,4 +14,17 @@ Non-negotiable priorities, in order:
 8. Whenever files under `cloudfunctions/` change, explicitly tell the user that the affected cloud function must be redeployed before testing the feature.
 9. Dark-theme forms must keep typed text visible on real devices and in WeChat DevTools. Inputs and textareas need explicit text color, placeholder color, cursor color and stable native rendering settings.
 
+## WeChat Review Gate
+
+Passing WeChat review for a personal-entity mini program is a permanent release requirement, not a one-time launch task.
+
+- Before implementing any feature, page, field, copy change, permission, upload, cloud function or data model, explicitly assess its effect on filing, personal-entity service categories, privacy disclosures and WeChat review.
+- Do not implement or ship a change until it is classified as `review-safe`, `review-risky but mitigated`, or `blocked pending compliance confirmation`.
+- Treat public content creation, multi-user submission, media upload, public notices, social interaction, fundraising, payment, medical information, financial services and sensitive personal data as high-risk by default.
+- UI hiding is not a review or security control. Production cloud functions must enforce the same restrictions reviewers see in the client.
+- Never create a temporary review-only facade that hides functionality intended to be enabled after approval. The submitted version and actual production behavior must remain materially consistent.
+- Every rejection must be copied into `docs/review-rejection-log.md` with the date, exact platform wording, affected page, remediation and verification evidence before resubmission.
+- If the exact rejection reason is unavailable, make only general risk reductions and request the original rejection text or screenshot before claiming the issue is fixed.
+- Never promise approval. Report what risk was reduced and what still depends on the platform's current decision.
+
 If a requested feature conflicts with these rules, stop and explain the conflict before implementation.

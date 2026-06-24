@@ -77,8 +77,8 @@ Page({
 
   async save() {
     const { form, teams, teamIndex, id } = this.data
-    if (!form.name.trim() || !form.company.trim()) {
-      wx.showToast({ title: '请填写姓名和企业名称', icon: 'none' })
+    if (!form.name.trim()) {
+      wx.showToast({ title: '请填写成员姓名', icon: 'none' })
       return
     }
     const team = teams[teamIndex]

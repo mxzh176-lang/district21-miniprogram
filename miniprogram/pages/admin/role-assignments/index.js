@@ -4,11 +4,13 @@ const permission = require('../../../utils/permission')
 Page({
   data: {
     allowed: false,
+    canEdit: false,
     organizations: [],
     organizationIndex: 0,
     positions: [],
     positionIndex: 0,
     users: [],
+    incompleteUserCount: 0,
     userIndex: 0,
     startDate: '2026-07-01',
     endDate: '2027-06-30',
@@ -19,12 +21,7 @@ Page({
 
   async onLoad() {
     const session = await api.call('getSession')
-    if (!permission.canManageAssignments(session)) {
-      wx.showToast({ title: '仅协作区管理员可管理岗位授权', icon: 'none' })
-      setTimeout(() => wx.navigateBack(), 600)
-      return
-    }
-    this.setData({ allowed: true })
+    this.setData({ allowed: true, canEdit: permission.canManageAssignments(session) })
     await this.loadBaseData()
   },
 
@@ -36,12 +33,16 @@ Page({
       ])
       const organizationMap = {}
       organizations.forEach(item => { organizationMap[item.cloudId || item.id] = item.name })
+      const eligibleUsers = users.filter(item =>
+        item.profileCompleted && item.defaultOrganizationId && item.name && !item.name.startsWith('待认证用户')
+      )
       this.setData({
         organizations,
-        users: users.map(item => ({
+        users: eligibleUsers.map(item => ({
           ...item,
-          displayName: `${item.name} · ${organizationMap[item.defaultOrganizationId] || '未选组织'} · ${item.accountSuffix || String(item.id).slice(-6)}`
+          displayName: `${item.name} · ${organizationMap[item.defaultOrganizationId]} · ${item.memberCode || item.accountSuffix || String(item.id).slice(-6)}`
         })),
+        incompleteUserCount: users.length - eligibleUsers.length,
         loading: false
       })
       await this.loadOrganizationData()

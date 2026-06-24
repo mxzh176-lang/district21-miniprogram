@@ -526,7 +526,14 @@ function localCall(action, payload = {}) {
       result = []
       break
     case 'listPlatformUsers':
-      result = allMembers().map(item => ({ id: item._id, name: item.name, defaultOrganizationId: item.teamId }))
+      result = allMembers().map(item => ({
+        id: item._id,
+        name: item.name,
+        defaultOrganizationId: item.teamId,
+        profileCompleted: Boolean(item.name && item.teamId),
+        accountSuffix: String(item._id || '').slice(-6),
+        memberCode: item.memberCode || ''
+      }))
       break
     case 'listUserRoles':
       result = []
