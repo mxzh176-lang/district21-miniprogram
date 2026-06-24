@@ -1,8 +1,6 @@
 <view class="page" wx:if="{{entry._id}}">
   <view class="detail-hero tone-{{entry.tone}}">
-    <view class="detail-status">
-      {{entry.status === 'draft' ? '待人工确认草稿' : '已归档记录'}}
-    </view>
+    <view class="detail-status">岗位事件档案</view>
     <view class="detail-date">{{entry.dateLabel}}</view>
     <view class="detail-title">{{entry.title}}</view>
     <view class="detail-team">{{entry.team}}</view>
@@ -11,6 +9,8 @@
   <view class="card">
     <view class="info-row"><text class="label">录入人</text><text>{{entry.uploadedBy}}</text></view>
     <view class="info-row"><text class="label">负责角色</text><text>{{entry.uploaderRole}}</text></view>
+    <view class="info-row"><text class="label">地点</text><text>{{entry.location || '未填写'}}</text></view>
+    <view class="info-row"><text class="label">参与人数</text><text>{{entry.participantCount || 0}} 人</text></view>
     <view class="info-row"><text class="label">关键词</text><text>{{entry.keywordText}}</text></view>
     <view class="divider"></view>
     <view class="content-title">记录摘要</view>
@@ -28,9 +28,6 @@
     </view>
   </view>
 
-  <view wx:if="{{entry.status === 'draft'}}" class="draft-note">
-    本内容由内部授权人员录入，目前仅为草稿。管理员核对文字与附件后才能归档。
-  </view>
   <view class="detail-actions" wx:if="{{canEdit || canDelete}}">
     <button wx:if="{{canEdit}}" bindtap="editEntry">编辑档案</button>
     <button wx:if="{{canDelete}}" class="delete-button" bindtap="deleteEntry">删除档案</button>

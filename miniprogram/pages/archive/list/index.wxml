@@ -2,7 +2,11 @@
   <view class="list-hero">
     <view class="hero-kicker">ARCHIVE EVENTS</view>
     <view class="hero-title">{{categoryName}}</view>
-    <view class="hero-desc">{{organization.name}} · 按岗位分类的内部档案</view>
+    <view class="hero-desc">{{organization.name}} · 负责人：{{positionPerson}}</view>
+    <view class="position-stats">
+      <view class="stat-number">{{totalEventCount}}</view>
+      <view class="stat-label">累计事件</view>
+    </view>
     <view class="action-row" wx:if="{{canCreate}}">
       <button class="add-button" bindtap="addEntry">＋ 新增记录</button>
       <button wx:if="{{isSuperAdmin}}" class="import-button" bindtap="importWord">导入 Word</button>
@@ -12,7 +16,7 @@
   <view class="permission-note">
     <text wx:if="{{categoryId === 'treasurer'}}">账目公开透明，所有成员可查看；仅管理员和当前有效司库可维护。</text>
     <text wx:elif="{{isSuperAdmin}}">只有最高管理员可批量导入 Word；岗位管理员可新增本栏目的单条事件。</text>
-    <text wx:elif="{{canEdit}}">你可以维护本岗位的内部记录，核对后归档。</text>
+    <text wx:elif="{{canEdit}}">你可以新增和维护本岗位的内部事件。</text>
     <text wx:else>当前账号只有查看权限。</text>
   </view>
   <view class="permission-note category-notice" wx:if="{{categoryNotice}}">{{categoryNotice}}</view>
@@ -52,13 +56,13 @@
       <view class="event-copy">
         <view class="event-heading">
           <view class="event-title">{{item.title}}</view>
-          <view class="status {{item.status}}">
-            {{item.status === 'draft' ? '草稿' : '已归档'}}
-          </view>
+          <view class="status published">岗位事件</view>
         </view>
         <view class="event-summary">{{item.summary}}</view>
         <view class="event-meta">
           <text>{{item.uploaderRole}}</text>
+          <text wx:if="{{item.location}}">{{item.location}}</text>
+          <text>{{item.participantCount || 0}}人</text>
           <text>{{item.photoCount}}张照片</text>
           <text>录入：{{item.uploadedBy}}</text>
         </view>

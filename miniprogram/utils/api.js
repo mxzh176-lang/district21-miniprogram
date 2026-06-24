@@ -313,6 +313,8 @@ function archiveListItem(item) {
     date: item.date,
     dateLabel: item.dateLabel,
     title: item.title,
+    location: item.location || '',
+    participantCount: Number(item.participantCount) || 0,
     team: item.team,
     uploadedBy: item.uploadedBy,
     uploaderRole: item.uploaderRole,

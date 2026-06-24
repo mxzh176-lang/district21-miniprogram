@@ -23,6 +23,7 @@ Page({
     this.setData({
       entry: {
         ...entry,
+        team: entry.team || (organization && organization.name) || '',
         keywordText: (entry.keywords || []).join(' · ')
       },
       photos,

@@ -61,6 +61,8 @@ Page({
     categoryName: '',
     organization: {},
     entries: [],
+    totalEventCount: 0,
+    positionPerson: '',
     categoryOptions: [],
     categoryIndex: 0,
     eventMonth: '',
@@ -111,11 +113,17 @@ Page({
   async loadEntries(categoryId = this.data.categoryId) {
     try {
       this.setData({ loading: true })
-      const entries = await api.call('listArchiveEntries', {
+      const query = {
         organizationId: this.data.organizationId,
         categoryId,
         eventMonth: this.data.eventMonth
-      })
+      }
+      const [entries, allEntries] = await Promise.all([
+        api.call('listArchiveEntries', query),
+        this.data.eventMonth
+          ? api.call('listArchiveEntries', { organizationId: this.data.organizationId, categoryId })
+          : Promise.resolve(null)
+      ])
       const position = permission.findArchivePosition(this.data.organization, categoryId)
       const categoryName = position ? position.name : (CATEGORY_NAMES[categoryId] || '档案事件')
       const sortedEntries = entries
@@ -130,8 +138,10 @@ Page({
       this.setData({
         categoryId,
         categoryName,
+        positionPerson: position && position.person ? position.person : '负责人待绑定',
         categoryNotice: CATEGORY_NOTICES[categoryId] || '',
         entries: sortedEntries,
+        totalEventCount: (allEntries || entries).length,
         canCreate: permission.canMaintainArchive(this.data.member, this.data.organization, categoryId, 'create'),
         canEdit: permission.canMaintainArchive(this.data.member, this.data.organization, categoryId, 'update'),
         canDelete: permission.canMaintainArchive(this.data.member, this.data.organization, categoryId, 'delete'),

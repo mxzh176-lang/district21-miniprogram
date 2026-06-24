@@ -25,6 +25,27 @@
   font-size: 20rpx;
 }
 
+.position-stats {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10rpx;
+  margin-top: 20rpx;
+  padding: 12rpx 18rpx;
+  border-radius: 16rpx;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.stat-number {
+  color: #fff;
+  font-size: 34rpx;
+  font-weight: 800;
+}
+
+.stat-label {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 18rpx;
+}
+
 .action-row {
   display: flex;
   gap: 14rpx;
