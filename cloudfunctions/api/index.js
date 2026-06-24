@@ -292,6 +292,24 @@ async function activeRoleAssignments(userId) {
   }
 }
 
+async function checkActiveRoleManager(openid, organizationId, positionId) {
+  const user = await findPlatformUser(openid)
+  organizationId = canonicalOrganizationId(organizationId)
+  positionId = cleanText(positionId, 140)
+  if (!user || !organizationId || !positionId) return false
+  const today = new Date().toISOString().slice(0, 10)
+  const result = await db.collection(COLLECTIONS.roleAssignment)
+    .where({ organizationId, status: 'active' })
+    .limit(500)
+    .get()
+  return result.data.some(assignment =>
+    (assignment.memberId === user.id || assignment.userId === user.id) &&
+    positionIdMatches(assignment.positionId, positionId) &&
+    Boolean(assignment.startDate) && assignment.startDate <= today &&
+    (!assignment.endDate || assignment.endDate >= today)
+  )
+}
+
 async function activePermissionGrants(userId) {
   try {
     const today = new Date().toISOString().slice(0, 10)

@@ -210,6 +210,26 @@ function isActiveAssignment(assignment, date = new Date()) {
     (!assignment.endDate || assignment.endDate >= today)
 }
 
+function isActiveRoleManager(user, organizationId, positionId) {
+  if (!user || !organizationId || !positionId) return false
+  const today = new Date().toISOString().slice(0, 10)
+  const userId = user.id || user._id
+  const canonicalOrganizationId = ORGANIZATION_ALIASES[organizationId] || organizationId
+  return (user.roles || []).some(role => {
+    if (!role || typeof role !== 'object' || normalizeRole(role.role) !== 'role_manager') return false
+    const assignmentUserId = role.memberId || role.userId
+    const assignmentOrganizationId = ORGANIZATION_ALIASES[role.organizationId] || role.organizationId
+    const matchesPosition = role.positionId === positionId ||
+      String(role.positionId || '').endsWith(`_${positionId}`)
+    return role.status === 'active' &&
+      assignmentUserId === userId &&
+      assignmentOrganizationId === canonicalOrganizationId &&
+      matchesPosition &&
+      Boolean(role.startDate) && role.startDate <= today &&
+      (!role.endDate || role.endDate >= today)
+  })
+}
+
 function canMaintainPosition(user, context = {}, action = 'update') {
   if (!user) return false
   if (hasGrant(user, 'archives', action, context)) return true
@@ -339,6 +359,7 @@ module.exports = {
   canManageAssignments,
   canEditServiceTeamPositions,
   isActiveAssignment,
+  isActiveRoleManager,
   canMaintainPosition,
   canMaintainLedger,
   canMaintainHonors,
