@@ -10,10 +10,13 @@ const ACTIONS = [
   'listPlatformUsers',
   'listUserRoles',
   'listPermissionGrants',
+  'listUserPermissions',
   'saveUserRole',
   'savePermissionGrant',
+  'saveUserPermissions',
   'revokeUserRole',
   'revokePermissionGrant',
+  'revokeUserPermissions',
   'saveRoleAssignment',
   'getMember',
   'saveMember',
@@ -42,9 +45,12 @@ async function execute(action, payload, localFallback) {
     'saveRoleAssignment',
     'listUserRoles',
     'listPermissionGrants',
+    'listUserPermissions',
     'saveUserRole',
     'savePermissionGrant',
+    'saveUserPermissions',
     'revokePermissionGrant',
+    'revokeUserPermissions',
     'revokeUserRole'
   ].includes(action)) {
     return cloudbase.invoke(action, payload)

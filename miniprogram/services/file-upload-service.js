@@ -73,11 +73,6 @@ function originalFileName(filePath, providedName, sequence) {
   return `${safePathSegment(base, String((sequence || 0) + 1).padStart(3, '0'), 60)}.${suffix}`
 }
 
-function timestamp(value = new Date()) {
-  const pad = number => String(number).padStart(2, '0')
-  return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}_${pad(value.getHours())}${pad(value.getMinutes())}${pad(value.getSeconds())}`
-}
-
 function buildOrgCloudPath(params) {
   const eventName = safePathSegment(params.eventName, '', 80)
   if (!params.eventName || !String(params.eventName).trim()) throw new Error('请先填写事件名称')
@@ -86,11 +81,12 @@ function buildOrgCloudPath(params) {
   const departmentName = params.departmentName
     ? safePathSegment(params.departmentName, '', 40)
     : ''
-  const name = originalFileName(params.filePath, params.originalFileName, params.sequence)
+  const suffix = fileExtension(params.filePath, params.originalFileName)
+  const name = `${eventName}_${Number(params.sequence || 0) + 1}.${suffix}`
   const folders = FIXED_ORGANIZATION_PATH.concat([teamName, leaderRole])
   if (departmentName) folders.push(departmentName)
   folders.push(eventName)
-  return `${folders.join('/')}/${timestamp(params.now)}_${name}`
+  return `${folders.join('/')}/${name}`
 }
 
 function inferFileType(fileName) {

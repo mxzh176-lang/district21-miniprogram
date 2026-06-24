@@ -12,6 +12,12 @@ function normalizeRole(role) {
 
 const ADMIN_ROLES = ['super_admin', 'federation_admin', 'office_admin', 'region_admin', 'area_admin', 'team_admin']
 const EDITOR_ROLES = ADMIN_ROLES.concat(['editor', 'role_manager'])
+const MODULE_ALIASES = {
+  archives: 'archive',
+  contacts: 'member',
+  tasks: 'todo',
+  honors: 'honor'
+}
 const ORGANIZATION_ALIASES = {
   district: 'org_region_21_suihua',
   linghang: 'org_team_linghang',
@@ -70,11 +76,51 @@ function canAccessOrganization(user, organization) {
 
 function canAccessMenu(user, menu) {
   if (isSuperAdmin(user)) return true
+  if (hasPortPermission(user, MODULE_ALIASES[menu] || menu, 'read')) return true
   if (hasGrant(user, menu, 'read')) return true
   if ((user.permissions || []).includes(menu)) return true
   if (canManage(user)) return true
   if (canEditContent(user)) return ['archives', 'photos', 'notices'].includes(menu)
   return false
+}
+
+function activePortPermissions(user, date = new Date()) {
+  if (!user) return []
+  const today = date.toISOString().slice(0, 10)
+  return (user.portPermissions || []).filter(item =>
+    item && item.status === 'active' &&
+    (!item.startDate || item.startDate <= today) &&
+    (!item.endDate || item.endDate >= today)
+  )
+}
+
+function portScopeMatches(grant, user, context = {}) {
+  const organizationId = context.cloudOrganizationId || context.organizationId || context.teamId || ''
+  const positionId = context.positionId || context.categoryId || ''
+  if (grant.dataScope === 'district') return true
+  if (grant.dataScope === 'team') return grant.teamId === organizationId || String(grant.teamId || '').endsWith(`_${organizationId}`)
+  if (grant.dataScope === 'position') {
+    const matchesTeam = grant.teamId === organizationId || String(grant.teamId || '').endsWith(`_${organizationId}`)
+    const matchesPosition = grant.positionId === positionId || String(grant.positionId || '').endsWith(`_${positionId}`)
+    return matchesTeam && matchesPosition
+  }
+  if (grant.dataScope === 'self') {
+    const userId = user.id || user._id
+    return [context.creatorId, context.createdBy, context.userId].filter(Boolean).includes(userId)
+  }
+  return false
+}
+
+function hasPortPermission(user, module, action = 'read', context = {}) {
+  module = MODULE_ALIASES[module] || module
+  const hasScopeContext = Boolean(
+    context.organizationId || context.cloudOrganizationId || context.teamId ||
+    context.positionId || context.categoryId || context.creatorId || context.createdBy
+  )
+  return activePortPermissions(user).some(grant =>
+    (((grant.permissions || {})[module]) || []).includes(action) &&
+    (!hasScopeContext || grant.dataScope === 'self' && action === 'create' || portScopeMatches(grant, user, context))
+  )
 }
 
 function activeGrants(user, date = new Date()) {
@@ -121,6 +167,7 @@ function hasGrant(user, module, action = 'read', context = {}) {
 
 function canPerform(user, module, action = 'read', context = {}) {
   if (isSuperAdmin(user)) return true
+  if (activePortPermissions(user).length) return hasPortPermission(user, module, action, context)
   const organization = {
     id: context.organizationId || context.teamId,
     cloudId: context.cloudOrganizationId,
@@ -165,10 +212,12 @@ function canMaintainPosition(user, context = {}, action = 'update') {
 }
 
 function canMaintainLedger(user, context = {}, action = 'update') {
+  if (activePortPermissions(user).length) return hasPortPermission(user, 'finance', action, context)
   return canMaintainPosition(user, { ...context, positionId: context.positionId || 'treasurer' }, action)
 }
 
 function canMaintainHonors(user, context = {}, action = 'create') {
+  if (activePortPermissions(user).length) return hasPortPermission(user, 'honor', action, context)
   return canPerform(user, 'honors', action, context) || canMaintainPosition(user, context, action)
 }
 
@@ -192,6 +241,7 @@ function canMaintainArchive(user, organization, categoryId, action = 'update') {
     parentPositionId: position.parentPositionId,
     person: position.person
   }
+  if (activePortPermissions(user).length) return hasPortPermission(user, 'history', action, context)
   return categoryId === 'treasurer'
     ? canMaintainLedger(user, context, action)
     : canMaintainPosition(user, context, action)
@@ -200,6 +250,14 @@ function canMaintainArchive(user, organization, categoryId, action = 'update') {
 function canCompleteTodo(user, todo = {}) {
   if (!user) return false
   const userId = user.id || user._id
+  if (activePortPermissions(user).length) {
+    return hasPortPermission(user, 'todo', 'complete', {
+      organizationId: todo.organizationId || todo.teamId,
+      teamId: todo.teamId,
+      positionId: todo.positionId || todo.categoryId,
+      creatorId: todo.createdBy
+    })
+  }
   if (todo.createdBy && todo.createdBy === userId) return true
   if (hasGrant(user, 'tasks', 'update', {
     organizationId: todo.organizationId || todo.teamId,
@@ -252,6 +310,8 @@ module.exports = {
   canAccessOrganization,
   canAccessMenu,
   activeGrants,
+  activePortPermissions,
+  hasPortPermission,
   hasGrant,
   canPerform,
   canManageAssignments,

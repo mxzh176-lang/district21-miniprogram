@@ -92,6 +92,16 @@ function archiveEntryToRecord(entry) {
   }
 }
 
+function uniquePhotos(photos) {
+  const seen = new Set()
+  return (photos || []).filter(photo => {
+    const value = String(photo || '').trim()
+    if (!value || seen.has(value)) return false
+    seen.add(value)
+    return true
+  })
+}
+
 async function execute(action, payload, localFallback) {
   if (action === 'listLedgerRecords') {
     return cloudbase.invoke('listLedgerRecords', {
@@ -131,7 +141,7 @@ async function execute(action, payload, localFallback) {
       id: payload.entry && payload.entry._id,
       record: archiveEntryToRecord(payload.entry || {})
     })
-    const photos = payload.entry && payload.entry.photos ? payload.entry.photos : []
+    const photos = uniquePhotos(payload.entry && payload.entry.photos)
     const images = []
     for (let index = 0; index < photos.length; index += 1) {
       const photo = photos[index]

@@ -67,6 +67,16 @@ function copy(titlePlaceholder, keywordLabel, keywordPlaceholder, keywordExample
   return { ...DEFAULT_FORM_COPY, titlePlaceholder, keywordLabel, keywordPlaceholder, keywordExamples, detailPlaceholder }
 }
 
+function uniquePhotos(photos) {
+  const seen = new Set()
+  return (photos || []).filter(photo => {
+    const value = String(photo || '').trim()
+    if (!value || seen.has(value)) return false
+    seen.add(value)
+    return true
+  })
+}
+
 Page({
   data: {
     id: '',
@@ -75,6 +85,7 @@ Page({
     organizationName: '',
     categoryName: '',
     canEdit: false,
+    canUpload: false,
     form: {
       date: '',
       title: '',
@@ -106,6 +117,11 @@ Page({
       organizationName: organization.name,
       categoryName: position ? position.name : CATEGORY_NAMES[options.category] || '档案事件',
       canEdit: permission.canMaintainArchive(member, organization, categoryId, options.id ? 'update' : 'create'),
+      canUpload: permission.hasPortPermission(member, 'history', 'upload', {
+        organizationId: organization.id,
+        cloudOrganizationId: organization.cloudId,
+        positionId: position && (position.positionId || position.id)
+      }) || (!permission.activePortPermissions(member).length && permission.canMaintainArchive(member, organization, categoryId, 'update')),
       formCopy: FORM_COPY[categoryId] || DEFAULT_FORM_COPY,
       'form.date': this.formatDate(new Date()),
       'form.uploadedBy': member.nickname || '当前管理员'
@@ -166,7 +182,7 @@ Page({
             saved.push(file.tempFilePath)
           }
         }
-        const photos = (this.data.form.photos || []).concat(saved).slice(0, 9)
+        const photos = uniquePhotos((this.data.form.photos || []).concat(saved)).slice(0, 9)
         this.setData({
           'form.photos': photos,
           'form.photoCount': photos.length
@@ -326,14 +342,21 @@ Page({
         uploaderRole: categoryName,
         status,
         photoCount: form.photoCount,
-        photos: form.photos || [],
+        photos: uniquePhotos(form.photos),
         tone: 'blue',
         keywords: form.keywords.split(/[，,\s]+/).filter(Boolean),
         summary: form.summary.trim(),
         content: form.content.trim()
       }
     })
-    if (!id && entry && entry._id) this.setData({ id: entry._id })
+    if (entry) {
+      const photos = uniquePhotos(entry.photos)
+      this.setData({
+        id: entry._id || id,
+        'form.photos': photos,
+        'form.photoCount': photos.length
+      })
+    }
     return entry
   },
 

@@ -37,7 +37,7 @@
     <view class="menu-copy"><view class="menu-title">协作区与四队发展历史</view><view class="menu-desc">按年份保存重要服务与里程碑</view></view>
     <view class="arrow">›</view>
   </view>
-  <view wx:if="{{!needsProfile && member.status === 'approved'}}" class="menu-card" bindtap="goUserPermissions">
+  <view wx:if="{{!needsProfile && member.status === 'approved' && canViewPermissions}}" class="menu-card" bindtap="goUserPermissions">
     <view class="menu-icon blue">管</view>
     <view class="menu-copy"><view class="menu-title">用户与权限</view><view class="menu-desc">查看角色、岗位、模块和授权期限</view></view>
     <view class="arrow">›</view>

@@ -13,6 +13,7 @@ Page({
     taskDates: [],
     teamId: 'all',
     canEdit: false,
+    canCreate: false,
     doneCount: 0,
     totalCount: 0
   },
@@ -29,7 +30,10 @@ Page({
 
   async onShow() {
     const session = await api.call('getSession')
-    this.setData({ canEdit: permission.canPerform(session, 'tasks', 'update') || permission.canPerform(session, 'tasks', 'create') })
+    this.setData({
+      canEdit: permission.canPerform(session, 'todo', 'update'),
+      canCreate: permission.canPerform(session, 'todo', 'create')
+    })
     this.session = session
     await this.loadDates()
     await this.loadTasks()

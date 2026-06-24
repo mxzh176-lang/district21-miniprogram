@@ -3,7 +3,7 @@
     <view class="hero-kicker">OPEN LEDGER</view>
     <view class="hero-title">{{organization.name}}账目</view>
     <view class="hero-desc">账目公开透明，所有成员可查看；仅管理员和当前有效司库可维护。</view>
-    <button wx:if="{{canEdit}}" class="create-button" bindtap="openCreate">＋ 新增账目</button>
+    <button wx:if="{{canCreate}}" class="create-button" bindtap="openCreate">＋ 新增账目</button>
   </view>
 
   <view class="form-card" wx:if="{{showForm}}">
@@ -22,7 +22,7 @@
       <view class="ledger-desc">{{item.description}}</view>
     </view>
     <view class="amount {{item.type}}">¥{{item.amount}}</view>
-    <view wx:if="{{canEdit}}" class="record-actions"><text data-id="{{item.id}}" bindtap="editRecord">编辑</text><text class="delete" data-id="{{item.id}}" bindtap="deleteRecord">删除</text></view>
+    <view wx:if="{{canUpdate || canDelete}}" class="record-actions"><text wx:if="{{canUpdate}}" data-id="{{item.id}}" bindtap="editRecord">编辑</text><text wx:if="{{canDelete}}" class="delete" data-id="{{item.id}}" bindtap="deleteRecord">删除</text></view>
   </view>
   <view class="empty" wx:if="{{!records.length}}">当前暂无账目记录。</view>
 </view>

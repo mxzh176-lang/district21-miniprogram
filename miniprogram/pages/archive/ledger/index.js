@@ -7,6 +7,9 @@ Page({
     organization: {},
     records: [],
     canEdit: false,
+    canCreate: false,
+    canUpdate: false,
+    canDelete: false,
     showForm: false,
     typeOptions: [
       { value: 'income', label: '收入' },
@@ -32,7 +35,10 @@ Page({
     this.setData({
       organization,
       records,
-      canEdit: permission.canMaintainArchive(session, organization, 'treasurer')
+      canEdit: permission.canMaintainLedger(session, { organizationId: organization.cloudId || organization.id }, 'update'),
+      canCreate: permission.canMaintainLedger(session, { organizationId: organization.cloudId || organization.id }, 'create'),
+      canUpdate: permission.canMaintainLedger(session, { organizationId: organization.cloudId || organization.id }, 'update'),
+      canDelete: permission.canMaintainLedger(session, { organizationId: organization.cloudId || organization.id }, 'delete')
     })
     wx.setNavigationBarTitle({ title: `${organization.shortName} · 司库账目` })
   },
@@ -47,7 +53,7 @@ Page({
 
   editRecord(event) {
     const record = this.data.records.find(item => item.id === event.currentTarget.dataset.id)
-    if (!record || !this.data.canEdit) return
+    if (!record || !this.data.canUpdate) return
     const typeIndex = Math.max(0, this.data.typeOptions.findIndex(item => item.value === record.type))
     this.setData({ showForm: true, typeIndex, form: { ...record, amount: String(record.amount) } })
   },

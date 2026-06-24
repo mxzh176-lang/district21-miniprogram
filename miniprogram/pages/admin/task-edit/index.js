@@ -21,6 +21,7 @@ Page({
     statusIndex: 0,
     categoryIndex: 0,
     saving: false,
+    canDelete: false,
     form: {
       title: '',
       month: '',
@@ -43,6 +44,7 @@ Page({
       return
     }
     this.session = member
+    this.setData({ canDelete: permission.canPerform(member, 'todo', 'delete') })
     if (options.id) {
       this.setData({ id: options.id })
       await this.loadTask()

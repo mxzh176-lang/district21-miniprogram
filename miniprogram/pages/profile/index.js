@@ -2,7 +2,7 @@ const api = require('../../utils/api')
 const permission = require('../../utils/permission')
 
 Page({
-  data: { member: {}, canManage: false, needsProfile: false },
+  data: { member: {}, canManage: false, canViewPermissions: false, needsProfile: false },
 
   async onShow() {
     const member = await api.call('getSession')
@@ -13,6 +13,9 @@ Page({
         displayCode: member.memberCode || member.accountSuffix || String(member.id || member._id || '').slice(-6)
       },
       canManage: permission.canManage(member),
+      canViewPermissions: permission.isSuperAdmin(member) ||
+        permission.hasPortPermission(member, 'permission', 'read') ||
+        !permission.activePortPermissions(member).length,
       needsProfile: !member.profileCompleted || !member.organizationId
     })
   },

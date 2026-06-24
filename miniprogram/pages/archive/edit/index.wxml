@@ -128,7 +128,7 @@
         </view>
       </view>
 
-      <view class="photo-upload" bindtap="choosePhotos">
+      <view class="photo-upload" wx:if="{{canUpload}}" bindtap="choosePhotos">
         <view class="upload-icon">＋</view>
         <view class="upload-copy">
           <view class="upload-title">{{form.photoCount ? '继续添加附件' : formCopy.photoTitle}}</view>
@@ -141,7 +141,7 @@
         <view class="preview-item" wx:for="{{form.photos}}" wx:key="*this">
           <image src="{{item}}" mode="aspectFill" />
           <view class="photo-index">{{index + 1}}</view>
-          <view class="remove-photo" data-index="{{index}}" catchtap="removePhoto">×</view>
+          <view class="remove-photo" wx:if="{{canUpload}}" data-index="{{index}}" catchtap="removePhoto">×</view>
         </view>
       </view>
 

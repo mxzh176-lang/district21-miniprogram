@@ -44,6 +44,6 @@
     </view>
     <button class="secondary-button" bindtap="generateDraft">按分类生成嘉许模板</button>
     <button class="primary-button" bindtap="save" loading="{{saving}}">保存</button>
-    <button wx:if="{{id}}" class="danger-button delete" bindtap="remove">移入回收站</button>
+    <button wx:if="{{id && canDelete}}" class="danger-button delete" bindtap="remove">移入回收站</button>
   </view>
 </view>

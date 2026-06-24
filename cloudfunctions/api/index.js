@@ -9,6 +9,7 @@ const COLLECTIONS = {
   user: 'user',
   userRole: 'user_role',
   permissionGrant: 'permission_grant',
+  userPermissions: 'user_permissions',
   position: 'position',
   roleAssignment: 'role_assignment',
   eventRecord: 'event_record',
@@ -222,11 +223,17 @@ async function canAdministerOrganization(userId, organizationId) {
 
 async function requireEventEditor(openid, record = {}, action = 'update') {
   const user = await requirePlatformUser(openid)
-  if (await canAdministerOrganization(user.id, record.organizationId)) return user
   const permissionContext = {
     organizationId: record.organizationId || record.teamId,
-    positionId: record.positionId || record.categoryId
+    positionId: record.positionId || record.categoryId,
+    creatorId: record.creatorId || record.createdBy
   }
+  const portState = await portPermissionState(user.id, 'history', action, permissionContext)
+  if (portState.allowed) return user
+  if (portState.configured) {
+    throw Object.assign(new Error('无权限操作'), { code: 'PERMISSION_DENIED' })
+  }
+  if (await canAdministerOrganization(user.id, record.organizationId)) return user
   if (await hasPlatformGrant(user.id, 'archives', action, permissionContext)) return user
   const assignments = await activeRoleAssignments(user.id)
   const positionId = cleanText(record.positionId || record.categoryId, 140)
@@ -285,6 +292,86 @@ async function activePermissionGrants(userId) {
     console.warn('permission_grant unavailable', error.message)
     return []
   }
+}
+
+const PORT_PERMISSION_ACTIONS = {
+  history: ['read', 'create', 'update', 'delete', 'upload'],
+  archive: ['read', 'update', 'upload', 'delete'],
+  todo: ['read', 'create', 'update', 'complete', 'delete'],
+  finance: ['read', 'create', 'update', 'delete'],
+  member: ['read', 'create', 'update', 'delete'],
+  honor: ['read', 'create', 'update', 'delete'],
+  permission: ['read', 'create', 'update', 'delete']
+}
+const PORT_DATA_SCOPES = ['district', 'team', 'position', 'self']
+
+async function activeUserPermissions(userId) {
+  try {
+    const today = new Date().toISOString().slice(0, 10)
+    const result = await db.collection(COLLECTIONS.userPermissions)
+      .where({ userId, status: 'active' })
+      .limit(100)
+      .get()
+    return result.data.filter(item =>
+      (!item.startDate || item.startDate <= today) &&
+      (!item.endDate || item.endDate >= today)
+    )
+  } catch (error) {
+    console.warn('user_permissions unavailable', error.message)
+    return []
+  }
+}
+
+function portScopeMatches(grant, userId, context = {}) {
+  const organizationId = canonicalOrganizationId(context.organizationId || context.teamId)
+  const positionId = cleanText(context.positionId || context.categoryId, 140)
+  if (grant.dataScope === 'district') return true
+  if (grant.dataScope === 'team') return canonicalOrganizationId(grant.teamId) === organizationId
+  if (grant.dataScope === 'position') {
+    return canonicalOrganizationId(grant.teamId) === organizationId &&
+      positionIdMatches(grant.positionId, positionId)
+  }
+  if (grant.dataScope === 'self') {
+    return [context.creatorId, context.createdBy, context.userId].filter(Boolean).includes(userId)
+  }
+  return false
+}
+
+async function portPermissionState(userId, module, action, context = {}) {
+  const roles = await platformRoles(userId)
+  if (roles.some(item => item.role === 'super_admin')) return { configured: true, allowed: true }
+  const grants = await activeUserPermissions(userId)
+  const allowed = portPermissionAllowed(grants, userId, module, action, context)
+  return { configured: grants.length > 0, allowed }
+}
+
+async function enforcingPortPermissions(userId) {
+  const roles = await platformRoles(userId)
+  if (roles.some(item => item.role === 'super_admin')) return []
+  return activeUserPermissions(userId)
+}
+
+function portPermissionAllowed(grants, userId, module, action, context = {}) {
+  return grants.some(grant =>
+    ((grant.permissions || {})[module] || []).includes(action) &&
+    (grant.dataScope === 'self' && action === 'create' || portScopeMatches(grant, userId, context))
+  )
+}
+
+async function requireLegacyPortEditor(openid, module, action, context = {}) {
+  const platformUser = await findPlatformUser(openid)
+  if (platformUser && platformUser.status === 'active') {
+    const scopedContext = {
+      ...context,
+      organizationId: context.organizationId || context.teamId || platformUser.defaultOrganizationId
+    }
+    const portState = await portPermissionState(platformUser.id, module, action, scopedContext)
+    if (portState.allowed) return requireApproved(openid)
+    if (portState.configured) {
+      throw Object.assign(new Error('无权限操作'), { code: 'PERMISSION_DENIED' })
+    }
+  }
+  return requireEditor(openid)
 }
 
 const ORGANIZATION_ID_ALIASES = {
@@ -364,10 +451,11 @@ async function getPlatformSession(openid) {
   if (user.status === 'disabled') {
     throw Object.assign(new Error('当前账号已停用'), { code: 'USER_DISABLED' })
   }
-  const [baseRoles, assignments, grants] = await Promise.all([
+  const [baseRoles, assignments, grants, portPermissions] = await Promise.all([
     platformRoles(user.id),
     activeRoleAssignments(user.id),
-    activePermissionGrants(user.id)
+    activePermissionGrants(user.id),
+    activeUserPermissions(user.id)
   ])
   const roles = baseRoles.concat(assignments.map(item => ({
     id: item.id,
@@ -396,6 +484,7 @@ async function getPlatformSession(openid) {
     platformRole: primaryRole,
     roles,
     grants,
+    portPermissions,
     organizationId: user.defaultOrganizationId || '',
     profileCompleted: Boolean(user.profileCompleted || (user.name && !user.name.startsWith('待认证用户-'))),
     memberCode: user.memberCode || '',
@@ -484,6 +573,143 @@ async function listProfileOrganizations(openid) {
 const PERMISSION_MODULES = ['all', 'archives', 'contacts', 'tasks', 'history', 'notices', 'photos', 'honors']
 const PERMISSION_ACTIONS = ['read', 'create', 'update', 'delete']
 const PERMISSION_SCOPES = ['global', 'organization', 'organization_tree', 'position', 'position_tree']
+
+async function listUserPermissions(openid) {
+  const user = await requirePlatformUser(openid)
+  const roles = await platformRoles(user.id)
+  const ownGrants = await activeUserPermissions(user.id)
+  const canRead = ownGrants.some(item => ((item.permissions || {}).permission || []).includes('read'))
+  if (!roles.some(item => item.role === 'super_admin') && ownGrants.length && !canRead) {
+    throw Object.assign(new Error('无权限操作'), { code: 'PERMISSION_DENIED' })
+  }
+  const result = await db.collection(COLLECTIONS.userPermissions).limit(500).get()
+  return result.data.filter(item => item.status !== 'deleted')
+}
+
+function sanitizePortPermissions(input = {}) {
+  const result = {}
+  Object.keys(PORT_PERMISSION_ACTIONS).forEach(module => {
+    const actions = Array.isArray(input[module]) ? input[module] : []
+    result[module] = Array.from(new Set(actions
+      .map(item => cleanText(item, 20))
+      .filter(item => PORT_PERMISSION_ACTIONS[module].includes(item))))
+  })
+  return result
+}
+
+async function saveUserPermissions(openid, event = {}) {
+  const operator = await requireSuperAdmin(openid)
+  const input = event.userPermissions || {}
+  const userId = cleanText(input.userId, 100)
+  const teamId = canonicalOrganizationId(input.teamId)
+  const roleCode = cleanText(input.roleCode, 100)
+  const roleName = cleanText(input.roleName, 100)
+  const dataScope = cleanText(input.dataScope, 20)
+  const positionId = cleanText(input.positionId, 140)
+  const startDate = cleanText(input.startDate, 10)
+  const endDate = cleanText(input.endDate, 10)
+  if (!userId || !teamId || !roleCode || !roleName || !PORT_DATA_SCOPES.includes(dataScope) || !startDate || !endDate) {
+    throw Object.assign(new Error('用户、服务队、角色、数据范围和有效期不能为空'), { code: 'INVALID_USER_PERMISSIONS' })
+  }
+  if (startDate > endDate) {
+    throw Object.assign(new Error('授权开始时间不能晚于结束时间'), { code: 'INVALID_USER_PERMISSION_DATE' })
+  }
+  const target = await requireAuthorizationTarget(userId)
+  const team = await requireActiveOrganization(teamId)
+  if (!['region', 'team'].includes(team.type)) {
+    throw Object.assign(new Error('请选择协作区或服务队'), { code: 'INVALID_PERMISSION_TEAM' })
+  }
+  if (dataScope === 'position') {
+    const positionResult = await db.collection(COLLECTIONS.position)
+      .where({ id: positionId, organizationId: teamId, status: 'active' })
+      .limit(1)
+      .get()
+    if (!positionResult.data[0]) {
+      throw Object.assign(new Error('所选岗位不属于当前服务队'), { code: 'INVALID_PERMISSION_POSITION' })
+    }
+  }
+  const id = cleanText(input.id, 100) || businessId('user_permission')
+  const existing = await db.collection(COLLECTIONS.userPermissions).where({ id }).limit(1).get()
+  const data = {
+    id,
+    userId,
+    userName: target.name,
+    teamId,
+    roleCode,
+    roleName,
+    dataScope,
+    positionId: dataScope === 'position' ? positionId : '',
+    permissions: sanitizePortPermissions(input.permissions),
+    startDate,
+    endDate,
+    status: 'active',
+    grantedBy: operator.id,
+    updatedAt: now()
+  }
+  if (existing.data[0]) {
+    await db.collection(COLLECTIONS.userPermissions).doc(existing.data[0]._id).update({ data })
+  } else {
+    data.createdAt = now()
+    await db.collection(COLLECTIONS.userPermissions).add({ data })
+  }
+  const previousLinkedRoles = await db.collection(COLLECTIONS.userRole)
+    .where({ sourcePermissionId: id, status: 'active' })
+    .limit(20)
+    .get()
+  await Promise.all(previousLinkedRoles.data.map(item => db.collection(COLLECTIONS.userRole).doc(item._id).update({
+    data: { status: 'inactive', updatedAt: now() }
+  })))
+  if (['super_admin', 'area_admin', 'team_admin'].includes(roleCode)) {
+    const roleOrganizationId = roleCode === 'super_admin'
+      ? 'org_federation_china'
+      : roleCode === 'area_admin' ? 'org_region_21_suihua' : teamId
+    const roleResult = await db.collection(COLLECTIONS.userRole)
+      .where({ sourcePermissionId: id })
+      .limit(1)
+      .get()
+    const roleData = {
+      id: roleResult.data[0] ? roleResult.data[0].id : businessId('role'),
+      sourcePermissionId: id,
+      userId,
+      organizationId: roleOrganizationId,
+      role: roleCode,
+      startDate,
+      endDate,
+      expiresAt: endDate,
+      status: 'active',
+      grantedBy: operator.id,
+      grantedAt: now(),
+      updatedAt: now()
+    }
+    if (roleResult.data[0]) await db.collection(COLLECTIONS.userRole).doc(roleResult.data[0]._id).update({ data: roleData })
+    else {
+      roleData.createdAt = now()
+      await db.collection(COLLECTIONS.userRole).add({ data: roleData })
+    }
+  }
+  await db.collection(COLLECTIONS.user).where({ id: userId }).update({
+    data: { status: 'active', updatedAt: now() }
+  })
+  await writePlatformLog(operator, existing.data[0] ? 'update_permission' : 'grant_permission', 'user_permissions', id, data)
+  return data
+}
+
+async function revokeUserPermissions(openid, event = {}) {
+  const operator = await requireSuperAdmin(openid)
+  const id = cleanText(event.id, 100)
+  const result = await db.collection(COLLECTIONS.userPermissions).where({ id }).limit(1).get()
+  const grant = result.data[0]
+  if (!grant) return true
+  await db.collection(COLLECTIONS.userPermissions).doc(grant._id).update({
+    data: { status: 'deleted', updatedAt: now() }
+  })
+  const linkedRoles = await db.collection(COLLECTIONS.userRole).where({ sourcePermissionId: id, status: 'active' }).limit(20).get()
+  await Promise.all(linkedRoles.data.map(item => db.collection(COLLECTIONS.userRole).doc(item._id).update({
+    data: { status: 'inactive', updatedAt: now() }
+  })))
+  await writePlatformLog(operator, 'delete_permission', 'user_permissions', id, grant)
+  return true
+}
 
 async function requirePermissionGrantAdmin(openid) {
   return requireAssignmentAdmin(openid)
@@ -787,6 +1013,7 @@ async function listPositionDirectory(openid, event = {}) {
     (!item.startDate || item.startDate <= today) && (!item.endDate || item.endDate >= today)
   )
   const administrator = await canAdministerOrganization(user.id, organizationId)
+  const configuredPortPermissions = await activeUserPermissions(user.id)
   return Promise.all(positionResult.data.map(async position => {
     const assignment = activeAssignments.find(item => item.positionId === position.id)
     return {
@@ -799,11 +1026,16 @@ async function listPositionDirectory(openid, event = {}) {
       userId: assignment ? assignment.userId : '',
       startDate: assignment ? assignment.startDate || '' : '',
       endDate: assignment ? assignment.endDate || '' : '',
-      canEdit: administrator || await hasPlatformGrant(user.id, 'archives', 'update', {
-        organizationId,
-        positionId: position.id,
-        parentPositionId: position.parentPositionId || ''
-      })
+      canEdit: configuredPortPermissions.length
+        ? (await portPermissionState(user.id, 'archive', 'update', {
+            organizationId,
+            positionId: position.id
+          })).allowed
+        : administrator || await hasPlatformGrant(user.id, 'archives', 'update', {
+            organizationId,
+            positionId: position.id,
+            parentPositionId: position.parentPositionId || ''
+          })
     }
   }))
 }
@@ -829,14 +1061,17 @@ async function savePositionDirectory(openid, event = {}) {
     .get()
   const position = result.data[0]
   if (!position) throw Object.assign(new Error('所选岗位不存在'), { code: 'POSITION_NOT_FOUND' })
-  const allowed = await canAdministerOrganization(operator.id, organizationId) ||
+  const portState = await portPermissionState(operator.id, 'archive', 'update', { organizationId, positionId })
+  const allowed = portState.allowed || (!portState.configured && (
+    await canAdministerOrganization(operator.id, organizationId) ||
     await hasPlatformGrant(operator.id, 'archives', 'update', {
       organizationId,
       positionId,
       parentPositionId: position.parentPositionId || ''
     })
+  ))
   if (!allowed) {
-    throw Object.assign(new Error('当前用户没有修改该岗位和负责人的权限'), { code: 'POSITION_DIRECTORY_PERMISSION_REQUIRED' })
+    throw Object.assign(new Error('无权限操作'), { code: 'PERMISSION_DENIED' })
   }
   await requireAuthorizationTarget(userId)
   await db.collection(COLLECTIONS.position).doc(position._id).update({ data: { name, updatedAt: now() } })
@@ -1003,6 +1238,9 @@ const HONOR_RULES = {
 
 async function requireHonorEditor(openid, record, action) {
   const user = await requirePlatformUser(openid)
+  const portState = await portPermissionState(user.id, 'honor', action, record)
+  if (portState.allowed) return user
+  if (portState.configured) throw Object.assign(new Error('无权限操作'), { code: 'PERMISSION_DENIED' })
   if (await canAdministerOrganization(user.id, record.organizationId)) return user
   if (await hasPlatformGrant(user.id, 'honors', action, record)) return user
   const assignments = await activeRoleAssignments(user.id)
@@ -1024,7 +1262,10 @@ async function listHonorRecords(openid, event = {}) {
   const query = { organizationId, status: 'active' }
   if (event.term) query.term = cleanText(event.term, 30)
   const result = await db.collection(COLLECTIONS.honorRecord).where(query).orderBy('date', 'desc').limit(200).get()
-  return result.data.map(item => ({ ...item, _id: undefined }))
+  const portGrants = await enforcingPortPermissions(user.id)
+  return result.data
+    .filter(item => !portGrants.length || portPermissionAllowed(portGrants, user.id, 'honor', 'read', item))
+    .map(item => ({ ...item, _id: undefined }))
 }
 
 async function saveHonorRecord(openid, event = {}) {
@@ -1197,7 +1438,8 @@ async function listOrganizations(openid, event = {}) {
 }
 
 async function listEventRecords(openid, event = {}) {
-  await requirePlatformUser(openid)
+  const user = await requirePlatformUser(openid)
+  const portGrants = await enforcingPortPermissions(user.id)
   const status = cleanText(event.status, 30) || 'published'
   const organizationId = cleanText(event.organizationId, 80)
   const category = cleanText(event.category, 40)
@@ -1212,6 +1454,7 @@ async function listEventRecords(openid, event = {}) {
     .filter(item => !category || item.category === category)
     .filter(item => !categoryId || item.categoryId === categoryId)
     .filter(item => !eventMonth || item.eventMonth === eventMonth)
+    .filter(item => !portGrants.length || portPermissionAllowed(portGrants, user.id, 'history', 'read', item))
     .sort((a, b) => String(b.eventDate || '').localeCompare(String(a.eventDate || '')))
     .slice(0, limit)
   try {
@@ -1289,13 +1532,17 @@ async function saveEventRecord(openid, event = {}) {
 }
 
 async function getEventRecord(openid, event = {}) {
-  await requirePlatformUser(openid)
+  const user = await requirePlatformUser(openid)
   const id = cleanText(event.id, 100)
   if (!id) throw Object.assign(new Error('缺少纪事 ID'), { code: 'EVENT_ID_REQUIRED' })
   const result = await db.collection(COLLECTIONS.eventRecord).where({ id }).limit(1).get()
   const record = result.data[0]
   if (!record || record.deletedAt) {
     throw Object.assign(new Error('纪事不存在或已归档'), { code: 'NOT_FOUND' })
+  }
+  const portState = await portPermissionState(user.id, 'history', 'read', record)
+  if (portState.configured && !portState.allowed) {
+    throw Object.assign(new Error('无权限操作'), { code: 'PERMISSION_DENIED' })
   }
   const images = await db.collection(COLLECTIONS.eventImage)
     .where({ eventId: record.id, status: 'active' })
@@ -1323,9 +1570,15 @@ async function archiveEventRecord(openid, event = {}) {
 }
 
 async function listEventImages(openid, event = {}) {
-  await requirePlatformUser(openid)
+  const user = await requirePlatformUser(openid)
   const eventId = cleanText(event.eventId, 100)
   if (!eventId) return []
+  const recordResult = await db.collection(COLLECTIONS.eventRecord).where({ id: eventId }).limit(1).get()
+  const record = recordResult.data[0]
+  const portState = await portPermissionState(user.id, 'history', 'read', record || {})
+  if (portState.configured && !portState.allowed) {
+    throw Object.assign(new Error('无权限操作'), { code: 'PERMISSION_DENIED' })
+  }
   const result = await db.collection(COLLECTIONS.eventImage)
     .where({ eventId, status: 'active' })
     .orderBy('sortOrder', 'asc')
@@ -1336,24 +1589,54 @@ async function listEventImages(openid, event = {}) {
 
 async function saveEventImages(openid, event = {}) {
   const eventId = cleanText(event.eventId, 100)
-  const images = Array.isArray(event.images) ? event.images.slice(0, 9) : []
+  const imageKeys = new Set()
+  const images = (Array.isArray(event.images) ? event.images : []).filter(image => {
+    image = image || {}
+    const fileId = cleanText(image.fileId, 500)
+    const imageUrl = cleanText(image.imageUrl, 1000)
+    const key = fileId || imageUrl
+    if (!key || imageKeys.has(key)) return false
+    imageKeys.add(key)
+    return true
+  }).slice(0, 9)
   const eventResult = await db.collection(COLLECTIONS.eventRecord).where({ id: eventId }).limit(1).get()
   const record = eventResult.data[0]
   if (!record || record.deletedAt) {
     throw Object.assign(new Error('纪事不存在，无法保存照片'), { code: 'EVENT_NOT_FOUND' })
   }
-  const user = await requireEventEditor(openid, record, 'update')
+  const user = await requireEventEditor(openid, record, 'upload')
   const existing = await db.collection(COLLECTIONS.eventImage)
-    .where({ eventId, status: 'active' })
+    .where({ eventId })
     .limit(100)
     .get()
-  await Promise.all(existing.data.map(item =>
-    db.collection(COLLECTIONS.eventImage).doc(item._id).update({
-      data: { status: 'deleted', deletedAt: now() }
-    })
-  ))
+  const retainedFileIds = new Set(images.map(image => cleanText(image.fileId, 500)).filter(Boolean))
+  const imageOrder = new Map(images.map((image, index) => [
+    cleanText(image.fileId, 500) || cleanText(image.imageUrl, 1000),
+    index
+  ]))
+  const removedFileIds = Array.from(new Set(existing.data
+    .map(item => cleanText(item.fileId, 500))
+    .filter(fileId => fileId && !retainedFileIds.has(fileId))))
+  const retainedKeys = new Set()
+  await Promise.all(existing.data.map(item => {
+    const key = cleanText(item.fileId, 500) || cleanText(item.imageUrl, 1000)
+    if (item.status === 'active' && imageOrder.has(key) && !retainedKeys.has(key)) {
+      retainedKeys.add(key)
+      return db.collection(COLLECTIONS.eventImage).doc(item._id).update({
+        data: { sortOrder: imageOrder.get(key), updatedAt: now() }
+      })
+    }
+    if (item.status === 'active') {
+      return db.collection(COLLECTIONS.eventImage).doc(item._id).update({
+        data: { status: 'deleted', deletedAt: now(), updatedAt: now() }
+      })
+    }
+    return Promise.resolve()
+  }))
   await Promise.all(images.map((image, index) => {
     image = image || {}
+    const key = cleanText(image.fileId, 500) || cleanText(image.imageUrl, 1000)
+    if (retainedKeys.has(key)) return Promise.resolve()
     return db.collection(COLLECTIONS.eventImage).add({
       data: {
         id: businessId('image'),
@@ -1377,8 +1660,30 @@ async function saveEventImages(openid, event = {}) {
   await db.collection(COLLECTIONS.eventRecord).doc(record._id).update({
     data: { imageCount: images.length, updatedAt: now() }
   })
+  if (removedFileIds.length) {
+    try {
+      const fileRecords = await db.collection(COLLECTIONS.fileRecord)
+        .where({ resourceType: 'event_record', resourceId: eventId })
+        .limit(100)
+        .get()
+      await Promise.all(fileRecords.data
+        .filter(item => removedFileIds.includes(item.fileID))
+        .map(item => db.collection(COLLECTIONS.fileRecord).doc(item._id).update({
+          data: { status: 'deleted', deletedAt: now(), updatedAt: now() }
+        })))
+    } catch (error) {
+      console.warn('清理文件记录失败', eventId, error)
+    }
+    for (let index = 0; index < removedFileIds.length; index += 50) {
+      try {
+        await cloud.deleteFile({ fileList: removedFileIds.slice(index, index + 50) })
+      } catch (error) {
+        console.warn('清理云存储文件失败', eventId, error)
+      }
+    }
+  }
   await writePlatformLog(user, 'update', 'event_image', eventId, { imageCount: images.length })
-  return { eventId, imageCount: images.length }
+  return { eventId, imageCount: images.length, removedFileCount: removedFileIds.length }
 }
 
 async function ensureFileRecordCollection() {
@@ -1411,12 +1716,14 @@ async function saveFileRecord(openid, event = {}) {
     if (record.organizationId !== organizationId) {
       throw Object.assign(new Error('文件组织与事件组织不一致'), { code: 'FILE_ORGANIZATION_MISMATCH' })
     }
-    await requireEventEditor(openid, record, 'update')
+    await requireEventEditor(openid, record, 'upload')
   } else {
-    const allowed = await canAdministerOrganization(user.id, organizationId) ||
+    const portModule = module === 'history' ? 'history' : 'archive'
+    const portState = await portPermissionState(user.id, portModule, 'upload', { organizationId })
+    const legacyAllowed = await canAdministerOrganization(user.id, organizationId) ||
       await hasPlatformGrant(user.id, module, 'create', { organizationId })
-    if (!allowed) {
-      throw Object.assign(new Error('当前用户没有该组织的文件上传权限'), { code: 'FILE_UPLOAD_PERMISSION_REQUIRED' })
+    if (!portState.allowed && (portState.configured || !legacyAllowed)) {
+      throw Object.assign(new Error('无权限操作'), { code: 'PERMISSION_DENIED' })
     }
   }
   const fixedPath = '中国狮子联会/哈尔滨代表处/二十一协作区/'
@@ -1471,7 +1778,7 @@ async function saveFileRecord(openid, event = {}) {
 }
 
 async function listLedgerRecords(openid, event = {}) {
-  await requirePlatformUser(openid)
+  const user = await requirePlatformUser(openid)
   const organizationId = cleanText(event.organizationId, 100)
   if (!organizationId) return []
   const result = await db.collection(COLLECTIONS.ledgerRecord)
@@ -1479,17 +1786,28 @@ async function listLedgerRecords(openid, event = {}) {
     .orderBy('date', 'desc')
     .limit(200)
     .get()
+  const portGrants = await enforcingPortPermissions(user.id)
   return result.data.filter(item => !item.deletedAt)
+    .filter(item => !portGrants.length || portPermissionAllowed(portGrants, user.id, 'finance', 'read', item))
 }
 
 async function saveLedgerRecord(openid, event = {}) {
   const record = event.record || {}
   const organizationId = cleanText(record.organizationId, 100)
-  const user = await requireEventEditor(openid, {
+  const context = {
     organizationId,
     positionId: 'treasurer',
-    categoryId: 'treasurer'
-  })
+    categoryId: 'treasurer',
+    creatorId: record.createdBy
+  }
+  const platformUser = await requirePlatformUser(openid)
+  const action = record.id ? 'update' : 'create'
+  const portState = await portPermissionState(platformUser.id, 'finance', action, context)
+  const user = portState.allowed
+    ? platformUser
+    : portState.configured
+      ? (() => { throw Object.assign(new Error('无权限操作'), { code: 'PERMISSION_DENIED' }) })()
+      : await requireEventEditor(openid, context)
   const id = cleanText(record.id, 100) || businessId('ledger')
   const data = {
     id,
@@ -1526,11 +1844,19 @@ async function deleteLedgerRecord(openid, event = {}) {
   const result = await db.collection(COLLECTIONS.ledgerRecord).where({ id }).limit(1).get()
   const record = result.data[0]
   if (!record) return true
-  const user = await requireEventEditor(openid, {
+  const context = {
     organizationId: record.organizationId,
     positionId: 'treasurer',
-    categoryId: 'treasurer'
-  })
+    categoryId: 'treasurer',
+    creatorId: record.createdBy
+  }
+  const platformUser = await requirePlatformUser(openid)
+  const portState = await portPermissionState(platformUser.id, 'finance', 'delete', context)
+  const user = portState.allowed
+    ? platformUser
+    : portState.configured
+      ? (() => { throw Object.assign(new Error('无权限操作'), { code: 'PERMISSION_DENIED' }) })()
+      : await requireEventEditor(openid, context)
   await db.collection(COLLECTIONS.ledgerRecord).doc(record._id).update({
     data: { deletedAt: now(), updatedAt: now() }
   })
@@ -1611,8 +1937,12 @@ async function getTask(openid, event) {
 }
 
 async function saveTask(openid, event) {
-  const member = await requireEditor(openid)
   const task = event.task || {}
+  const member = await requireLegacyPortEditor(openid, 'todo', event.id ? 'update' : 'create', {
+    organizationId: task.organizationId || task.teamId,
+    positionId: task.positionId || task.categoryId,
+    creatorId: task.createdBy
+  })
   const data = {
     title: cleanText(task.title, 100),
     month: cleanText(task.month, 7),
@@ -1639,8 +1969,14 @@ async function saveTask(openid, event) {
 }
 
 async function deleteTask(openid, event) {
-  const member = await requireEditor(openid)
   const id = cleanText(event.id, 80)
+  const taskResult = await db.collection(COLLECTIONS.tasks).doc(id).get()
+  const task = taskResult.data || {}
+  const member = await requireLegacyPortEditor(openid, 'todo', 'delete', {
+    organizationId: task.organizationId || task.teamId,
+    positionId: task.positionId || task.categoryId,
+    creatorId: task.createdBy
+  })
   await db.collection(COLLECTIONS.tasks).doc(id).update({ data: { deletedAt: new Date(), deletedBy: openid } })
   await writeAudit(member, 'delete', 'task', id)
   return true
@@ -1659,8 +1995,11 @@ async function getOrg(openid, event) {
 }
 
 async function saveOrg(openid, event) {
-  const member = await requireEditor(openid)
   const unit = event.unit || {}
+  const member = await requireLegacyPortEditor(openid, 'member', event.id ? 'update' : 'create', {
+    organizationId: unit.organizationId || unit.teamId,
+    creatorId: unit.createdBy
+  })
   const data = {
     position: cleanText(unit.position, 100),
     person: cleanText(unit.person, 40),
@@ -1683,8 +2022,13 @@ async function saveOrg(openid, event) {
 }
 
 async function deleteOrg(openid, event) {
-  const member = await requireEditor(openid)
   const id = cleanText(event.id, 80)
+  const unitResult = await db.collection(COLLECTIONS.org).doc(id).get()
+  const unit = unitResult.data || {}
+  const member = await requireLegacyPortEditor(openid, 'member', 'delete', {
+    organizationId: unit.organizationId || unit.teamId,
+    creatorId: unit.createdBy
+  })
   await db.collection(COLLECTIONS.org).doc(id).update({ data: { deletedAt: new Date(), deletedBy: openid } })
   await writeAudit(member, 'delete', 'org', id)
   return true
@@ -1729,8 +2073,11 @@ async function getActivity(openid, event) {
 }
 
 async function saveActivity(openid, event) {
-  const member = await requireEditor(openid)
   const activity = event.activity || {}
+  const member = await requireLegacyPortEditor(openid, 'history', event.id ? 'update' : 'create', {
+    organizationId: activity.organizationId || activity.teamId,
+    creatorId: activity.createdBy
+  })
   const data = {
     title: cleanText(activity.title, 100),
     date: cleanText(activity.date, 10),
@@ -1755,20 +2102,30 @@ async function saveActivity(openid, event) {
 }
 
 async function deleteActivity(openid, event) {
-  const member = await requireEditor(openid)
   const id = cleanText(event.id, 80)
+  const activityResult = await db.collection(COLLECTIONS.activities).doc(id).get()
+  const activity = activityResult.data || {}
+  const member = await requireLegacyPortEditor(openid, 'history', 'delete', {
+    organizationId: activity.organizationId || activity.teamId,
+    creatorId: activity.createdBy
+  })
   await db.collection(COLLECTIONS.activities).doc(id).update({ data: { deletedAt: new Date(), deletedBy: openid } })
   await writeAudit(member, 'delete', 'activity', id)
   return true
 }
 
 async function addPhoto(openid, event) {
-  const member = await requireEditor(openid)
   const activityId = cleanText(event.activityId, 80)
   const fileID = cleanText(event.fileID, 1000)
   if (!activityId || !fileID.startsWith('cloud://')) {
     throw Object.assign(new Error('照片信息不正确'), { code: 'INVALID_PHOTO' })
   }
+  const activityResult = await db.collection(COLLECTIONS.activities).doc(activityId).get()
+  const activity = activityResult.data || {}
+  const member = await requireLegacyPortEditor(openid, 'history', 'upload', {
+    organizationId: activity.organizationId || activity.teamId,
+    creatorId: activity.createdBy
+  })
   const count = await db.collection(COLLECTIONS.photos).where({ activityId }).count()
   const result = await db.collection(COLLECTIONS.photos).add({
     data: {
@@ -1786,8 +2143,15 @@ async function addPhoto(openid, event) {
 }
 
 async function deletePhoto(openid, event) {
-  const member = await requireEditor(openid)
   const id = cleanText(event.id, 80)
+  const photoResult = await db.collection(COLLECTIONS.photos).doc(id).get()
+  const photo = photoResult.data || {}
+  const activityResult = photo.activityId ? await db.collection(COLLECTIONS.activities).doc(photo.activityId).get() : { data: {} }
+  const activity = activityResult.data || {}
+  const member = await requireLegacyPortEditor(openid, 'history', 'delete', {
+    organizationId: activity.organizationId || activity.teamId,
+    creatorId: activity.createdBy
+  })
   await db.collection(COLLECTIONS.photos).doc(id).update({ data: { deletedAt: new Date(), deletedBy: openid } })
   await writeAudit(member, 'delete', 'photo', id)
   return true
@@ -1817,9 +2181,12 @@ async function getContent(openid, event) {
 }
 
 async function saveContent(openid, event) {
-  const member = await requireEditor(openid)
   const type = event.type === 'history' ? 'history' : 'notice'
   const content = event.content || {}
+  const member = await requireLegacyPortEditor(openid, 'history', event.id ? 'update' : 'create', {
+    organizationId: content.organizationId || content.teamId,
+    creatorId: content.createdBy
+  })
   const data = {
     title: cleanText(content.title, 100),
     content: cleanText(content.content, 5000),
@@ -1842,9 +2209,14 @@ async function saveContent(openid, event) {
 }
 
 async function deleteContent(openid, event) {
-  const member = await requireEditor(openid)
   const type = event.type === 'history' ? 'history' : 'notice'
   const id = cleanText(event.id, 80)
+  const contentResult = await db.collection(contentCollection(type)).doc(id).get()
+  const content = contentResult.data || {}
+  const member = await requireLegacyPortEditor(openid, 'history', 'delete', {
+    organizationId: content.organizationId || content.teamId,
+    creatorId: content.createdBy
+  })
   await db.collection(contentCollection(type)).doc(id).update({ data: { deletedAt: new Date(), deletedBy: openid } })
   await writeAudit(member, 'delete', type, id)
   return true
@@ -2077,10 +2449,13 @@ const handlers = {
   listPlatformUsers,
   listUserRoles,
   listPermissionGrants,
+  listUserPermissions,
   saveUserRole,
   savePermissionGrant,
+  saveUserPermissions,
   revokeUserRole,
   revokePermissionGrant,
+  revokeUserPermissions,
   saveRoleAssignment,
   listOrganizations,
   listEventRecords,

@@ -10,7 +10,7 @@
         <view class="progress-number">{{doneCount}}/{{totalCount}}</view>
         <view class="progress-label">已完成</view>
       </view>
-      <button wx:if="{{canEdit}}" class="create-button" bindtap="createTask">创建待办</button>
+      <button wx:if="{{canCreate}}" class="create-button" bindtap="createTask">创建待办</button>
     </view>
   </view>
 

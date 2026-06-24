@@ -1,56 +1,34 @@
 <view class="page">
   <view class="role-hero">
-    <view class="hero-kicker">ACCESS CONTROL</view>
+    <view class="hero-kicker">ROLE + PORT ACCESS</view>
     <view class="hero-title">用户与权限</view>
-    <view class="hero-desc">内部成员可查看授权情况；只有符合范围的管理员可以修改。</view>
+    <view class="hero-desc">先套用角色默认权限，再按端口微调；授权始终受组织、岗位和有效期限制。</view>
   </view>
 
-  <view class="permission-nav">
-    <view class="permission-link" bindtap="goRoleAssignments">岗位与任期 <text>›</text></view>
-    <view class="permission-link" bindtap="goPermissionGrants">模块与范围 <text>›</text></view>
-  </view>
+  <view class="readonly-note" wx:if="{{!canEdit}}">当前为只读模式，只有超级管理员可修改授权。</view>
+  <view class="setup-card" wx:if="{{setupRequired}}">请先在云开发数据库创建 user_permissions 集合，然后重新部署 api 云函数。</view>
 
-  <view class="readonly-note" wx:if="{{!canEdit}}">当前为只读模式，权限变更须由管理员操作。</view>
-
-  <view class="steps-card" wx:if="{{canEdit}}">
-    <view>1. 对方用微信打开小程序</view>
-    <view>2. 在“我的”填写姓名和所属组织</view>
-    <view>3. 在此选择用户、角色和组织</view>
-    <view>4. 保存后重新进入小程序生效</view>
-  </view>
-
-  <view class="form-card" wx:if="{{canEdit}}">
-    <view class="label">选择用户</view>
-    <picker range="{{users}}" range-key="displayName" value="{{userIndex}}" bindchange="onUserChange">
-      <view class="picker-value">{{users.length ? users[userIndex].displayName : '暂无资料完整的成员'}}</view>
-    </picker>
-    <view class="identity-tip" wx:if="{{incompleteUserCount}}">有 {{incompleteUserCount}} 人仍显示为待认证用户，已从授权列表隐藏。请对方先完善内部身份资料。</view>
-    <view class="label">成员编号</view>
-    <input class="picker-value code-input" maxlength="30" value="{{memberCode}}" bindinput="onMemberCodeInput" placeholder="例如 YH-001" placeholder-class="code-placeholder" cursor-color="#7be4ff" />
-    <button class="save-button secondary" disabled="{{!users.length}}" bindtap="saveMemberCode">保存成员编号</button>
-    <view class="label">选择角色</view>
-    <picker range="{{roleOptions}}" range-key="label" value="{{roleIndex}}" bindchange="onRoleChange">
-      <view class="picker-value">{{roleOptions[roleIndex].label}}</view>
-    </picker>
-    <view class="label">管理范围</view>
-    <picker range="{{organizations}}" range-key="name" value="{{organizationIndex}}" bindchange="onOrganizationChange">
-      <view class="picker-value">{{organizations.length ? organizations[organizationIndex].name : '暂无组织'}}</view>
-    </picker>
-    <view class="date-row">
-      <view class="date-field"><view class="label">开始日期</view><picker mode="date" value="{{startDate}}" bindchange="onStartDateChange"><view class="picker-value">{{startDate}}</view></picker></view>
-      <view class="date-field"><view class="label">结束日期</view><picker mode="date" value="{{endDate}}" bindchange="onEndDateChange"><view class="picker-value">{{endDate}}</view></picker></view>
+  <view class="form-card" wx:if="{{canEdit && !loading}}">
+    <view class="step"><text>1</text><view><view class="step-title">选择用户</view><picker range="{{users}}" range-key="displayName" value="{{userIndex}}" bindchange="onUserChange"><view class="picker-value">{{users.length ? users[userIndex].displayName : '暂无可授权用户'}}</view></picker></view></view>
+    <view class="identity-tip" wx:if="{{incompleteUserCount}}">有 {{incompleteUserCount}} 人未填写姓名和所属组织，暂不能授权。</view>
+    <view class="step"><text>2</text><view><view class="step-title">选择服务队</view><picker range="{{teams}}" range-key="name" value="{{teamIndex}}" bindchange="onTeamChange"><view class="picker-value">{{teams.length ? teams[teamIndex].name : '暂无服务队'}}</view></picker></view></view>
+    <view class="step"><text>3</text><view><view class="step-title">选择角色</view><picker range="{{roles}}" range-key="name" value="{{roleIndex}}" bindchange="onRoleChange"><view class="picker-value">{{roles[roleIndex].name}}</view></picker><view class="preset-tip">已自动加载该角色默认权限</view></view></view>
+    <view class="step"><text>4</text><view><view class="step-title">选择数据范围</view><picker range="{{dataScopes}}" range-key="label" value="{{scopeIndex}}" bindchange="onScopeChange"><view class="picker-value">{{dataScopes[scopeIndex].label}}</view></picker></view></view>
+    <view class="step permissions-step"><text>5</text><view><view class="step-title">勾选具体端口权限</view><view class="preset-tip">以角色默认值为起点，可逐项开启或关闭</view></view></view>
+    <view class="permission-group" wx:for="{{permissionGroups}}" wx:key="module">
+      <view class="group-head" data-module="{{item.module}}" bindtap="toggleGroup"><view>{{item.label}} <text>{{item.selectedCount}} 项</text></view><text>{{item.expanded ? '−' : '+'}}</text></view>
+      <checkbox-group wx:if="{{item.expanded}}" class="permission-grid" data-module="{{item.module}}" bindchange="onPermissionChange">
+        <label wx:for="{{item.actions}}" wx:for-item="action" wx:key="value"><checkbox value="{{action.value}}" checked="{{action.checked}}" color="#4b74d9" /><text>{{action.label}}</text></label>
+      </checkbox-group>
     </view>
-    <button class="save-button" disabled="{{!users.length || !organizations.length}}" bindtap="saveRole">保存管理员角色</button>
+    <view class="step"><text>6</text><view><view class="step-title">设置有效期</view><view class="date-row"><picker mode="date" value="{{startDate}}" bindchange="onStartDateChange"><view class="picker-value">{{startDate}}</view></picker><picker mode="date" value="{{endDate}}" bindchange="onEndDateChange"><view class="picker-value">{{endDate}}</view></picker></view></view></view>
+    <button class="save-button" disabled="{{!users.length || !teams.length}}" bindtap="savePermissions">{{editingId ? '保存授权修改' : '保存用户授权'}}</button>
   </view>
 
-  <view class="section-title">管理员角色记录</view>
-  <view class="role-card" wx:for="{{roles}}" wx:key="id">
-    <view class="role-copy">
-      <view class="user-name">{{item.userName}}</view>
-      <view class="role-name">{{item.roleLabel}} · {{item.organizationName}}</view>
-      <view class="role-term">{{item.termLabel}}</view>
-    </view>
-    <view class="revoke" wx:if="{{canEdit}}" data-id="{{item.id}}" bindtap="revokeRole">取消</view>
+  <view class="section-title">已配置授权</view>
+  <view class="grant-card" wx:for="{{grants}}" wx:key="id">
+    <view><view class="user-name">{{item.userName}}</view><view class="grant-meta">{{item.teamName}} · {{item.roleName}}</view><view class="grant-meta">{{item.scopeName}} · {{item.startDate}} 至 {{item.endDate}}</view></view>
+    <view class="grant-actions" wx:if="{{canEdit}}"><text data-id="{{item.id}}" bindtap="editGrant">编辑</text><text class="danger" data-id="{{item.id}}" bindtap="revokeGrant">删除</text></view>
   </view>
-  <view wx:if="{{!roles.length}}" class="empty">暂无管理员角色。</view>
+  <view class="empty" wx:if="{{!loading && !grants.length}}">暂无 user_permissions 授权记录。</view>
 </view>
