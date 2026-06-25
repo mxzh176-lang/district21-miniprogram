@@ -13,7 +13,7 @@
     <view class="info-row"><text class="label">参与人数</text><text>{{entry.participantCount || 0}} 人</text></view>
     <view class="info-row" wx:if="{{entry.honorStatus && entry.honorStatus !== 'none'}}">
       <text class="label">荣誉状态</text>
-      <text>{{entry.honorStatus === 'pending_confirm' ? '待确认' : entry.honorStatus === 'granted' ? '确认授予' : '暂不授予'}}</text>
+      <text>{{entry.honorStatusText || entry.honorStatusLabel}}</text>
     </view>
     <view class="info-row" wx:if="{{entry.honorStatus && entry.honorStatus !== 'none'}}">
       <text class="label">荣誉等级</text>
@@ -24,8 +24,12 @@
       <text>{{entry.honorRecipientName}}</text>
     </view>
     <view class="info-row" wx:if="{{entry.confirmedByName}}">
-      <text class="label">确认人</text>
+      <text class="label">直属确认人</text>
       <text>{{entry.confirmedByName}}</text>
+    </view>
+    <view class="info-row" wx:if="{{entry.honorVerifiedByName}}">
+      <text class="label">荣誉核准人</text>
+      <text>{{entry.honorVerifiedByName}}</text>
     </view>
     <view class="info-row"><text class="label">关键词</text><text>{{entry.keywordText}}</text></view>
     <view class="divider"></view>

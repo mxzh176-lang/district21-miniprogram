@@ -343,6 +343,9 @@ function archiveListItem(item) {
     confirmedBy: item.confirmedBy || '',
     confirmedByName: item.confirmedByName || '',
     confirmedAt: item.confirmedAt || '',
+    honorVerifiedBy: item.honorVerifiedBy || '',
+    honorVerifiedByName: item.honorVerifiedByName || '',
+    honorVerifiedAt: item.honorVerifiedAt || '',
     photoCount: item.photoCount,
     photos: item.photos && item.photos.length ? [item.photos[0]] : [],
     tone: item.tone,
@@ -607,8 +610,8 @@ function localCall(action, payload = {}) {
       const entry = {
         ...payload.entry,
         _id: payload.entry._id || `local-${Date.now()}`,
-        eventStatus: payload.entry.eventStatus || (payload.entry.honorRequestedLevel && payload.entry.honorRequestedLevel !== 'none' ? 'pending_confirm' : 'archived'),
-        honorStatus: payload.entry.honorStatus || (payload.entry.honorRequestedLevel && payload.entry.honorRequestedLevel !== 'none' ? 'pending_confirm' : 'none'),
+        eventStatus: payload.entry.eventStatus || (payload.entry.honorRequestedLevel && payload.entry.honorRequestedLevel !== 'none' ? 'pending_leader_confirm' : 'archived'),
+        honorStatus: payload.entry.honorStatus || (payload.entry.honorRequestedLevel && payload.entry.honorRequestedLevel !== 'none' ? 'pending_leader_confirm' : 'none'),
         honorRecipientName: payload.entry.honorRecipientName || payload.entry.uploadedBy || '',
         honorRecipientUserId: payload.entry.honorRecipientUserId || demoMember._id,
         honorRecipientPositionId: payload.entry.honorRecipientPositionId || payload.entry.positionId || payload.entry.categoryId,
@@ -624,7 +627,13 @@ function localCall(action, payload = {}) {
     }
     case 'listHonorConfirmations':
       result = allArchiveEntries()
-        .filter(item => item.honorStatus === 'pending_confirm')
+        .filter(item => ['pending_confirm', 'pending_leader_confirm'].includes(item.honorStatus))
+        .filter(item => !payload.organizationId || item.organizationId === payload.organizationId)
+        .map(archiveListItem)
+      break
+    case 'listHonorVerifications':
+      result = allArchiveEntries()
+        .filter(item => ['pending_honor_verify', 'need_recheck'].includes(item.honorStatus))
         .filter(item => !payload.organizationId || item.organizationId === payload.organizationId)
         .map(archiveListItem)
       break
@@ -632,7 +641,7 @@ function localCall(action, payload = {}) {
       const entries = getLocalArchiveEntries()
       const index = entries.findIndex(item => item._id === payload.id)
       if (index >= 0) {
-        entries[index] = { ...entries[index], status: 'published', eventStatus: 'archived', honorStatus: 'pending_confirm' }
+        entries[index] = { ...entries[index], status: 'published', eventStatus: 'archived', honorStatus: 'none' }
         saveLocalArchiveEntries(entries)
         result = entries[index]
       } else {
@@ -648,7 +657,7 @@ function localCall(action, payload = {}) {
           ...entries[index],
           status: 'published',
           eventStatus: 'archived',
-          honorStatus: 'granted',
+          honorStatus: 'pending_honor_verify',
           honorConfirmedLevel: payload.honorConfirmedLevel || payload.level || entries[index].honorRequestedLevel || 'good',
           confirmedByName: '当前确认人',
           confirmedAt: new Date().toISOString()
@@ -680,9 +689,47 @@ function localCall(action, payload = {}) {
       }
       break
     }
+    case 'verifyHonorForWall': {
+      const entries = getLocalArchiveEntries()
+      const index = entries.findIndex(item => item._id === payload.id)
+      if (index >= 0) {
+        entries[index] = {
+          ...entries[index],
+          status: 'published',
+          eventStatus: 'archived',
+          honorStatus: 'honor_verified',
+          honorVerifiedByName: '当前荣誉主席',
+          honorVerifiedAt: new Date().toISOString()
+        }
+        saveLocalArchiveEntries(entries)
+        result = entries[index]
+      } else {
+        result = true
+      }
+      break
+    }
+    case 'markHonorNeedRecheck': {
+      const entries = getLocalArchiveEntries()
+      const index = entries.findIndex(item => item._id === payload.id)
+      if (index >= 0) {
+        entries[index] = {
+          ...entries[index],
+          status: 'published',
+          eventStatus: 'archived',
+          honorStatus: 'need_recheck',
+          honorVerifiedByName: '当前荣誉主席',
+          honorVerifiedAt: new Date().toISOString()
+        }
+        saveLocalArchiveEntries(entries)
+        result = entries[index]
+      } else {
+        result = true
+      }
+      break
+    }
     case 'getArchiveHonorStats': {
       const baseEvents = allArchiveEntries()
-        .filter(item => item.honorStatus === 'granted')
+        .filter(item => ['honor_verified', 'granted'].includes(item.honorStatus))
         .filter(item => !payload.organizationId || item.organizationId === payload.organizationId)
         .filter(item => !payload.level || item.honorConfirmedLevel === payload.level)
         .filter(item => !payload.positionId || item.honorRecipientPositionId === payload.positionId || item.positionId === payload.positionId || item.categoryId === payload.positionId)

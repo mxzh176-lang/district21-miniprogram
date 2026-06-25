@@ -11,12 +11,13 @@ Page({
     organizationId: '',
     loading: true,
     entries: [],
+    verifyEntries: [],
     levelOptions: LEVEL_OPTIONS
   },
 
   onLoad(options) {
     this.setData({ organizationId: options.organization || 'yuanhang' })
-    wx.setNavigationBarTitle({ title: '待确认' })
+    wx.setNavigationBarTitle({ title: '直属确认与荣誉核准' })
   },
 
   async onShow() {
@@ -26,15 +27,17 @@ Page({
   async loadEntries() {
     try {
       this.setData({ loading: true })
-      const entries = await api.call('listHonorConfirmations', {
-        organizationId: this.data.organizationId
-      })
+      const [entries, verifyEntries] = await Promise.all([
+        api.call('listHonorConfirmations', { organizationId: this.data.organizationId }),
+        api.call('listHonorVerifications', { organizationId: this.data.organizationId })
+      ])
       this.setData({
         entries: (entries || []).map(item => ({
           ...item,
           selectedLevel: item.honorRequestedLevel === 'none' ? 'good' : item.honorRequestedLevel,
           selectedLevelLabel: item.honorRequestedLabel || item.honorLevelLabel || '优秀'
         })),
+        verifyEntries: verifyEntries || [],
         loading: false
       })
     } catch (error) {
@@ -55,7 +58,7 @@ Page({
 
   async runAction(id, action, payload = {}) {
     try {
-      wx.showLoading({ title: '正在确认' })
+      wx.showLoading({ title: '处理中' })
       await api.call(action, { id, ...payload })
       wx.hideLoading()
       wx.showToast({ title: '已完成', icon: 'success' })
@@ -81,6 +84,14 @@ Page({
 
   markNotGranted(event) {
     this.runAction(event.currentTarget.dataset.id, 'markHonorNotGranted')
+  },
+
+  verifyHonor(event) {
+    this.runAction(event.currentTarget.dataset.id, 'verifyHonorForWall')
+  },
+
+  markNeedRecheck(event) {
+    this.runAction(event.currentTarget.dataset.id, 'markHonorNeedRecheck')
   },
 
   openDetail(event) {

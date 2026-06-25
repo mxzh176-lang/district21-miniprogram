@@ -4,6 +4,11 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
 
+const HONOR_LEADER_PENDING_STATUSES = ['pending_confirm', 'pending_leader_confirm']
+const HONOR_VERIFY_PENDING_STATUSES = ['pending_honor_verify', 'need_recheck']
+const HONOR_WALL_STATUSES = ['honor_verified', 'granted']
+const HONOR_CHAIR_POSITION_CODE = 'honor-chair'
+
 const COLLECTIONS = {
   organization: 'organization',
   user: 'user',
@@ -489,6 +494,19 @@ function honorLabel(level) {
   return HONOR_LEVEL_LABELS[level] || ''
 }
 
+function honorStatusLabel(status) {
+  return {
+    pending_confirm: '待直属上级确认',
+    pending_leader_confirm: '待直属上级确认',
+    pending_honor_verify: '待荣誉主席核准',
+    honor_verified: '已核准入榜',
+    need_recheck: '需复核',
+    granted: '已核准入榜',
+    not_granted: '暂不授予',
+    none: ''
+  }[status] || ''
+}
+
 function normalizeHonorRequestedLevel(level) {
   const value = cleanText(level, 20)
   return HONOR_LEVELS.includes(value) ? value : 'none'
@@ -595,10 +613,10 @@ async function buildHonorFields(member, record, baseData) {
   }
   const confirmation = await resolveHonorConfirmPosition(position)
   return {
-    eventStatus: 'pending_confirm',
+    eventStatus: 'pending_leader_confirm',
     honorRequestedLevel: requestedLevel,
     honorConfirmedLevel: null,
-    honorStatus: 'pending_confirm',
+    honorStatus: 'pending_leader_confirm',
     confirmPositionId: confirmation.confirmPositionId,
     confirmUnavailableReason: confirmation.confirmUnavailableReason,
     honorRecipientUserId: member.id,
@@ -617,17 +635,38 @@ async function requireHonorConfirmer(openid, record, requirePending = true) {
   if (!record || record.deletedAt) {
     throw Object.assign(new Error('事件不存在或已归档'), { code: 'NOT_FOUND' })
   }
-  if (requirePending && record.honorStatus !== 'pending_confirm') {
-    throw Object.assign(new Error('该事件当前不是待确认状态'), { code: 'HONOR_NOT_PENDING' })
+  if (requirePending && !HONOR_LEADER_PENDING_STATUSES.includes(record.honorStatus)) {
+    throw Object.assign(new Error('该事件当前不是待直属确认状态'), { code: 'HONOR_NOT_PENDING' })
   }
   if (record.honorRecipientUserId && record.honorRecipientUserId === user.id) {
-    throw Object.assign(new Error('申报人本人不能确认自己的待确认荣誉事件'), { code: 'HONOR_SELF_CONFIRM_FORBIDDEN' })
+    throw Object.assign(new Error('申报人本人不能确认自己的待直属确认荣誉事件'), { code: 'HONOR_SELF_CONFIRM_FORBIDDEN' })
   }
   const assignments = await activeRoleAssignments(user.id)
   const confirmPositionId = cleanText(record.confirmPositionId, 160)
   const allowed = assignments.some(item => item.positionId === confirmPositionId || positionIdMatches(item.positionId, confirmPositionId))
   if (!allowed) {
     throw Object.assign(new Error('仅当前直属上级岗位负责人可确认'), { code: 'HONOR_CONFIRM_POSITION_REQUIRED' })
+  }
+  return user
+}
+
+async function requireHonorVerifier(openid, record, requirePending = true) {
+  const user = await requirePlatformUser(openid)
+  if (!record || record.deletedAt) {
+    throw Object.assign(new Error('事件不存在或已归档'), { code: 'NOT_FOUND' })
+  }
+  if (requirePending && !HONOR_VERIFY_PENDING_STATUSES.includes(record.honorStatus)) {
+    throw Object.assign(new Error('该事件当前不是待荣誉核准状态'), { code: 'HONOR_NOT_PENDING_VERIFY' })
+  }
+  const roles = await platformRoles(user.id)
+  if (roles.some(item => item.role === 'super_admin')) return user
+  const assignments = await activeRoleAssignments(user.id)
+  const allowed = assignments.some(item =>
+    item.organizationId === record.organizationId &&
+    positionIdMatches(item.positionId, HONOR_CHAIR_POSITION_CODE)
+  )
+  if (!allowed) {
+    throw Object.assign(new Error('仅当前荣誉主席可核准入榜'), { code: 'HONOR_VERIFY_POSITION_REQUIRED' })
   }
   return user
 }
@@ -1164,6 +1203,7 @@ const TEAM_POSITIONS = [
   ['tamer', '纠察', 'captain'],
   ['treasurer', '司库', 'captain'],
   ['admin', '总务', 'captain'],
+  ['honor-chair', '荣誉主席'],
   ['first-vp', '第一副队长', 'captain'],
   ['second-vp', '第二副队长', 'captain'],
   ['third-vp', '第三副队长', 'captain'],
@@ -1763,8 +1803,8 @@ async function saveEventRecord(openid, event = {}) {
   const id = cleanText(record.id || event.id, 100) || businessId('event')
   const eventDate = cleanText(record.eventDate, 10)
   const existing = await db.collection(COLLECTIONS.eventRecord).where({ id }).limit(1).get()
-  if (existing.data[0] && existing.data[0].honorStatus === 'pending_confirm') {
-    throw Object.assign(new Error('待确认事件暂不可修改'), { code: 'PENDING_CONFIRM_LOCKED' })
+  if (existing.data[0] && ['pending_confirm', 'pending_leader_confirm', 'pending_honor_verify', 'honor_verified', 'need_recheck'].includes(existing.data[0].honorStatus)) {
+    throw Object.assign(new Error('荣誉流转中的事件暂不可修改'), { code: 'PENDING_CONFIRM_LOCKED' })
   }
   const data = {
     id,
@@ -1790,7 +1830,7 @@ async function saveEventRecord(openid, event = {}) {
     participantCount: Math.max(0, Math.floor(Number(record.participantCount) || 0)),
     creatorId: member.id,
     ownerName: cleanText(record.ownerName || member.name, 40),
-    status: ['draft', 'pending_review', 'pending_confirm', 'published', 'rejected', 'archived'].includes(record.status)
+    status: ['draft', 'pending_review', 'pending_confirm', 'pending_leader_confirm', 'published', 'rejected', 'archived'].includes(record.status)
       ? record.status
       : 'draft',
     visibility: ['private', 'organization', 'public'].includes(record.visibility)
@@ -1801,9 +1841,9 @@ async function saveEventRecord(openid, event = {}) {
     updatedAt: now()
   }
   Object.assign(data, await buildHonorFields(member, record, data))
-  if (data.honorStatus === 'pending_confirm') {
-    data.status = 'pending_confirm'
-  } else if (data.status === 'pending_confirm') {
+  if (HONOR_LEADER_PENDING_STATUSES.includes(data.honorStatus)) {
+    data.status = 'pending_leader_confirm'
+  } else if (HONOR_LEADER_PENDING_STATUSES.includes(data.status)) {
     data.status = 'published'
   }
 
@@ -1866,9 +1906,11 @@ function eventHonorView(item) {
   return {
     ...item,
     confirmedAt: item.confirmedAt ? formatDate(item.confirmedAt) : '',
+    honorVerifiedAt: item.honorVerifiedAt ? formatDate(item.honorVerifiedAt) : '',
     honorRequestedLabel: honorLabel(item.honorRequestedLevel),
     honorConfirmedLabel: honorLabel(item.honorConfirmedLevel),
-    honorLevelLabel: honorLabel(item.honorConfirmedLevel || item.honorRequestedLevel)
+    honorLevelLabel: honorLabel(item.honorConfirmedLevel || item.honorRequestedLevel),
+    honorStatusLabel: honorStatusLabel(item.honorStatus)
   }
 }
 
@@ -1881,10 +1923,30 @@ async function listHonorConfirmations(openid, event = {}) {
   const result = await db.collection(COLLECTIONS.eventRecord).limit(300).get()
   return result.data
     .filter(item => !item.deletedAt)
-    .filter(item => item.honorStatus === 'pending_confirm')
+    .filter(item => HONOR_LEADER_PENDING_STATUSES.includes(item.honorStatus))
     .filter(item => !organizationId || item.organizationId === organizationId)
-    .filter(item => confirmPositionIds.has(item.confirmPositionId))
+    .filter(item => confirmPositionIds.has(item.confirmPositionId) || Array.from(confirmPositionIds).some(positionId => positionIdMatches(positionId, item.confirmPositionId)))
     .sort((a, b) => String(b.createdAt || b.eventDate || '').localeCompare(String(a.createdAt || a.eventDate || '')))
+    .map(eventHonorView)
+}
+
+async function listHonorVerifications(openid, event = {}) {
+  const user = await requirePlatformUser(openid)
+  const organizationId = canonicalOrganizationId(event.organizationId)
+  const roles = await platformRoles(user.id)
+  const assignments = await activeRoleAssignments(user.id)
+  const canVerify = roles.some(item => item.role === 'super_admin') ||
+    assignments.some(item =>
+      (!organizationId || item.organizationId === organizationId) &&
+      positionIdMatches(item.positionId, HONOR_CHAIR_POSITION_CODE)
+    )
+  if (!canVerify) return []
+  const result = await db.collection(COLLECTIONS.eventRecord).limit(300).get()
+  return result.data
+    .filter(item => !item.deletedAt)
+    .filter(item => HONOR_VERIFY_PENDING_STATUSES.includes(item.honorStatus))
+    .filter(item => !organizationId || item.organizationId === organizationId)
+    .sort((a, b) => String(b.confirmedAt || b.createdAt || b.eventDate || '').localeCompare(String(a.confirmedAt || a.createdAt || a.eventDate || '')))
     .map(eventHonorView)
 }
 
@@ -1893,10 +1955,10 @@ async function updateHonorConfirmation(openid, event = {}, mode = 'archive') {
   const result = await db.collection(COLLECTIONS.eventRecord).where({ id }).limit(1).get()
   const record = result.data[0]
   await requireHonorConfirmer(openid, record, false)
-  if (record && mode === 'archive' && record.eventStatus === 'archived' && record.honorStatus === 'pending_confirm') {
+  if (record && mode === 'archive' && record.eventStatus === 'archived' && record.honorStatus === 'none') {
     return record
   }
-  if (record && mode === 'grant' && record.honorStatus === 'granted') {
+  if (record && mode === 'grant' && record.honorStatus === 'pending_honor_verify') {
     return record
   }
   if (record && mode === 'not_granted' && record.honorStatus === 'not_granted') {
@@ -1911,10 +1973,20 @@ async function updateHonorConfirmation(openid, event = {}, mode = 'archive') {
   }
   let data = common
   let action = 'confirm_archive'
+  if (mode === 'archive') {
+    data = {
+      ...common,
+      honorStatus: 'none',
+      honorConfirmedLevel: null,
+      confirmedBy: user.id,
+      confirmedByName: cleanText(user.name, 40),
+      confirmedAt
+    }
+  }
   if (mode === 'grant') {
     data = {
       ...common,
-      honorStatus: 'granted',
+      honorStatus: 'pending_honor_verify',
       honorConfirmedLevel: normalizeHonorGrantLevel(event.honorConfirmedLevel || event.level || record.honorRequestedLevel),
       confirmedBy: user.id,
       confirmedByName: cleanText(user.name, 40),
@@ -1949,6 +2021,37 @@ async function markHonorNotGranted(openid, event = {}) {
   return updateHonorConfirmation(openid, event, 'not_granted')
 }
 
+async function updateHonorVerification(openid, event = {}, mode = 'verify') {
+  const id = cleanText(event.id, 100)
+  const result = await db.collection(COLLECTIONS.eventRecord).where({ id }).limit(1).get()
+  const record = result.data[0]
+  const user = await requireHonorVerifier(openid, record)
+  const verifiedAt = now()
+  const common = {
+    status: 'published',
+    eventStatus: 'archived',
+    updatedAt: verifiedAt,
+    honorVerifiedBy: user.id,
+    honorVerifiedByName: cleanText(user.name, 40),
+    honorVerifiedAt: verifiedAt
+  }
+  const data = mode === 'need_recheck'
+    ? { ...common, honorStatus: 'need_recheck' }
+    : { ...common, honorStatus: 'honor_verified' }
+  const action = mode === 'need_recheck' ? 'mark_honor_need_recheck' : 'verify_honor_for_wall'
+  await db.collection(COLLECTIONS.eventRecord).doc(record._id).update({ data })
+  await writePlatformLog(user, 'update', 'event_record', id, { action, title: record.title })
+  return { ...record, ...data, id, _id: record._id }
+}
+
+async function verifyHonorForWall(openid, event = {}) {
+  return updateHonorVerification(openid, event, 'verify')
+}
+
+async function markHonorNeedRecheck(openid, event = {}) {
+  return updateHonorVerification(openid, event, 'need_recheck')
+}
+
 function inTerm(record, termKey) {
   const today = new Date().toISOString().slice(0, 10)
   if (termKey) {
@@ -1969,7 +2072,7 @@ async function getArchiveHonorStats(openid, event = {}) {
   const result = await db.collection(COLLECTIONS.eventRecord).limit(500).get()
   const baseRecords = result.data
     .filter(item => !item.deletedAt)
-    .filter(item => item.honorStatus === 'granted')
+    .filter(item => HONOR_WALL_STATUSES.includes(item.honorStatus))
     .filter(item => !organizationId || item.organizationId === organizationId)
     .filter(item => !level || item.honorConfirmedLevel === level)
     .filter(item => !positionId || item.honorRecipientPositionId === positionId || item.categoryId === positionId || item.positionId === positionId)
@@ -2933,9 +3036,12 @@ const handlers = {
   getEventRecord,
   archiveEventRecord,
   listHonorConfirmations,
+  listHonorVerifications,
   confirmArchiveEvent,
   confirmGrantHonor,
   markHonorNotGranted,
+  verifyHonorForWall,
+  markHonorNeedRecheck,
   getArchiveHonorStats,
   listEventImages,
   saveEventImages,
