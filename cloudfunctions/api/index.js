@@ -620,6 +620,9 @@ async function requireHonorConfirmer(openid, record, requirePending = true) {
   if (requirePending && record.honorStatus !== 'pending_confirm') {
     throw Object.assign(new Error('该事件当前不是待确认状态'), { code: 'HONOR_NOT_PENDING' })
   }
+  if (record.honorRecipientUserId && record.honorRecipientUserId === user.id) {
+    throw Object.assign(new Error('申报人本人不能确认自己的待确认荣誉事件'), { code: 'HONOR_SELF_CONFIRM_FORBIDDEN' })
+  }
   const assignments = await activeRoleAssignments(user.id)
   const confirmPositionId = cleanText(record.confirmPositionId, 160)
   const allowed = assignments.some(item => item.positionId === confirmPositionId || positionIdMatches(item.positionId, confirmPositionId))
