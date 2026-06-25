@@ -9,6 +9,8 @@ Page({
     loading: true,
     loadError: '',
     canManage: false,
+    honorStats: { counts: { good: 0, great: 0, excellent: 0 }, total: 0 },
+    pendingConfirmCount: 0,
     session: null
   },
 
@@ -91,6 +93,36 @@ Page({
       loading: false,
       loadError: ''
     })
+    await this.loadHonorOverview()
+  },
+
+  async loadHonorOverview() {
+    try {
+      const [honorStats, confirmations] = await Promise.all([
+        api.call('getArchiveHonorStats', { organizationId: this.data.selectedId }),
+        api.call('listHonorConfirmations', { organizationId: this.data.selectedId })
+      ])
+      this.setData({
+        honorStats: honorStats || { counts: { good: 0, great: 0, excellent: 0 }, total: 0 },
+        pendingConfirmCount: (confirmations || []).length
+      })
+    } catch (error) {
+      this.setData({
+        honorStats: { counts: { good: 0, great: 0, excellent: 0 }, total: 0 },
+        pendingConfirmCount: 0
+      })
+    }
+  },
+
+  openHonorWall(event) {
+    const level = event.currentTarget.dataset.level || ''
+    wx.navigateTo({
+      url: `/pages/archive/honor-wall/index?organization=${this.data.selectedId}${level ? `&level=${level}` : ''}`
+    })
+  },
+
+  openConfirmations() {
+    wx.navigateTo({ url: `/pages/archive/confirm/index?organization=${this.data.selectedId}` })
   },
 
   addContent(event) {

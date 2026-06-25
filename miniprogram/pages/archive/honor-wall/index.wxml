@@ -1,0 +1,80 @@
+<view class="page">
+  <view class="hero">
+    <view class="hero-kicker">HONOR EVENT WALL</view>
+    <view class="hero-title">荣誉事件墙</view>
+    <view class="hero-desc">只展示已确认授予的岗位事件。</view>
+    <view class="stats-row">
+      <view class="stat">
+        <view class="value">{{stats.counts.good || 0}}</view>
+        <view class="label">优秀</view>
+      </view>
+      <view class="stat">
+        <view class="value">{{stats.counts.great || 0}}</view>
+        <view class="label">杰出</view>
+      </view>
+      <view class="stat">
+        <view class="value">{{stats.counts.excellent || 0}}</view>
+        <view class="label">卓越</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="filter-card">
+    <picker range="{{levelFilters}}" range-key="label" value="{{levelIndex}}" bindchange="changeLevel">
+      <view class="filter-value"><text>等级</text><text>{{levelFilters[levelIndex].label}}⌄</text></view>
+    </picker>
+    <picker range="{{positionOptions}}" range-key="name" value="{{positionIndex}}" bindchange="changePosition">
+      <view class="filter-value"><text>岗位</text><text>{{positionOptions[positionIndex].name}}⌄</text></view>
+    </picker>
+    <picker range="{{chairOptions}}" range-key="name" value="{{chairIndex}}" bindchange="changeChair">
+      <view class="filter-value"><text>主席</text><text>{{chairOptions[chairIndex].name}}⌄</text></view>
+    </picker>
+    <picker range="{{termOptions}}" range-key="label" value="{{termIndex}}" bindchange="changeTerm">
+      <view class="filter-value"><text>任期</text><text>{{termOptions[termIndex].label}}⌄</text></view>
+    </picker>
+  </view>
+
+  <view class="section-title">主席统计</view>
+  <view wx:if="{{!stats.chairStats.length}}" class="empty">暂无主席荣誉统计。</view>
+  <view class="person-card" wx:for="{{stats.chairStats}}" wx:key="key">
+    <view>
+      <view class="person-name">{{item.name || '未命名主席'}}</view>
+      <view class="person-role">{{item.positionName}}</view>
+    </view>
+    <view class="mini-stats">
+      <text>优秀 {{item.counts.good || 0}}</text>
+      <text>杰出 {{item.counts.great || 0}}</text>
+      <text>卓越 {{item.counts.excellent || 0}}</text>
+    </view>
+  </view>
+
+  <view class="section-title">狮友个人统计</view>
+  <view wx:if="{{!stats.memberStats.length}}" class="empty">暂无狮友个人荣誉统计。</view>
+  <view class="person-card" wx:for="{{stats.memberStats}}" wx:key="key">
+    <view class="person-name">{{item.name || '未命名狮友'}}</view>
+    <view class="mini-stats">
+      <text>优秀 {{item.counts.good || 0}}</text>
+      <text>杰出 {{item.counts.great || 0}}</text>
+      <text>卓越 {{item.counts.excellent || 0}}</text>
+    </view>
+  </view>
+
+  <view class="section-title">事件明细</view>
+  <view wx:if="{{loading}}" class="empty">正在读取荣誉事件…</view>
+  <view wx:elif="{{!stats.events.length}}" class="empty">当前筛选下暂无荣誉事件。</view>
+  <view class="event-card" wx:for="{{stats.events}}" wx:key="_id" data-id="{{item._id}}" bindtap="openDetail">
+    <view class="event-head">
+      <view>
+        <view class="event-date">{{item.date}}</view>
+        <view class="event-title">{{item.title}}</view>
+      </view>
+      <view class="badge">{{item.honorLevelLabel || item.honorConfirmedLabel}}</view>
+    </view>
+    <view class="event-meta">
+      <text>{{item.uploaderRole}}</text>
+      <text>主席：{{item.honorRecipientName || item.uploadedBy}}</text>
+      <text>确认人：{{item.confirmedByName || '已确认'}}</text>
+      <text wx:if="{{item.confirmedAt}}">{{item.confirmedAt}}</text>
+    </view>
+  </view>
+</view>

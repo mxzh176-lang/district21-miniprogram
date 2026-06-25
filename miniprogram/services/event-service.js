@@ -18,7 +18,12 @@ const ACTIONS = [
   'listArchiveEntries',
   'getArchiveEntry',
   'saveArchiveEntry',
-  'deleteArchiveEntry'
+  'deleteArchiveEntry',
+  'listHonorConfirmations',
+  'confirmArchiveEvent',
+  'confirmGrantHonor',
+  'markHonorNotGranted',
+  'getArchiveHonorStats'
   ,'listLedgerRecords'
   ,'saveLedgerRecord'
   ,'deleteLedgerRecord'
@@ -44,6 +49,7 @@ function recordToArchiveEntry(record) {
     cloudDocumentId: record._id,
     organizationId: toLocalOrganizationId(record.organizationId),
     categoryId: record.categoryId || record.category,
+    positionId: record.positionId || record.categoryId || '',
     date: record.eventDate || '',
     dateLabel: record.eventDate || '',
     location: record.location || '',
@@ -53,6 +59,23 @@ function recordToArchiveEntry(record) {
     uploadedBy: record.ownerName || '',
     uploaderRole: record.category || '',
     status: record.status || 'draft',
+    eventStatus: record.eventStatus || '',
+    honorRequestedLevel: record.honorRequestedLevel || 'none',
+    honorConfirmedLevel: record.honorConfirmedLevel || '',
+    honorStatus: record.honorStatus || 'none',
+    honorRequestedLabel: record.honorRequestedLabel || '',
+    honorConfirmedLabel: record.honorConfirmedLabel || '',
+    honorLevelLabel: record.honorLevelLabel || '',
+    confirmPositionId: record.confirmPositionId || '',
+    confirmUnavailableReason: record.confirmUnavailableReason || '',
+    honorRecipientUserId: record.honorRecipientUserId || '',
+    honorRecipientName: record.honorRecipientName || '',
+    honorRecipientPositionId: record.honorRecipientPositionId || '',
+    termStartDate: record.termStartDate || '',
+    termEndDate: record.termEndDate || '',
+    confirmedBy: record.confirmedBy || '',
+    confirmedByName: record.confirmedByName || '',
+    confirmedAt: record.confirmedAt || '',
     photoCount: Number(record.imageCount) || photos.length,
     photos,
     tone: 'blue',
@@ -90,6 +113,19 @@ function archiveEntryToRecord(entry) {
     participantCount: Number(entry.participantCount) || 0,
     ownerName: entry.uploadedBy || '',
     status: entry.status || 'draft',
+    eventStatus: entry.eventStatus || (entry.honorRequestedLevel && entry.honorRequestedLevel !== 'none' ? 'pending_confirm' : 'archived'),
+    honorRequestedLevel: entry.honorRequestedLevel || 'none',
+    honorConfirmedLevel: entry.honorConfirmedLevel || null,
+    honorStatus: entry.honorStatus || (entry.honorRequestedLevel && entry.honorRequestedLevel !== 'none' ? 'pending_confirm' : 'none'),
+    confirmPositionId: entry.confirmPositionId || '',
+    honorRecipientUserId: entry.honorRecipientUserId || '',
+    honorRecipientName: entry.honorRecipientName || '',
+    honorRecipientPositionId: entry.honorRecipientPositionId || '',
+    termStartDate: entry.termStartDate || '',
+    termEndDate: entry.termEndDate || '',
+    confirmedBy: entry.confirmedBy || '',
+    confirmedByName: entry.confirmedByName || '',
+    confirmedAt: entry.confirmedAt || null,
     visibility: 'organization',
     imageCount: Number(entry.photoCount) || 0
   }
@@ -136,6 +172,25 @@ async function execute(action, payload, localFallback) {
     const merged = {}
     localEntries.concat(records.map(recordToArchiveEntry)).forEach(item => { merged[item._id] = item })
     return Object.values(merged)
+  }
+  if (action === 'listHonorConfirmations') {
+    const records = await cloudbase.invoke('listHonorConfirmations', {
+      organizationId: toCloudOrganizationId(payload.organizationId)
+    })
+    return records.map(recordToArchiveEntry)
+  }
+  if (action === 'confirmArchiveEvent') return cloudbase.invoke('confirmArchiveEvent', payload)
+  if (action === 'confirmGrantHonor') return cloudbase.invoke('confirmGrantHonor', payload)
+  if (action === 'markHonorNotGranted') return cloudbase.invoke('markHonorNotGranted', payload)
+  if (action === 'getArchiveHonorStats') {
+    const response = await cloudbase.invoke('getArchiveHonorStats', {
+      ...payload,
+      organizationId: toCloudOrganizationId(payload.organizationId)
+    })
+    return {
+      ...response,
+      events: (response.events || []).map(recordToArchiveEntry)
+    }
   }
   if (action === 'getArchiveEntry') {
     return recordToArchiveEntry(await cloudbase.invoke('getEventRecord', { id: payload.id }))

@@ -170,6 +170,36 @@
           value="{{form.uploadedBy}}" disabled />
       </view>
     </view>
+
+    <view class="form-section honor-section" wx:if="{{honorEligible}}">
+      <view class="section-heading">
+        <view class="section-number honor-number">荣</view>
+        <view>
+          <view class="section-title">荣誉申报</view>
+          <view class="section-desc">提交保存前选择；申报后进入待确认，不直接进入荣誉事件墙</view>
+        </view>
+      </view>
+
+      <view class="honor-options">
+        <view
+          class="honor-option {{honorRequestedLevel === item.value ? 'active' : ''}}"
+          wx:for="{{honorOptions}}"
+          wx:key="value"
+          data-value="{{item.value}}"
+          bindtap="onHonorChange"
+        >
+          <view class="honor-radio">{{honorRequestedLevel === item.value ? '●' : '○'}}</view>
+          <view>
+            <view class="honor-label">{{item.label}}</view>
+            <view class="honor-desc">{{item.desc}}</view>
+          </view>
+        </view>
+      </view>
+
+      <view class="confirm-tip" wx:if="{{honorRequestedLevel !== 'none'}}">
+        待确认岗位：{{confirmPositionName || '直属上级'}}。确认后可选择“确认归档”“确认授予”或“暂不授予”。
+      </view>
+    </view>
   </block>
 
   <view class="footer-actions" wx:if="{{canEdit}}">

@@ -145,6 +145,12 @@ const COMMITTEE_GROUPS = {
   'second-vp': ['服务', '公共关系', '新闻宣传', '筹款'],
   'third-vp': ['关爱', '联谊', '年会']
 }
+const HONOR_LEVEL_LABELS = {
+  none: '不申报',
+  good: '优秀',
+  great: '杰出',
+  excellent: '卓越'
+}
 
 function cleanPositionName(name) {
   return String(name || '')
@@ -310,6 +316,7 @@ function archiveListItem(item) {
     _id: item._id,
     organizationId: item.organizationId,
     categoryId: item.categoryId,
+    positionId: item.positionId || item.categoryId,
     date: item.date,
     dateLabel: item.dateLabel,
     title: item.title,
@@ -319,6 +326,23 @@ function archiveListItem(item) {
     uploadedBy: item.uploadedBy,
     uploaderRole: item.uploaderRole,
     status: item.status,
+    eventStatus: item.eventStatus || '',
+    honorRequestedLevel: item.honorRequestedLevel || 'none',
+    honorConfirmedLevel: item.honorConfirmedLevel || '',
+    honorStatus: item.honorStatus || 'none',
+    honorRequestedLabel: HONOR_LEVEL_LABELS[item.honorRequestedLevel] || '',
+    honorConfirmedLabel: HONOR_LEVEL_LABELS[item.honorConfirmedLevel] || '',
+    honorLevelLabel: HONOR_LEVEL_LABELS[item.honorConfirmedLevel || item.honorRequestedLevel] || '',
+    confirmPositionId: item.confirmPositionId || '',
+    confirmUnavailableReason: item.confirmUnavailableReason || '',
+    honorRecipientUserId: item.honorRecipientUserId || '',
+    honorRecipientName: item.honorRecipientName || '',
+    honorRecipientPositionId: item.honorRecipientPositionId || '',
+    termStartDate: item.termStartDate || '',
+    termEndDate: item.termEndDate || '',
+    confirmedBy: item.confirmedBy || '',
+    confirmedByName: item.confirmedByName || '',
+    confirmedAt: item.confirmedAt || '',
     photoCount: item.photoCount,
     photos: item.photos && item.photos.length ? [item.photos[0]] : [],
     tone: item.tone,
@@ -546,7 +570,8 @@ function localCall(action, payload = {}) {
           const organizationMatch = !payload.organizationId || item.organizationId === payload.organizationId
           const categoryMatch = !payload.categoryId || item.categoryId === payload.categoryId
           const monthMatch = !payload.eventMonth || String(item.date || '').slice(0, 7) === payload.eventMonth
-          return organizationMatch && categoryMatch && monthMatch
+          const statusMatch = !payload.status || item.status === payload.status
+          return organizationMatch && categoryMatch && monthMatch && statusMatch
         })
         .map(archiveListItem)
       break
@@ -581,13 +606,149 @@ function localCall(action, payload = {}) {
       const entries = getLocalArchiveEntries()
       const entry = {
         ...payload.entry,
-        _id: payload.entry._id || `local-${Date.now()}`
+        _id: payload.entry._id || `local-${Date.now()}`,
+        eventStatus: payload.entry.eventStatus || (payload.entry.honorRequestedLevel && payload.entry.honorRequestedLevel !== 'none' ? 'pending_confirm' : 'archived'),
+        honorStatus: payload.entry.honorStatus || (payload.entry.honorRequestedLevel && payload.entry.honorRequestedLevel !== 'none' ? 'pending_confirm' : 'none'),
+        honorRecipientName: payload.entry.honorRecipientName || payload.entry.uploadedBy || '',
+        honorRecipientUserId: payload.entry.honorRecipientUserId || demoMember._id,
+        honorRecipientPositionId: payload.entry.honorRecipientPositionId || payload.entry.positionId || payload.entry.categoryId,
+        termStartDate: payload.entry.termStartDate || '2026-07-01',
+        termEndDate: payload.entry.termEndDate || '2027-06-30'
       }
       const index = entries.findIndex(item => item._id === entry._id)
       if (index >= 0) entries[index] = entry
       else entries.push(entry)
       saveLocalArchiveEntries(entries)
       result = entry
+      break
+    }
+    case 'listHonorConfirmations':
+      result = allArchiveEntries()
+        .filter(item => item.honorStatus === 'pending_confirm')
+        .filter(item => !payload.organizationId || item.organizationId === payload.organizationId)
+        .map(archiveListItem)
+      break
+    case 'confirmArchiveEvent': {
+      const entries = getLocalArchiveEntries()
+      const index = entries.findIndex(item => item._id === payload.id)
+      if (index >= 0) {
+        entries[index] = { ...entries[index], status: 'published', eventStatus: 'archived', honorStatus: 'pending_confirm' }
+        saveLocalArchiveEntries(entries)
+        result = entries[index]
+      } else {
+        result = true
+      }
+      break
+    }
+    case 'confirmGrantHonor': {
+      const entries = getLocalArchiveEntries()
+      const index = entries.findIndex(item => item._id === payload.id)
+      if (index >= 0) {
+        entries[index] = {
+          ...entries[index],
+          status: 'published',
+          eventStatus: 'archived',
+          honorStatus: 'granted',
+          honorConfirmedLevel: payload.honorConfirmedLevel || payload.level || entries[index].honorRequestedLevel || 'good',
+          confirmedByName: '当前确认人',
+          confirmedAt: new Date().toISOString()
+        }
+        saveLocalArchiveEntries(entries)
+        result = entries[index]
+      } else {
+        result = true
+      }
+      break
+    }
+    case 'markHonorNotGranted': {
+      const entries = getLocalArchiveEntries()
+      const index = entries.findIndex(item => item._id === payload.id)
+      if (index >= 0) {
+        entries[index] = {
+          ...entries[index],
+          status: 'published',
+          eventStatus: 'archived',
+          honorStatus: 'not_granted',
+          honorConfirmedLevel: '',
+          confirmedByName: '当前确认人',
+          confirmedAt: new Date().toISOString()
+        }
+        saveLocalArchiveEntries(entries)
+        result = entries[index]
+      } else {
+        result = true
+      }
+      break
+    }
+    case 'getArchiveHonorStats': {
+      const baseEvents = allArchiveEntries()
+        .filter(item => item.honorStatus === 'granted')
+        .filter(item => !payload.organizationId || item.organizationId === payload.organizationId)
+        .filter(item => !payload.level || item.honorConfirmedLevel === payload.level)
+        .filter(item => !payload.positionId || item.honorRecipientPositionId === payload.positionId || item.positionId === payload.positionId || item.categoryId === payload.positionId)
+        .filter(item => !payload.recipientUserId || item.honorRecipientUserId === payload.recipientUserId)
+      const termMap = {}
+      baseEvents.forEach(item => {
+        const termKey = `${item.termStartDate || ''}_${item.termEndDate || ''}`
+        if (termKey !== '_' && !termMap[termKey]) {
+          termMap[termKey] = {
+            key: termKey,
+            startDate: item.termStartDate || '',
+            endDate: item.termEndDate || '',
+            label: `${item.termStartDate || '未设开始'} 至 ${item.termEndDate || '未设结束'}`
+          }
+        }
+      })
+      const today = new Date().toISOString().slice(0, 10)
+      const events = baseEvents.filter(item => {
+        if (payload.termKey) return `${item.termStartDate || ''}_${item.termEndDate || ''}` === payload.termKey
+        return (!item.termStartDate || item.termStartDate <= today) && (!item.termEndDate || item.termEndDate >= today)
+      })
+      const counts = { good: 0, great: 0, excellent: 0 }
+      const chairMap = {}
+      const memberMap = {}
+      const positionMap = {}
+      events.forEach(item => {
+        const level = item.honorConfirmedLevel || item.honorRequestedLevel
+        if (counts[level] !== undefined) counts[level] += 1
+        const chairKey = `${item.honorRecipientPositionId || item.positionId || item.categoryId}_${item.honorRecipientUserId || item.uploadedBy}`
+        if (!chairMap[chairKey]) {
+          chairMap[chairKey] = {
+            key: chairKey,
+            positionId: item.honorRecipientPositionId || item.positionId || item.categoryId,
+            positionName: item.uploaderRole,
+            userId: item.honorRecipientUserId || '',
+            name: item.honorRecipientName || item.uploadedBy,
+            counts: { good: 0, great: 0, excellent: 0 },
+            events: []
+          }
+        }
+        if (chairMap[chairKey].counts[level] !== undefined) chairMap[chairKey].counts[level] += 1
+        chairMap[chairKey].events.push(item._id)
+        const memberKey = item.honorRecipientUserId || item.uploadedBy
+        if (!memberMap[memberKey]) {
+          memberMap[memberKey] = {
+            key: memberKey,
+            userId: item.honorRecipientUserId || '',
+            name: item.honorRecipientName || item.uploadedBy,
+            counts: { good: 0, great: 0, excellent: 0 },
+            events: []
+          }
+        }
+        if (memberMap[memberKey].counts[level] !== undefined) memberMap[memberKey].counts[level] += 1
+        memberMap[memberKey].events.push(item._id)
+        const positionKey = item.honorRecipientPositionId || item.positionId || item.categoryId
+        if (positionKey && !positionMap[positionKey]) positionMap[positionKey] = { id: positionKey, name: item.uploaderRole || positionKey }
+      })
+      result = {
+        counts,
+        total: events.length,
+        events: events.map(archiveListItem),
+        chairStats: Object.values(chairMap),
+        memberStats: Object.values(memberMap),
+        positions: Object.values(positionMap),
+        terms: Object.values(termMap)
+      }
       break
     }
     case 'saveTask': {

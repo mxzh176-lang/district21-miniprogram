@@ -27,7 +27,7 @@ Page({
         keywordText: (entry.keywords || []).join(' · ')
       },
       photos,
-      canEdit: permission.canMaintainArchive(session, organization, entry.categoryId, 'update'),
+      canEdit: entry.honorStatus !== 'pending_confirm' && permission.canMaintainArchive(session, organization, entry.categoryId, 'update'),
       canDelete: permission.canMaintainArchive(session, organization, entry.categoryId, 'delete')
     })
     wx.setNavigationBarTitle({ title: entry.title })

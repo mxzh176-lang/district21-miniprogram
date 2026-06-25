@@ -479,6 +479,156 @@ function positionIdMatches(grantPositionId, positionId) {
   return grantPositionId === positionId || grantPositionId.endsWith(`_${positionId}`)
 }
 
+function positionCodeFromId(positionId) {
+  const value = cleanText(positionId, 160)
+  const match = TEAM_POSITIONS.find(([code]) => value === code || value.endsWith(`_${code}`) || value.endsWith(`:${code}`))
+  return match ? match[0] : value
+}
+
+function honorLabel(level) {
+  return HONOR_LEVEL_LABELS[level] || ''
+}
+
+function normalizeHonorRequestedLevel(level) {
+  const value = cleanText(level, 20)
+  return HONOR_LEVELS.includes(value) ? value : 'none'
+}
+
+function normalizeHonorGrantLevel(level) {
+  const value = cleanText(level, 20)
+  return HONOR_GRANT_LEVELS.includes(value) ? value : 'good'
+}
+
+function activeOnDate(item, dateText) {
+  return (!item.startDate || item.startDate <= dateText) && (!item.endDate || item.endDate >= dateText)
+}
+
+async function getActiveAssignmentByPosition(positionId) {
+  const today = new Date().toISOString().slice(0, 10)
+  const result = await db.collection(COLLECTIONS.roleAssignment)
+    .where({ positionId, status: 'active' })
+    .limit(50)
+    .get()
+  return result.data.find(item => activeOnDate(item, today)) || null
+}
+
+async function resolveArchivePosition(organizationId, positionId) {
+  const cleanOrganizationId = canonicalOrganizationId(organizationId)
+  const rawPositionId = cleanText(positionId, 160)
+  const code = positionCodeFromId(rawPositionId)
+  const candidates = Array.from(new Set([
+    rawPositionId,
+    code,
+    cleanOrganizationId && code ? `position_${cleanOrganizationId}_${code}` : ''
+  ].filter(Boolean)))
+  for (const id of candidates) {
+    const byId = await db.collection(COLLECTIONS.position).where({ id, status: 'active' }).limit(1).get()
+    if (byId.data[0]) return byId.data[0]
+  }
+  if (cleanOrganizationId && code) {
+    const byCode = await db.collection(COLLECTIONS.position)
+      .where({ organizationId: cleanOrganizationId, code, status: 'active' })
+      .limit(1)
+      .get()
+    if (byCode.data[0]) return byCode.data[0]
+  }
+  return null
+}
+
+async function resolveCaptainPosition(organizationId) {
+  return resolveArchivePosition(organizationId, 'captain')
+}
+
+async function resolveHonorConfirmPosition(position) {
+  const code = cleanText(position && position.code, 80) || positionCodeFromId(position && position.id)
+  let confirmPositionId = ''
+  if (CAPTAIN_CONFIRM_POSITION_CODES.includes(code)) {
+    const captain = await resolveCaptainPosition(position.organizationId)
+    confirmPositionId = captain ? captain.id : `position_${position.organizationId}_captain`
+  } else {
+    confirmPositionId = cleanText(position.parentPositionId, 160)
+    const parentAssignment = confirmPositionId ? await getActiveAssignmentByPosition(confirmPositionId) : null
+    if (!parentAssignment) {
+      const captain = await resolveCaptainPosition(position.organizationId)
+      confirmPositionId = captain ? captain.id : `position_${position.organizationId}_captain`
+    }
+  }
+  const confirmAssignment = confirmPositionId ? await getActiveAssignmentByPosition(confirmPositionId) : null
+  return {
+    confirmPositionId,
+    confirmUnavailableReason: confirmAssignment ? '' : 'captain_unbound'
+  }
+}
+
+async function buildHonorFields(member, record, baseData) {
+  const requestedLevel = normalizeHonorRequestedLevel(record.honorRequestedLevel)
+  if (requestedLevel === 'none') {
+    return {
+      eventStatus: 'archived',
+      honorRequestedLevel: 'none',
+      honorConfirmedLevel: null,
+      honorStatus: 'none',
+      confirmPositionId: '',
+      confirmUnavailableReason: '',
+      honorRecipientUserId: '',
+      honorRecipientName: '',
+      honorRecipientPositionId: '',
+      termStartDate: '',
+      termEndDate: '',
+      confirmedBy: '',
+      confirmedByName: '',
+      confirmedAt: null
+    }
+  }
+  const position = await resolveArchivePosition(baseData.organizationId, baseData.positionId || baseData.categoryId)
+  const positionCode = position ? position.code : positionCodeFromId(baseData.positionId || baseData.categoryId)
+  if (!position || !HONOR_REQUEST_POSITION_CODES.includes(positionCode)) {
+    throw Object.assign(new Error('当前岗位不支持荣誉申报'), { code: 'HONOR_POSITION_NOT_ALLOWED' })
+  }
+  const assignments = await activeRoleAssignments(member.id)
+  const assignment = assignments.find(item =>
+    item.organizationId === baseData.organizationId &&
+    (item.positionId === position.id || positionIdMatches(item.positionId, position.id) || positionIdMatches(item.positionId, positionCode))
+  )
+  if (!assignment) {
+    throw Object.assign(new Error('仅当前有效岗位负责人可申报本岗位荣誉事件'), { code: 'HONOR_POSITION_OWNER_REQUIRED' })
+  }
+  const confirmation = await resolveHonorConfirmPosition(position)
+  return {
+    eventStatus: 'pending_confirm',
+    honorRequestedLevel: requestedLevel,
+    honorConfirmedLevel: null,
+    honorStatus: 'pending_confirm',
+    confirmPositionId: confirmation.confirmPositionId,
+    confirmUnavailableReason: confirmation.confirmUnavailableReason,
+    honorRecipientUserId: member.id,
+    honorRecipientName: cleanText(member.name, 40),
+    honorRecipientPositionId: position.id,
+    termStartDate: cleanText(assignment.startDate, 10),
+    termEndDate: cleanText(assignment.endDate, 10),
+    confirmedBy: '',
+    confirmedByName: '',
+    confirmedAt: null
+  }
+}
+
+async function requireHonorConfirmer(openid, record, requirePending = true) {
+  const user = await requirePlatformUser(openid)
+  if (!record || record.deletedAt) {
+    throw Object.assign(new Error('事件不存在或已归档'), { code: 'NOT_FOUND' })
+  }
+  if (requirePending && record.honorStatus !== 'pending_confirm') {
+    throw Object.assign(new Error('该事件当前不是待确认状态'), { code: 'HONOR_NOT_PENDING' })
+  }
+  const assignments = await activeRoleAssignments(user.id)
+  const confirmPositionId = cleanText(record.confirmPositionId, 160)
+  const allowed = assignments.some(item => item.positionId === confirmPositionId || positionIdMatches(item.positionId, confirmPositionId))
+  if (!allowed) {
+    throw Object.assign(new Error('仅当前直属上级岗位负责人可确认'), { code: 'HONOR_CONFIRM_POSITION_REQUIRED' })
+  }
+  return user
+}
+
 async function hasPlatformGrant(userId, module, action, context = {}) {
   const grants = await activePermissionGrants(userId)
   const organizationId = canonicalOrganizationId(context.organizationId || context.teamId)
@@ -1029,6 +1179,31 @@ const TEAM_COMMITTEE_CODES = new Set([
   'service-plan', 'news-publicity', 'fundraising-plan',
   'care-committee', 'fellowship-committee', 'annual-meeting'
 ])
+
+const HONOR_LEVELS = ['none', 'good', 'great', 'excellent']
+const HONOR_GRANT_LEVELS = ['good', 'great', 'excellent']
+const HONOR_LEVEL_LABELS = {
+  none: '不申报',
+  good: '优秀',
+  great: '杰出',
+  excellent: '卓越'
+}
+const HONOR_REQUEST_POSITION_CODES = [
+  'secretary',
+  'treasurer',
+  'admin',
+  'tamer',
+  'member-retention',
+  'leadership-training',
+  'external-exchange',
+  'service-plan',
+  'news-publicity',
+  'fundraising-plan',
+  'care-committee',
+  'fellowship-committee',
+  'annual-meeting'
+]
+const CAPTAIN_CONFIRM_POSITION_CODES = ['secretary', 'treasurer', 'admin', 'tamer']
 
 async function requireSuperAdmin(openid) {
   const user = await requirePlatformUser(openid)
@@ -1584,6 +1759,10 @@ async function saveEventRecord(openid, event = {}) {
   const member = await requireEventEditor(openid, record, record.id || event.id ? 'update' : 'create')
   const id = cleanText(record.id || event.id, 100) || businessId('event')
   const eventDate = cleanText(record.eventDate, 10)
+  const existing = await db.collection(COLLECTIONS.eventRecord).where({ id }).limit(1).get()
+  if (existing.data[0] && existing.data[0].honorStatus === 'pending_confirm') {
+    throw Object.assign(new Error('待确认事件暂不可修改'), { code: 'PENDING_CONFIRM_LOCKED' })
+  }
   const data = {
     id,
     areaId: cleanText(record.areaId, 100) || 'org_region_21_suihua',
@@ -1608,7 +1787,7 @@ async function saveEventRecord(openid, event = {}) {
     participantCount: Math.max(0, Math.floor(Number(record.participantCount) || 0)),
     creatorId: member.id,
     ownerName: cleanText(record.ownerName || member.name, 40),
-    status: ['draft', 'pending_review', 'published', 'rejected', 'archived'].includes(record.status)
+    status: ['draft', 'pending_review', 'pending_confirm', 'published', 'rejected', 'archived'].includes(record.status)
       ? record.status
       : 'draft',
     visibility: ['private', 'organization', 'public'].includes(record.visibility)
@@ -1618,12 +1797,17 @@ async function saveEventRecord(openid, event = {}) {
     imageCount: Number(record.imageCount) || 0,
     updatedAt: now()
   }
+  Object.assign(data, await buildHonorFields(member, record, data))
+  if (data.honorStatus === 'pending_confirm') {
+    data.status = 'pending_confirm'
+  } else if (data.status === 'pending_confirm') {
+    data.status = 'published'
+  }
 
   if (!data.title || !data.organizationId || !data.eventDate) {
     throw Object.assign(new Error('纪事标题、组织和日期不能为空'), { code: 'INVALID_EVENT_RECORD' })
   }
 
-  const existing = await db.collection(COLLECTIONS.eventRecord).where({ id }).limit(1).get()
   if (existing.data[0]) {
     await db.collection(COLLECTIONS.eventRecord).doc(existing.data[0]._id).update({ data })
     await writePlatformLog(member, 'update', 'event_record', id, { title: data.title })
@@ -1673,6 +1857,183 @@ async function archiveEventRecord(openid, event = {}) {
   })
   await writePlatformLog(user, 'delete', 'event_record', id, { title: record.title })
   return true
+}
+
+function eventHonorView(item) {
+  return {
+    ...item,
+    confirmedAt: item.confirmedAt ? formatDate(item.confirmedAt) : '',
+    honorRequestedLabel: honorLabel(item.honorRequestedLevel),
+    honorConfirmedLabel: honorLabel(item.honorConfirmedLevel),
+    honorLevelLabel: honorLabel(item.honorConfirmedLevel || item.honorRequestedLevel)
+  }
+}
+
+async function listHonorConfirmations(openid, event = {}) {
+  const user = await requirePlatformUser(openid)
+  const organizationId = canonicalOrganizationId(event.organizationId)
+  const assignments = await activeRoleAssignments(user.id)
+  const confirmPositionIds = new Set(assignments.map(item => item.positionId).filter(Boolean))
+  if (!confirmPositionIds.size) return []
+  const result = await db.collection(COLLECTIONS.eventRecord).limit(300).get()
+  return result.data
+    .filter(item => !item.deletedAt)
+    .filter(item => item.honorStatus === 'pending_confirm')
+    .filter(item => !organizationId || item.organizationId === organizationId)
+    .filter(item => confirmPositionIds.has(item.confirmPositionId))
+    .sort((a, b) => String(b.createdAt || b.eventDate || '').localeCompare(String(a.createdAt || a.eventDate || '')))
+    .map(eventHonorView)
+}
+
+async function updateHonorConfirmation(openid, event = {}, mode = 'archive') {
+  const id = cleanText(event.id, 100)
+  const result = await db.collection(COLLECTIONS.eventRecord).where({ id }).limit(1).get()
+  const record = result.data[0]
+  await requireHonorConfirmer(openid, record, false)
+  if (record && mode === 'archive' && record.eventStatus === 'archived' && record.honorStatus === 'pending_confirm') {
+    return record
+  }
+  if (record && mode === 'grant' && record.honorStatus === 'granted') {
+    return record
+  }
+  if (record && mode === 'not_granted' && record.honorStatus === 'not_granted') {
+    return record
+  }
+  const user = await requireHonorConfirmer(openid, record)
+  const confirmedAt = now()
+  const common = {
+    status: 'published',
+    eventStatus: 'archived',
+    updatedAt: confirmedAt
+  }
+  let data = common
+  let action = 'confirm_archive'
+  if (mode === 'grant') {
+    data = {
+      ...common,
+      honorStatus: 'granted',
+      honorConfirmedLevel: normalizeHonorGrantLevel(event.honorConfirmedLevel || event.level || record.honorRequestedLevel),
+      confirmedBy: user.id,
+      confirmedByName: cleanText(user.name, 40),
+      confirmedAt
+    }
+    action = 'confirm_grant_honor'
+  } else if (mode === 'not_granted') {
+    data = {
+      ...common,
+      honorStatus: 'not_granted',
+      honorConfirmedLevel: null,
+      confirmedBy: user.id,
+      confirmedByName: cleanText(user.name, 40),
+      confirmedAt
+    }
+    action = 'mark_honor_not_granted'
+  }
+  await db.collection(COLLECTIONS.eventRecord).doc(record._id).update({ data })
+  await writePlatformLog(user, 'update', 'event_record', id, { action, title: record.title })
+  return { ...record, ...data, id, _id: record._id }
+}
+
+async function confirmArchiveEvent(openid, event = {}) {
+  return updateHonorConfirmation(openid, event, 'archive')
+}
+
+async function confirmGrantHonor(openid, event = {}) {
+  return updateHonorConfirmation(openid, event, 'grant')
+}
+
+async function markHonorNotGranted(openid, event = {}) {
+  return updateHonorConfirmation(openid, event, 'not_granted')
+}
+
+function inTerm(record, termKey) {
+  const today = new Date().toISOString().slice(0, 10)
+  if (termKey) {
+    return `${record.termStartDate || ''}_${record.termEndDate || ''}` === termKey
+  }
+  if (!record.termStartDate && !record.termEndDate) return true
+  return (!record.termStartDate || record.termStartDate <= today) && (!record.termEndDate || record.termEndDate >= today)
+}
+
+async function getArchiveHonorStats(openid, event = {}) {
+  const user = await requirePlatformUser(openid)
+  const organizationId = canonicalOrganizationId(event.organizationId)
+  const portGrants = await enforcingPortPermissions(user.id)
+  const level = cleanText(event.level, 20)
+  const positionId = cleanText(event.positionId, 160)
+  const recipientUserId = cleanText(event.recipientUserId, 100)
+  const termKey = cleanText(event.termKey, 40)
+  const result = await db.collection(COLLECTIONS.eventRecord).limit(500).get()
+  const baseRecords = result.data
+    .filter(item => !item.deletedAt)
+    .filter(item => item.honorStatus === 'granted')
+    .filter(item => !organizationId || item.organizationId === organizationId)
+    .filter(item => !level || item.honorConfirmedLevel === level)
+    .filter(item => !positionId || item.honorRecipientPositionId === positionId || item.categoryId === positionId || item.positionId === positionId)
+    .filter(item => !recipientUserId || item.honorRecipientUserId === recipientUserId)
+    .filter(item => !portGrants.length || portPermissionAllowed(portGrants, user.id, 'history', 'read', item))
+  const termMap = {}
+  baseRecords.forEach(item => {
+    const itemTermKey = `${item.termStartDate || ''}_${item.termEndDate || ''}`
+    if (itemTermKey !== '_' && !termMap[itemTermKey]) {
+      termMap[itemTermKey] = {
+        key: itemTermKey,
+        startDate: item.termStartDate || '',
+        endDate: item.termEndDate || '',
+        label: `${item.termStartDate || '未设开始'} 至 ${item.termEndDate || '未设结束'}`
+      }
+    }
+  })
+  const records = baseRecords
+    .filter(item => inTerm(item, termKey))
+    .sort((a, b) => String(b.confirmedAt || b.eventDate || '').localeCompare(String(a.confirmedAt || a.eventDate || '')))
+    .slice(0, 200)
+    .map(eventHonorView)
+  const counts = { good: 0, great: 0, excellent: 0 }
+  const chairMap = {}
+  const memberMap = {}
+  const positionMap = {}
+  records.forEach(item => {
+    const honorLevel = item.honorConfirmedLevel
+    if (counts[honorLevel] !== undefined) counts[honorLevel] += 1
+    const chairKey = `${item.honorRecipientPositionId || item.positionId}_${item.honorRecipientUserId || ''}`
+    if (!chairMap[chairKey]) {
+      chairMap[chairKey] = {
+        key: chairKey,
+        positionId: item.honorRecipientPositionId || item.positionId,
+        positionName: item.category || item.uploaderRole || '',
+        userId: item.honorRecipientUserId || '',
+        name: item.honorRecipientName || '',
+        counts: { good: 0, great: 0, excellent: 0 },
+        events: []
+      }
+    }
+    if (chairMap[chairKey].counts[honorLevel] !== undefined) chairMap[chairKey].counts[honorLevel] += 1
+    chairMap[chairKey].events.push(item.id)
+    const memberKey = item.honorRecipientUserId || item.honorRecipientName || 'unknown'
+    if (!memberMap[memberKey]) {
+      memberMap[memberKey] = {
+        key: memberKey,
+        userId: item.honorRecipientUserId || '',
+        name: item.honorRecipientName || '',
+        counts: { good: 0, great: 0, excellent: 0 },
+        events: []
+      }
+    }
+    if (memberMap[memberKey].counts[honorLevel] !== undefined) memberMap[memberKey].counts[honorLevel] += 1
+    memberMap[memberKey].events.push(item.id)
+    const posKey = item.honorRecipientPositionId || item.positionId || item.categoryId
+    if (posKey && !positionMap[posKey]) positionMap[posKey] = { id: posKey, name: item.category || item.uploaderRole || posKey }
+  })
+  return {
+    counts,
+    total: records.length,
+    events: records,
+    chairStats: Object.values(chairMap),
+    memberStats: Object.values(memberMap),
+    positions: Object.values(positionMap),
+    terms: Object.values(termMap)
+  }
 }
 
 async function listEventImages(openid, event = {}) {
@@ -2451,7 +2812,7 @@ async function listAuditLogs(openid) {
     update: '修改',
     delete: '移入回收站',
     upload: '上传',
-    review: '成员审核',
+    review: '成员确认',
     role: '权限变更'
   }
   return result.data
@@ -2568,6 +2929,11 @@ const handlers = {
   saveEventRecord,
   getEventRecord,
   archiveEventRecord,
+  listHonorConfirmations,
+  confirmArchiveEvent,
+  confirmGrantHonor,
+  markHonorNotGranted,
+  getArchiveHonorStats,
   listEventImages,
   saveEventImages,
   saveFileRecord,

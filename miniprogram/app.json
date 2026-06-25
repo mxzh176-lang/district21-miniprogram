@@ -7,6 +7,8 @@
     "pages/archive/list/index",
     "pages/archive/detail/index",
     "pages/archive/edit/index",
+    "pages/archive/confirm/index",
+    "pages/archive/honor-wall/index",
     "pages/archive/import/index",
     "pages/archive/ledger/index",
     "pages/archive/position-edit/index",
