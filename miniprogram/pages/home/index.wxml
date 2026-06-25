@@ -5,7 +5,10 @@
         <view class="hero-top">
           <view>
             <view class="eyebrow">LIONS DISTRICT 21 · SUIHUA</view>
-            <view class="hero-title">二十一协作区</view>
+            <view class="hero-title org-title" bindtap="chooseOrgScope">
+              <text>{{currentOrg.orgName}}</text>
+              <text class="org-switch-arrow">⌄</text>
+            </view>
             <view class="hero-subtitle">二一聚力 · 再创佳绩</view>
           </view>
           <view class="hero-seal">21</view>
@@ -20,7 +23,7 @@
   </swiper>
 
   <view class="team-strip">
-    <view class="team-item {{selectedTeamId === item.id ? 'active' : ''}}" wx:for="{{teams}}" wx:key="id" data-id="{{item.id}}" bindtap="selectTeam">
+    <view class="team-item {{selectedTeamId === item.id ? 'active' : ''}}" wx:for="{{visibleTeams}}" wx:key="id" data-id="{{item.id}}" bindtap="selectTeam">
       <view class="team-dot" style="background: {{item.color}}"></view>
       <view class="team-name">{{item.shortName}}</view>
       <view class="team-count">{{item.members}}人</view>
@@ -30,8 +33,17 @@
   <view class="feature-entry honor-entry" bindtap="goHonors">
     <view class="feature-icon honor-icon">誉</view>
     <view class="feature-copy">
-      <view class="feature-title">远航荣誉与表彰</view>
+      <view class="feature-title">{{honorTitle}}</view>
       <view class="feature-desc">总览目标、达成进度与表彰记录</view>
+    </view>
+    <view class="arrow">›</view>
+  </view>
+
+  <view class="feature-entry archive-entry" bindtap="goArchive">
+    <view class="feature-icon archive-icon">档</view>
+    <view class="feature-copy">
+      <view class="feature-title">{{archiveTitle}}</view>
+      <view class="feature-desc">{{archiveDesc}}</view>
     </view>
     <view class="arrow">›</view>
   </view>
@@ -99,11 +111,11 @@
   <view class="stats">
     <view class="stat" bindtap="goContacts">
       <view class="stat-number">{{summary.memberCount}}</view>
-      <view class="stat-label">在册狮友</view>
+      <view class="stat-label">{{currentOrg.orgType === 'district' ? '协作区总人数' : '服务队人数'}}</view>
     </view>
     <view class="stat">
-      <view class="stat-number">5</view>
-      <view class="stat-label">协作组织</view>
+      <view class="stat-number">{{currentOrg.orgType === 'district' ? 4 : 1}}</view>
+      <view class="stat-label">{{currentOrg.orgType === 'district' ? '服务队统计' : '当前服务队'}}</view>
     </view>
     <view class="stat">
       <view class="stat-number">{{summary.photoCount}}</view>
@@ -112,7 +124,7 @@
   </view>
 
   <view class="section-row">
-    <view class="section-title compact">最近服务足迹</view>
+    <view class="section-title compact">{{historyTitle}}</view>
     <view class="more" bindtap="goActivities">查看历史 ›</view>
   </view>
   <scroll-view scroll-x class="event-scroll">
