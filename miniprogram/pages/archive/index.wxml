@@ -34,6 +34,38 @@
     </view>
   </view>
 
+  <view class="confirm-entry" wx:if="{{pendingConfirmCount}}" bindtap="openConfirmations">
+    <view>
+      <view class="confirm-title">待确认</view>
+      <view class="confirm-desc">有 {{pendingConfirmCount}} 条荣誉申报需要直属上级处理</view>
+    </view>
+    <view class="confirm-action">去确认 ›</view>
+  </view>
+
+  <view class="honor-overview" bindtap="openHonorWall">
+    <view class="honor-heading">
+      <view>
+        <view class="honor-title">荣誉事件统计</view>
+        <view class="honor-desc">按当前服务队与当前任期统计已确认授予事件</view>
+      </view>
+      <view class="honor-link">事件墙 ›</view>
+    </view>
+    <view class="honor-stats">
+      <view class="honor-stat" data-level="good" catchtap="openHonorWall">
+        <view class="honor-value">{{honorStats.counts.good || 0}}</view>
+        <view class="honor-label">优秀</view>
+      </view>
+      <view class="honor-stat" data-level="great" catchtap="openHonorWall">
+        <view class="honor-value">{{honorStats.counts.great || 0}}</view>
+        <view class="honor-label">杰出</view>
+      </view>
+      <view class="honor-stat" data-level="excellent" catchtap="openHonorWall">
+        <view class="honor-value">{{honorStats.counts.excellent || 0}}</view>
+        <view class="honor-label">卓越</view>
+      </view>
+    </view>
+  </view>
+
   <view class="section-row">
     <view>
       <view class="section-title">档案栏目</view>

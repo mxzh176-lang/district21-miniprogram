@@ -43,12 +43,51 @@ const DEFAULT_FORM_COPY = {
   photoDescription: '仅上传与本条内部档案直接相关的图片'
 }
 
+const HONOR_ELIGIBLE_CATEGORY_IDS = [
+  'secretary',
+  'treasurer',
+  'admin',
+  'tamer',
+  'member-retention',
+  'leadership-training',
+  'external-exchange',
+  'service-plan',
+  'news-publicity',
+  'fundraising-plan',
+  'care-committee',
+  'fellowship-committee',
+  'annual-meeting'
+]
+
+const HONOR_LEVEL_OPTIONS = [
+  { value: 'none', label: '不申报', desc: '仅归档为岗位事件' },
+  { value: 'good', label: '优秀', desc: '提交给直属上级确认' },
+  { value: 'great', label: '杰出', desc: '提交给直属上级确认' },
+  { value: 'excellent', label: '卓越', desc: '提交给直属上级确认' }
+]
+
+const CONFIRM_POSITION_BY_CATEGORY = {
+  secretary: '队长',
+  treasurer: '队长',
+  admin: '队长',
+  tamer: '队长',
+  'member-retention': '第一副队长',
+  'leadership-training': '第一副队长',
+  'external-exchange': '第一副队长',
+  'service-plan': '第二副队长',
+  'news-publicity': '第二副队长',
+  'fundraising-plan': '第二副队长',
+  'care-committee': '第三副队长',
+  'fellowship-committee': '第三副队长',
+  'annual-meeting': '第三副队长'
+}
+
 const FORM_COPY = {
   'member-retention': copy('例如：六月会员保留沟通记录', '会员工作主题', '请输入会员发展或保留工作主题', ['沟通主题', '负责人', '后续安排'], '仅记录必要的内部沟通与跟进情况，不填写身份证、手机号等非必要个人信息'),
   'leadership-training': copy('例如：逢五相约培训记录', '培训主题', '请输入培训名称或学习主题', ['培训主题', '讲师', '学习成果'], '请记录培训目标、参与情况、主要内容、学习成果和后续实践安排'),
   'external-exchange': copy('例如：服务队交流访问记录', '交流主题', '请输入交流对象和交流主题', ['交流对象', '交流主题', '后续事项'], '请记录交流目的、参与人员、主要内容、达成事项和后续负责人'),
   'service-plan': copy('例如：六月助学走访服务记录', '服务主题', '请输入服务项目、地点和参与情况', ['服务项目', '服务地点', '参与人员'], '请记录服务需求、参与分工、执行过程、完成情况和后续安排'),
-  'news-publicity': copy('例如：六月服务资料报送记录', '资料主题', '请输入资料名称和内部报送事项', ['资料名称', '整理人', '报送情况'], '请记录资料来源、内部审核、素材清单、报送范围和留存位置'),
+  'news-publicity': copy('例如：六月服务资料报送记录', '资料主题', '请输入资料名称和内部报送事项', ['资料名称', '整理人', '报送情况'], '请记录资料来源、内部确认、素材清单、报送范围和留存位置'),
   'fundraising-plan': copy('例如：助学项目经费筹备记录', '经费事项', '请输入内部经费筹备或使用计划', ['经费用途', '预算安排', '凭证位置'], '仅记录组织内部经费筹备、使用计划和凭证留存，不提供公开募捐、支付或交易功能'),
   'care-committee': copy('例如：六月生日关爱记录', '关爱主题', '请输入关爱类型、时间和参与方式', ['关爱类型', '参与方式', '后续跟进'], '请记录关爱安排、参与方式和后续跟进；不填写病情、家庭状况等敏感隐私'),
   'fellowship-committee': copy('例如：六月内部联谊记录', '联谊主题', '请输入内部联谊名称和活动安排', ['联谊主题', '参与人员', '活动安排'], '请记录内部联谊的时间、安排、参与情况、完成情况和后续事项'),
@@ -99,6 +138,10 @@ Page({
       photoCount: 0,
       photos: []
     },
+    honorOptions: HONOR_LEVEL_OPTIONS,
+    honorRequestedLevel: 'none',
+    honorEligible: false,
+    confirmPositionName: '',
     templateApplied: false,
     formCopy: DEFAULT_FORM_COPY
   },
@@ -126,6 +169,9 @@ Page({
         cloudOrganizationId: organization.cloudId,
         positionId: position && (position.positionId || position.id)
       }) || (!permission.activePortPermissions(member).length && permission.canMaintainArchive(member, organization, categoryId, 'update')),
+      honorEligible: !options.id && HONOR_ELIGIBLE_CATEGORY_IDS.includes(categoryId),
+      honorRequestedLevel: 'none',
+      confirmPositionName: CONFIRM_POSITION_BY_CATEGORY[categoryId] || '',
       formCopy: FORM_COPY[categoryId] || DEFAULT_FORM_COPY,
       'form.date': this.formatDate(new Date()),
       'form.uploadedBy': member.name || member.nickname || '当前岗位负责人'
@@ -235,13 +281,13 @@ Page({
       },
       'news-publicity': {
         title: `${owner}狮兄狮姐完成远航${keywords}资料整理`,
-        summary: `${organizationName}完成“${keywords}”资料整理、内部审核和报送留存。`,
-        content: `归档日期：${form.date}\n资料主题：${keywords}\n负责人：${owner}\n\n一、资料来源：请补充\n二、内部审核人：请补充\n三、文字与图片清单：请补充\n四、报送对象与范围：请补充\n五、资料留存位置：请补充\n六、后续改进：请补充。`
+        summary: `${organizationName}完成“${keywords}”资料整理、内部确认和报送留存。`,
+        content: `归档日期：${form.date}\n资料主题：${keywords}\n负责人：${owner}\n\n一、资料来源：请补充\n二、内部确认人：请补充\n三、文字与图片清单：请补充\n四、报送对象与范围：请补充\n五、资料留存位置：请补充\n六、后续改进：请补充。`
       },
       'fundraising-plan': {
         title: `${owner}狮兄狮姐完成远航${keywords}经费筹备记录`,
         summary: `${organizationName}形成“${keywords}”内部经费筹备与使用计划档案。`,
-        content: `记录日期：${form.date}\n经费事项：${keywords}\n负责人：${owner}\n\n一、内部工作用途：请补充\n二、预算与资金安排：请补充\n三、内部审批情况：请补充\n四、经办与核对人员：请补充\n五、凭证归档位置：请补充\n六、后续事项：请补充\n\n说明：本模块仅用于组织内部档案留存，不提供公开募捐、支付或交易功能。`
+        content: `记录日期：${form.date}\n经费事项：${keywords}\n负责人：${owner}\n\n一、内部工作用途：请补充\n二、预算与资金安排：请补充\n三、内部确认情况：请补充\n四、经办与核对人员：请补充\n五、凭证归档位置：请补充\n六、后续事项：请补充\n\n说明：本模块仅用于组织内部档案留存，不提供公开募捐、支付或交易功能。`
       },
       'care-committee': {
         title: `${owner}狮兄狮姐组织远航开展${keywords}关爱`,
@@ -328,8 +374,13 @@ Page({
     return true
   },
 
+  onHonorChange(event) {
+    this.setData({ honorRequestedLevel: event.currentTarget.dataset.value || 'none' })
+  },
+
   async saveEntry() {
-    const { id, form, organizationId, categoryId, positionId, organizationName, categoryName } = this.data
+    const { id, form, organizationId, categoryId, positionId, organizationName, categoryName, honorRequestedLevel, honorEligible } = this.data
+    const requestedLevel = honorEligible ? honorRequestedLevel : 'none'
     const entry = await api.call('saveArchiveEntry', {
       entry: {
         _id: id || undefined,
@@ -344,7 +395,10 @@ Page({
         team: organizationName,
         uploadedBy: form.uploadedBy,
         uploaderRole: categoryName,
-        status: 'published',
+        status: requestedLevel === 'none' ? 'published' : 'pending_confirm',
+        eventStatus: requestedLevel === 'none' ? 'archived' : 'pending_confirm',
+        honorRequestedLevel: requestedLevel,
+        honorStatus: requestedLevel === 'none' ? 'none' : 'pending_confirm',
         photoCount: form.photoCount,
         photos: uniquePhotos(form.photos),
         tone: 'blue',
