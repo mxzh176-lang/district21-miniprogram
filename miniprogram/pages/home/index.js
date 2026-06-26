@@ -1,34 +1,8 @@
 const api = require('../../utils/api')
 const permission = require('../../utils/permission')
+const orgScope = require('../../utils/org-scope')
 
-const CURRENT_ORG_SCOPE = 'CURRENT_ORG_SCOPE'
-const ORG_OPTIONS = [
-  { orgType: 'district', orgId: 'district21', orgName: '二十一协作区', teamId: 'all', dataId: 'district', shortName: '协作区', members: 120 },
-  { orgType: 'team', orgId: 'linghang', orgName: '领航服务队', teamId: 'linghang', dataId: 'linghang', shortName: '领航', members: 31 },
-  { orgType: 'team', orgId: 'ailinghang', orgName: '爱领航服务队', teamId: 'ailinghang', dataId: 'ailinghang', shortName: '爱领航', members: 29 },
-  { orgType: 'team', orgId: 'yuanhang', orgName: '远航服务队', teamId: 'yuanhang', dataId: 'yuanhang', shortName: '远航', members: 32 },
-  { orgType: 'team', orgId: 'jingying', orgName: '精英服务队', teamId: 'jingying', dataId: 'jingying', shortName: '精英', members: 28 }
-]
-
-function orgForCache(value) {
-  const orgId = value && value.orgId
-  return ORG_OPTIONS.find(item => item.orgId === orgId) || ORG_OPTIONS[0]
-}
-
-function teamIdsForOrg(org) {
-  if (!org || org.orgType === 'district') return []
-  return [org.orgId, org.teamId, org.dataId, `org_team_${org.orgId}`].filter(Boolean)
-}
-
-function matchesCurrentOrg(item, org) {
-  if (!org || org.orgType === 'district') return true
-  const ids = teamIdsForOrg(org)
-  return ids.includes(item.teamId) ||
-    ids.includes(item.organizationId) ||
-    ids.includes(item.team) ||
-    String(item.team || '').includes(org.shortName) ||
-    String(item.team || '').includes(org.orgName)
-}
+const ORG_OPTIONS = orgScope.ORG_OPTIONS
 
 function decorateTasks(tasks, session) {
   return (tasks || []).map(item => ({
@@ -75,9 +49,7 @@ Page({
   },
 
   onLoad() {
-    let cached = null
-    try { cached = wx.getStorageSync(CURRENT_ORG_SCOPE) } catch (error) { cached = null }
-    const currentOrg = orgForCache(cached)
+    const currentOrg = orgScope.getCurrentScope()
     this.setData({
       currentOrg,
       selectedTeamId: currentOrg.teamId
@@ -143,11 +115,11 @@ Page({
     const visibleTeams = isDistrict
       ? teams
       : teams.filter(item => item.id === currentOrg.orgId || item.orgId === currentOrg.orgId)
-    const tasks = this.data.allTasks.filter(item => matchesCurrentOrg(item, currentOrg))
-    const completedTasks = this.data.allCompletedTasks.filter(item => matchesCurrentOrg(item, currentOrg))
-    const scopedActivities = this.data.allActivities.filter(item => matchesCurrentOrg(item, currentOrg))
+    const tasks = this.data.allTasks.filter(item => orgScope.matchesScope(item, currentOrg))
+    const completedTasks = this.data.allCompletedTasks.filter(item => orgScope.matchesScope(item, currentOrg))
+    const scopedActivities = this.data.allActivities.filter(item => orgScope.matchesScope(item, currentOrg))
     const activities = scopedActivities.slice(0, 3)
-    const notices = this.data.allNotices.filter(item => matchesCurrentOrg(item, currentOrg) || !item.teamId).slice(0, 3)
+    const notices = this.data.allNotices.filter(item => orgScope.matchesScope(item, currentOrg) || !item.teamId).slice(0, 3)
     const baseSummary = this.data.baseSummary || {}
     const teamMembers = currentOrg.members || (visibleTeams[0] && visibleTeams[0].members) || 0
     const memberCount = isDistrict
@@ -179,8 +151,7 @@ Page({
   },
 
   goTasks() {
-    const teamId = this.data.currentOrg.orgType === 'team' ? this.data.currentOrg.teamId : 'all'
-    wx.navigateTo({ url: `/pages/tasks/index?teamId=${teamId}` })
+    wx.switchTab({ url: '/pages/tasks/index' })
   },
 
   createTask() {
@@ -190,11 +161,7 @@ Page({
   selectTeam(event) {
     const selectedTeamId = event.currentTarget.dataset.id
     const currentOrg = ORG_OPTIONS.find(item => item.orgId === selectedTeamId || item.teamId === selectedTeamId) || ORG_OPTIONS[0]
-    wx.setStorageSync(CURRENT_ORG_SCOPE, {
-      orgType: currentOrg.orgType,
-      orgId: currentOrg.orgId,
-      orgName: currentOrg.orgName
-    })
+    orgScope.setCurrentScope(currentOrg)
     this.setData({ currentOrg })
     this.applyOrgScope()
   },
@@ -204,11 +171,7 @@ Page({
       itemList: ORG_OPTIONS.map(item => item.orgName),
       success: result => {
         const currentOrg = ORG_OPTIONS[result.tapIndex] || ORG_OPTIONS[0]
-        wx.setStorageSync(CURRENT_ORG_SCOPE, {
-          orgType: currentOrg.orgType,
-          orgId: currentOrg.orgId,
-          orgName: currentOrg.orgName
-        })
+        orgScope.setCurrentScope(currentOrg)
         this.setData({ currentOrg })
         this.applyOrgScope()
       }
@@ -236,15 +199,15 @@ Page({
   },
 
   goBirthdays() {
-    wx.navigateTo({ url: '/pages/tasks/index?category=狮友生日' })
+    wx.switchTab({ url: '/pages/tasks/index' })
   },
 
   goMonthlyService() {
-    wx.navigateTo({ url: '/pages/tasks/index?category=公益服务' })
+    wx.switchTab({ url: '/pages/tasks/index' })
   },
 
   goActivities() {
-    wx.switchTab({ url: '/pages/history/index' })
+    wx.navigateTo({ url: '/pages/history/index' })
   },
 
   openActivity(event) {

@@ -52,8 +52,8 @@
         "text": "首页"
       },
       {
-        "pagePath": "pages/history/index",
-        "text": "历史事件"
+        "pagePath": "pages/tasks/index",
+        "text": "待办"
       },
       {
         "pagePath": "pages/archive/index",
@@ -61,7 +61,7 @@
       },
       {
         "pagePath": "pages/org/index",
-        "text": "成员名册"
+        "text": "成员"
       },
       {
         "pagePath": "pages/profile/index",

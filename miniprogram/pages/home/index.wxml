@@ -1,14 +1,19 @@
 <view class="page">
+  <view class="scope-bar" bindtap="chooseOrgScope">
+    <view>
+      <view class="scope-kicker">当前范围</view>
+      <view class="scope-name">{{currentOrg.orgName}}</view>
+    </view>
+    <view class="scope-action">切换 ▼</view>
+  </view>
+
   <swiper class="hero-swiper" autoplay circular indicator-dots interval="3500">
     <swiper-item wx:for="{{heroSlides}}" wx:key="key">
       <view wx:if="{{item.type === 'intro'}}" class="hero">
         <view class="hero-top">
           <view>
             <view class="eyebrow">LIONS DISTRICT 21 · SUIHUA</view>
-            <view class="hero-title org-title" bindtap="chooseOrgScope">
-              <text>{{currentOrg.orgName}}</text>
-              <text class="org-switch-arrow">⌄</text>
-            </view>
+            <view class="hero-title org-title"><text>{{currentOrg.orgName}}</text></view>
             <view class="hero-subtitle">二一聚力 · 再创佳绩</view>
           </view>
           <view class="hero-seal">21</view>

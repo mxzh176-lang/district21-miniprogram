@@ -3,7 +3,7 @@
     <view class="hero-heading">
       <view>
         <view class="hero-kicker">MEMBER CONTACTS</view>
-        <view class="hero-title">内部成员名册</view>
+        <view class="hero-title">{{currentScope.orgType === 'team' ? currentScope.orgName : '内部成员名册'}}</view>
       </view>
       <button wx:if="{{canManage}}" class="add-member" bindtap="addMember">＋</button>
     </view>

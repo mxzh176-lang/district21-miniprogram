@@ -1,5 +1,6 @@
 const api = require('../../utils/api')
 const permission = require('../../utils/permission')
+const orgScope = require('../../utils/org-scope')
 
 const TEAMS = [
   { id: 'all', name: '全部服务队', shortName: '全部', initial: '全' },
@@ -182,17 +183,22 @@ Page({
   onLoad(options) {
     const now = new Date()
     const selectedMonth = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`
+    const currentScope = orgScope.getCurrentScope()
     this.setData({
       selectedMonth,
       monthLabel: `${Number(selectedMonth.slice(5, 7))}月`,
       category: options.category || 'all',
-      teamId: normalizeTeamId(options.teamId) || 'all'
+      teamId: normalizeTeamId(options.teamId) || currentScope.teamId || 'all',
+      currentScope
     })
   },
 
   async onShow() {
+    const currentScope = orgScope.getCurrentScope()
     const session = await api.call('getSession')
     this.setData({
+      currentScope,
+      teamId: currentScope.teamId || 'all',
       canEdit: permission.canPerform(session, 'todo', 'update'),
       canCreate: permission.canPerform(session, 'todo', 'create')
     })
@@ -255,7 +261,9 @@ Page({
   },
 
   selectTeam(event) {
-    this.setData({ teamId: event.currentTarget.dataset.teamId })
+    const teamId = event.currentTarget.dataset.teamId
+    const currentScope = orgScope.setCurrentScopeByTeamId(teamId)
+    this.setData({ teamId, currentScope })
     this.loadTasks()
   },
 

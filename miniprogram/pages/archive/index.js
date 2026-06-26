@@ -1,11 +1,13 @@
 const api = require('../../utils/api')
 const permission = require('../../utils/permission')
+const orgScope = require('../../utils/org-scope')
 
 Page({
   data: {
     organizations: [],
     selectedId: 'yuanhang',
     selectedOrganization: {},
+    currentScope: orgScope.ORG_OPTIONS[0],
     loading: true,
     loadError: '',
     canManage: false,
@@ -17,6 +19,7 @@ Page({
 
   async onShow() {
     try {
+      const currentScope = orgScope.getCurrentScope()
       const [organizations, session] = await Promise.all([
         api.call('listArchives'),
         api.call('getSession')
@@ -24,10 +27,12 @@ Page({
       this.setData({
         organizations,
         session,
+        currentScope,
         canManage: permission.canManage(session),
         loadError: ''
       })
-      await this.selectOrganizationById(this.data.selectedId)
+      const scopedId = currentScope.orgType === 'team' ? currentScope.orgId : this.data.selectedId
+      await this.selectOrganizationById(scopedId)
     } catch (error) {
       this.setData({ loading: false, loadError: '档案加载失败，请点击微信开发者工具“编译”后重试。' })
       api.showError(error)
@@ -35,7 +40,10 @@ Page({
   },
 
   selectOrganization(event) {
-    this.selectOrganizationById(event.currentTarget.dataset.id)
+    const id = event.currentTarget.dataset.id
+    const currentScope = orgScope.setCurrentScopeByTeamId(id)
+    this.setData({ currentScope })
+    this.selectOrganizationById(id)
   },
 
   async selectOrganizationById(id) {

@@ -1,7 +1,7 @@
 <view class="page tasks-page">
   <view class="task-hero">
     <view class="hero-copy">
-      <view class="hero-kicker">二十一协作区</view>
+      <view class="hero-kicker">{{currentScope.orgName || '二十一协作区'}}</view>
       <view class="hero-title">重点待办</view>
       <view class="hero-desc">重要活动不错过，服务协作更清晰</view>
     </view>

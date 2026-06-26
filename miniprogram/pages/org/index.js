@@ -1,5 +1,6 @@
 const api = require('../../utils/api')
 const permission = require('../../utils/permission')
+const orgScope = require('../../utils/org-scope')
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
 
@@ -10,6 +11,7 @@ Page({
     groups: [],
     teams: [],
     teamId: 'all',
+    currentScope: orgScope.ORG_OPTIONS[0],
     keyword: '',
     alphabet: ALPHABET.map(letter => ({ letter, available: false })),
     availableLetters: [],
@@ -20,6 +22,7 @@ Page({
   },
 
   async onShow() {
+    const currentScope = orgScope.getCurrentScope()
     const [members, teams, session] = await Promise.all([
       api.call('listOrg'),
       api.call('listTeams'),
@@ -28,13 +31,17 @@ Page({
     this.setData({
       members,
       teams: teams.slice(1),
+      currentScope,
+      teamId: currentScope.teamId || 'all',
       canManage: permission.canPerform(session, 'contacts', 'update') || permission.canPerform(session, 'contacts', 'create')
     })
     this.applyFilter()
   },
 
   selectTeam(event) {
-    this.setData({ teamId: event.currentTarget.dataset.id })
+    const teamId = event.currentTarget.dataset.id
+    const currentScope = orgScope.setCurrentScopeByTeamId(teamId)
+    this.setData({ teamId, currentScope })
     this.applyFilter()
   },
 

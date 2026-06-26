@@ -1,3 +1,37 @@
+.scope-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18rpx;
+  padding: 20rpx 24rpx;
+  border: 1rpx solid rgba(123, 228, 255, .24);
+  border-radius: 22rpx;
+  color: #fff;
+  background: linear-gradient(135deg, rgba(36, 28, 82, .96), rgba(21, 49, 95, .92));
+  box-shadow: 0 12rpx 34rpx rgba(0, 0, 24, .18);
+}
+
+.scope-kicker {
+  color: #7be4ff;
+  font-size: 18rpx;
+  letter-spacing: 3rpx;
+}
+
+.scope-name {
+  margin-top: 6rpx;
+  font-size: 31rpx;
+  font-weight: 900;
+}
+
+.scope-action {
+  padding: 11rpx 18rpx;
+  border-radius: 999rpx;
+  color: #dff8ff;
+  background: rgba(123, 228, 255, .14);
+  font-size: 21rpx;
+  font-weight: 800;
+}
+
 .hero {
   box-sizing: border-box;
   height: 100%;

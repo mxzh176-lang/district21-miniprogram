@@ -2,7 +2,7 @@
   <view class="archive-hero">
     <view class="hero-kicker">ARCHIVE DIRECTORY</view>
     <view class="hero-title">让狮爱有迹可循</view>
-    <view class="hero-desc">岗位人员直接填写内容，保存后自动形成历史事件</view>
+    <view class="hero-desc">{{currentScope.orgType === 'team' ? currentScope.orgName : '协作区与服务队'}}档案，岗位人员直接填写内容</view>
   </view>
 
   <view class="archive-error" wx:if="{{loadError}}">{{loadError}}</view>
