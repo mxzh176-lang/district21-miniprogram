@@ -1,5 +1,38 @@
 .tasks-page { padding-bottom: 64rpx; }
 
+.scope-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18rpx;
+  padding: 20rpx 24rpx;
+  border: 1rpx solid rgba(123, 228, 255, .22);
+  border-radius: 22rpx;
+  background: linear-gradient(135deg, rgba(33, 24, 73, .96), rgba(21, 50, 90, .9));
+}
+
+.scope-kicker {
+  color: #7be4ff;
+  font-size: 18rpx;
+  letter-spacing: 3rpx;
+}
+
+.scope-name {
+  margin-top: 6rpx;
+  color: #fff;
+  font-size: 30rpx;
+  font-weight: 900;
+}
+
+.scope-switch {
+  padding: 10rpx 17rpx;
+  border-radius: 999rpx;
+  color: #dff8ff;
+  background: rgba(123, 228, 255, .14);
+  font-size: 20rpx;
+  font-weight: 800;
+}
+
 .task-hero {
   display: flex;
   align-items: center;

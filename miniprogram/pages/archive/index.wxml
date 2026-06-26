@@ -1,4 +1,12 @@
 <view class="page">
+  <view class="scope-card" bindtap="chooseOrgScope">
+    <view>
+      <view class="scope-kicker">当前范围</view>
+      <view class="scope-name">{{currentScope.orgName || '二十一协作区'}}</view>
+    </view>
+    <view class="scope-switch">切换 ▼</view>
+  </view>
+
   <view class="archive-hero">
     <view class="hero-kicker">ARCHIVE DIRECTORY</view>
     <view class="hero-title">让狮爱有迹可循</view>

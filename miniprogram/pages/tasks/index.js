@@ -267,6 +267,17 @@ Page({
     this.loadTasks()
   },
 
+  chooseOrgScope() {
+    wx.showActionSheet({
+      itemList: orgScope.ORG_OPTIONS.map(item => item.orgName),
+      success: result => {
+        const currentScope = orgScope.setCurrentScope(orgScope.ORG_OPTIONS[result.tapIndex])
+        this.setData({ currentScope, teamId: currentScope.teamId || 'all' })
+        this.loadTasks()
+      }
+    })
+  },
+
   toggleCompleted() {
     this.setData({ completedExpanded: !this.data.completedExpanded })
   },

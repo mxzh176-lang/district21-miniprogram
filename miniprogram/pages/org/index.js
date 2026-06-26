@@ -45,6 +45,17 @@ Page({
     this.applyFilter()
   },
 
+  chooseOrgScope() {
+    wx.showActionSheet({
+      itemList: orgScope.ORG_OPTIONS.map(item => item.orgName),
+      success: result => {
+        const currentScope = orgScope.setCurrentScope(orgScope.ORG_OPTIONS[result.tapIndex])
+        this.setData({ currentScope, teamId: currentScope.teamId || 'all' })
+        this.applyFilter()
+      }
+    })
+  },
+
   search(event) {
     this.setData({ keyword: event.detail.value })
     this.applyFilter()

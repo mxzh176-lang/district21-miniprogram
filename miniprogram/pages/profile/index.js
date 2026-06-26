@@ -1,12 +1,15 @@
 const api = require('../../utils/api')
 const permission = require('../../utils/permission')
+const orgScope = require('../../utils/org-scope')
 
 Page({
-  data: { member: {}, canManage: false, canViewPermissions: false, needsProfile: false },
+  data: { member: {}, currentScope: orgScope.ORG_OPTIONS[0], canManage: false, canViewPermissions: false, needsProfile: false },
 
   async onShow() {
+    const currentScope = orgScope.getCurrentScope()
     const member = await api.call('getSession')
     this.setData({
+      currentScope,
       member: {
         ...member,
         displayRole: permission.displayRole(member),
@@ -41,7 +44,17 @@ Page({
   },
 
   goHistory() {
-    wx.switchTab({ url: '/pages/history/index' })
+    wx.navigateTo({ url: '/pages/history/index' })
+  },
+
+  chooseOrgScope() {
+    wx.showActionSheet({
+      itemList: orgScope.ORG_OPTIONS.map(item => item.orgName),
+      success: result => {
+        const currentScope = orgScope.setCurrentScope(orgScope.ORG_OPTIONS[result.tapIndex])
+        this.setData({ currentScope })
+      }
+    })
   },
 
   copyUserId() {

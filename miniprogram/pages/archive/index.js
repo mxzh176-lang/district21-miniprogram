@@ -46,6 +46,18 @@ Page({
     this.selectOrganizationById(id)
   },
 
+  chooseOrgScope() {
+    wx.showActionSheet({
+      itemList: orgScope.ORG_OPTIONS.map(item => item.orgName),
+      success: result => {
+        const currentScope = orgScope.setCurrentScope(orgScope.ORG_OPTIONS[result.tapIndex])
+        this.setData({ currentScope })
+        const scopedId = currentScope.orgType === 'team' ? currentScope.orgId : (this.data.organizations[0] && this.data.organizations[0].id) || this.data.selectedId
+        this.selectOrganizationById(scopedId)
+      }
+    })
+  },
+
   async selectOrganizationById(id) {
     let selectedOrganization = this.data.organizations.find(item => item.id === id) || this.data.organizations[0] || {}
     const supportIds = ['secretary', 'tamer', 'treasurer', 'admin']
