@@ -36,6 +36,26 @@
   letter-spacing: 5rpx;
 }
 
+.org-title {
+  display: inline-flex;
+  align-items: center;
+  max-width: 430rpx;
+}
+
+.org-title text:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.org-switch-arrow {
+  margin-left: 12rpx;
+  color: #7be4ff;
+  font-family: sans-serif;
+  font-size: 32rpx;
+  letter-spacing: 0;
+}
+
 .hero-subtitle {
   margin-top: 8rpx;
   color: rgba(255, 255, 255, 0.7);
@@ -131,6 +151,8 @@
 
 .honor-entry { border-left: 5rpx solid #c39a3a; }
 .honor-icon { color: #2b210c; background: #d4ad4f; }
+.archive-entry { border-left: 5rpx solid #7be4ff; }
+.archive-icon { background: linear-gradient(145deg, #37a5c8, #4d67d6); }
 
 .feature-copy {
   flex: 1;

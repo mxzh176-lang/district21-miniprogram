@@ -1,6 +1,18 @@
 const api = require('../../../utils/api')
 const permission = require('../../../utils/permission')
 
+function honorStatusText(status) {
+  return {
+    pending_confirm: '待直属确认',
+    pending_leader_confirm: '待直属确认',
+    pending_honor_verify: '待荣誉核准',
+    honor_verified: '已核准入榜',
+    need_recheck: '需复核',
+    granted: '已核准入榜',
+    not_granted: '暂不授予'
+  }[status] || ''
+}
+
 Page({
   data: { id: '', entry: {}, photos: [], canEdit: false, canDelete: false },
 
@@ -24,10 +36,12 @@ Page({
       entry: {
         ...entry,
         team: entry.team || (organization && organization.name) || '',
-        keywordText: (entry.keywords || []).join(' · ')
+        keywordText: (entry.keywords || []).join(' · '),
+        honorStatusText: honorStatusText(entry.honorStatus)
       },
       photos,
-      canEdit: entry.honorStatus !== 'pending_confirm' && permission.canMaintainArchive(session, organization, entry.categoryId, 'update'),
+      canEdit: !['pending_confirm', 'pending_leader_confirm', 'pending_honor_verify', 'honor_verified', 'need_recheck'].includes(entry.honorStatus) &&
+        permission.canMaintainArchive(session, organization, entry.categoryId, 'update'),
       canDelete: permission.canMaintainArchive(session, organization, entry.categoryId, 'delete')
     })
     wx.setNavigationBarTitle({ title: entry.title })

@@ -36,17 +36,24 @@
 
   <view class="confirm-entry" wx:if="{{pendingConfirmCount}}" bindtap="openConfirmations">
     <view>
-      <view class="confirm-title">待确认</view>
+      <view class="confirm-title">待直属确认</view>
       <view class="confirm-desc">有 {{pendingConfirmCount}} 条荣誉申报需要直属上级处理</view>
     </view>
     <view class="confirm-action">去确认 ›</view>
+  </view>
+  <view class="confirm-entry" wx:if="{{pendingVerifyCount}}" bindtap="openConfirmations">
+    <view>
+      <view class="confirm-title">待荣誉核准</view>
+      <view class="confirm-desc">有 {{pendingVerifyCount}} 条荣誉申报需要荣誉主席核准入榜</view>
+    </view>
+    <view class="confirm-action">去核准 ›</view>
   </view>
 
   <view class="honor-overview" bindtap="openHonorWall">
     <view class="honor-heading">
       <view>
         <view class="honor-title">荣誉事件统计</view>
-        <view class="honor-desc">按当前服务队与当前任期统计已确认授予事件</view>
+        <view class="honor-desc">按当前服务队与当前任期统计已核准入榜事件</view>
       </view>
       <view class="honor-link">事件墙 ›</view>
     </view>

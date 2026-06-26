@@ -20,9 +20,12 @@ const ACTIONS = [
   'saveArchiveEntry',
   'deleteArchiveEntry',
   'listHonorConfirmations',
+  'listHonorVerifications',
   'confirmArchiveEvent',
   'confirmGrantHonor',
   'markHonorNotGranted',
+  'verifyHonorForWall',
+  'markHonorNeedRecheck',
   'getArchiveHonorStats'
   ,'listLedgerRecords'
   ,'saveLedgerRecord'
@@ -63,6 +66,7 @@ function recordToArchiveEntry(record) {
     honorRequestedLevel: record.honorRequestedLevel || 'none',
     honorConfirmedLevel: record.honorConfirmedLevel || '',
     honorStatus: record.honorStatus || 'none',
+    honorStatusLabel: record.honorStatusLabel || '',
     honorRequestedLabel: record.honorRequestedLabel || '',
     honorConfirmedLabel: record.honorConfirmedLabel || '',
     honorLevelLabel: record.honorLevelLabel || '',
@@ -76,6 +80,9 @@ function recordToArchiveEntry(record) {
     confirmedBy: record.confirmedBy || '',
     confirmedByName: record.confirmedByName || '',
     confirmedAt: record.confirmedAt || '',
+    honorVerifiedBy: record.honorVerifiedBy || '',
+    honorVerifiedByName: record.honorVerifiedByName || '',
+    honorVerifiedAt: record.honorVerifiedAt || '',
     photoCount: Number(record.imageCount) || photos.length,
     photos,
     tone: 'blue',
@@ -113,10 +120,10 @@ function archiveEntryToRecord(entry) {
     participantCount: Number(entry.participantCount) || 0,
     ownerName: entry.uploadedBy || '',
     status: entry.status || 'draft',
-    eventStatus: entry.eventStatus || (entry.honorRequestedLevel && entry.honorRequestedLevel !== 'none' ? 'pending_confirm' : 'archived'),
+    eventStatus: entry.eventStatus || (entry.honorRequestedLevel && entry.honorRequestedLevel !== 'none' ? 'pending_leader_confirm' : 'archived'),
     honorRequestedLevel: entry.honorRequestedLevel || 'none',
     honorConfirmedLevel: entry.honorConfirmedLevel || null,
-    honorStatus: entry.honorStatus || (entry.honorRequestedLevel && entry.honorRequestedLevel !== 'none' ? 'pending_confirm' : 'none'),
+    honorStatus: entry.honorStatus || (entry.honorRequestedLevel && entry.honorRequestedLevel !== 'none' ? 'pending_leader_confirm' : 'none'),
     confirmPositionId: entry.confirmPositionId || '',
     honorRecipientUserId: entry.honorRecipientUserId || '',
     honorRecipientName: entry.honorRecipientName || '',
@@ -126,6 +133,9 @@ function archiveEntryToRecord(entry) {
     confirmedBy: entry.confirmedBy || '',
     confirmedByName: entry.confirmedByName || '',
     confirmedAt: entry.confirmedAt || null,
+    honorVerifiedBy: entry.honorVerifiedBy || '',
+    honorVerifiedByName: entry.honorVerifiedByName || '',
+    honorVerifiedAt: entry.honorVerifiedAt || null,
     visibility: 'organization',
     imageCount: Number(entry.photoCount) || 0
   }
@@ -179,9 +189,17 @@ async function execute(action, payload, localFallback) {
     })
     return records.map(recordToArchiveEntry)
   }
+  if (action === 'listHonorVerifications') {
+    const records = await cloudbase.invoke('listHonorVerifications', {
+      organizationId: toCloudOrganizationId(payload.organizationId)
+    })
+    return records.map(recordToArchiveEntry)
+  }
   if (action === 'confirmArchiveEvent') return cloudbase.invoke('confirmArchiveEvent', payload)
   if (action === 'confirmGrantHonor') return cloudbase.invoke('confirmGrantHonor', payload)
   if (action === 'markHonorNotGranted') return cloudbase.invoke('markHonorNotGranted', payload)
+  if (action === 'verifyHonorForWall') return cloudbase.invoke('verifyHonorForWall', payload)
+  if (action === 'markHonorNeedRecheck') return cloudbase.invoke('markHonorNeedRecheck', payload)
   if (action === 'getArchiveHonorStats') {
     const response = await cloudbase.invoke('getArchiveHonorStats', {
       ...payload,

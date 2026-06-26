@@ -176,7 +176,7 @@
         <view class="section-number honor-number">荣</view>
         <view>
           <view class="section-title">荣誉申报</view>
-          <view class="section-desc">提交保存前选择；申报后进入待确认，不直接进入荣誉事件墙</view>
+          <view class="section-desc">提交保存前选择；申报后进入待直属确认，不直接进入荣誉榜</view>
         </view>
       </view>
 
@@ -197,7 +197,7 @@
       </view>
 
       <view class="confirm-tip" wx:if="{{honorRequestedLevel !== 'none'}}">
-        待确认岗位：{{confirmPositionName || '直属上级'}}。确认后可选择“确认归档”“确认授予”或“暂不授予”。
+        直属确认岗位：{{confirmPositionName || '直属上级'}}。确认授予后进入荣誉主席核准。
       </view>
     </view>
   </block>

@@ -11,6 +11,7 @@ Page({
     canManage: false,
     honorStats: { counts: { good: 0, great: 0, excellent: 0 }, total: 0 },
     pendingConfirmCount: 0,
+    pendingVerifyCount: 0,
     session: null
   },
 
@@ -98,18 +99,21 @@ Page({
 
   async loadHonorOverview() {
     try {
-      const [honorStats, confirmations] = await Promise.all([
+      const [honorStats, confirmations, verifications] = await Promise.all([
         api.call('getArchiveHonorStats', { organizationId: this.data.selectedId }),
-        api.call('listHonorConfirmations', { organizationId: this.data.selectedId })
+        api.call('listHonorConfirmations', { organizationId: this.data.selectedId }),
+        api.call('listHonorVerifications', { organizationId: this.data.selectedId })
       ])
       this.setData({
         honorStats: honorStats || { counts: { good: 0, great: 0, excellent: 0 }, total: 0 },
-        pendingConfirmCount: (confirmations || []).length
+        pendingConfirmCount: (confirmations || []).length,
+        pendingVerifyCount: (verifications || []).length
       })
     } catch (error) {
       this.setData({
         honorStats: { counts: { good: 0, great: 0, excellent: 0 }, total: 0 },
-        pendingConfirmCount: 0
+        pendingConfirmCount: 0,
+        pendingVerifyCount: 0
       })
     }
   },
