@@ -30,16 +30,42 @@ function photosFor(activity) {
   return labels.map((label, index) => ({ _id: `${activity._id}-photo-${index + 1}`, label, tone: photoTones[(index + activities.indexOf(activity)) % photoTones.length] }))
 }
 
-const members = [
-  { _id: 'm1', name: '李晶', letter: 'L', team: '远航服务队', teamId: 'yuanhang', position: '第一副队长', company: '晶诚商贸有限公司', industry: '商贸流通', resource: '公益物资、供应链', birthday: '06-12', initial: '李', avatarTone: 'green' },
-  { _id: 'm2', name: '徐雪峰', letter: 'X', team: '远航服务队', teamId: 'yuanhang', position: '会员发展主席', company: '雪峰文化传媒', industry: '文化传媒', resource: '摄影摄像、宣传设计', birthday: '09-08', initial: '徐', avatarTone: 'red' },
-  { _id: 'm3', name: '王志强', letter: 'W', team: '领航服务队', teamId: 'linghang', position: '服务主席', company: '志强物流运输', industry: '物流运输', resource: '车辆、仓储、配送', birthday: '06-21', initial: '王', avatarTone: 'blue' },
-  { _id: 'm4', name: '刘静', letter: 'L', team: '爱领航服务队', teamId: 'ailinghang', position: '关爱主席', company: '静心健康管理', industry: '健康服务', resource: '健康咨询、义诊资源', birthday: '07-03', initial: '刘', avatarTone: 'purple' },
-  { _id: 'm5', name: '赵宏伟', letter: 'Z', team: '精英服务队', teamId: 'jingying', position: '队长', company: '宏伟农业科技', industry: '现代农业', resource: '农产品、乡村项目', birthday: '11-16', initial: '赵', avatarTone: 'green' },
-  { _id: 'm6', name: '景雅东', letter: 'J', team: '远航服务队', teamId: 'yuanhang', position: '联谊主席', company: '小鱼故事中餐厅', industry: '餐饮服务', resource: '活动场地、餐饮保障', birthday: '06-28', initial: '景', avatarTone: 'red' },
-  { _id: 'm7', name: '陈晓梅', letter: 'C', team: '领航服务队', teamId: 'linghang', position: '秘书', company: '晓梅教育咨询', industry: '教育培训', resource: '课程、教师、助学咨询', birthday: '08-19', initial: '陈', avatarTone: 'blue' },
-  { _id: 'm8', name: '孙海峰', letter: 'S', team: '精英服务队', teamId: 'jingying', position: '新闻宣传主席', company: '海峰网络科技', industry: '互联网技术', resource: '小程序、网站、直播支持', birthday: '10-05', initial: '孙', avatarTone: 'purple' }
-]
+const memberLetters = {
+  安: 'A', 白: 'B', 陈: 'C', 崔: 'C', 丁: 'D', 董: 'D', 付: 'F', 冯: 'F',
+  高: 'G', 郭: 'G', 关: 'G', 韩: 'H', 何: 'H', 胡: 'H', 黄: 'H',
+  荆: 'J', 景: 'J', 姜: 'J', 孔: 'K', 李: 'L', 刘: 'L', 吕: 'L',
+  梁: 'L', 林: 'L', 米: 'M', 马: 'M', 潘: 'P', 彭: 'P', 任: 'R',
+  宋: 'S', 孙: 'S', 滕: 'T', 田: 'T', 王: 'W', 吴: 'W', 徐: 'X',
+  许: 'X', 谢: 'X', 杨: 'Y', 姚: 'Y', 张: 'Z', 赵: 'Z', 周: 'Z',
+  朱: 'Z', 蒋: 'J', 辛: 'X', 侯: 'H', 金: 'J', 范: 'F', 邓: 'D',
+  薛: 'X', 裴: 'P', 程: 'C', 毛: 'M', 邰: 'T', 谭: 'T'
+}
+
+const memberRoster = {
+  linghang: ['王刚', '刘宝山', '于波', '范信银', '陈维凡', '刘金辉', '腾保国', '贾晓梅', '杨磊', '吴含', '朱连春', '蒋萧彤', '辛志武', '马玉红', '李洪志', '李力安', '侯盛楠', '王连会', '孙建', '金萍', '徐红霞', '王玉宝', '王洪伟', '王立彬', '关向星'],
+  jingying: ['王丽', '杨帆', '陈纯玉', '杨丽莹', '付艳秋', '张永祺', '孙明龙', '孙洪涛', '于永和', '张影', '周玉慧', '裴大伟', '林衍伟', '安铁', '薛允丽', '郭晓红', '张淑云', '李永生', '王继芳', '吕洪威', '任凤影', '张南翔', '程传海'],
+  ailinghang: ['陈纯颖', '王必东', '张书慧', '杨振忠', '陈冬彬', '孙显波', '王秋香', '谢志琴', '邓福友', '陈瓯', '王磊', '辛福恩', '毛烨', '吴亚娟', '杨秀娟', '张成功', '孙慧霖', '刘磊', '李红太', '刘金岭', '范晓波', '李玉博', '邰欢欢'],
+  yuanhang: ['关丙刚', '张明星', '徐双龙', '张芳', '李晶', '刘建鑫', '李姗姗', '刘圣亮', '杨景辉', '李文强', '吕媛媛', '王奇', '潘洋洋', '景树生', '徐雪峰', '胡世领', '徐铭宣', '徐春梅', '吴雪', '谭振峰', '腾飞']
+}
+
+const teamInfo = teams.reduce((map, team) => {
+  map[team.id] = team
+  return map
+}, {})
+
+const members = Object.keys(memberRoster).flatMap(teamId => {
+  const team = teamInfo[teamId]
+  return memberRoster[teamId].map((name, index) => ({
+    _id: `member-${teamId}-${index + 1}`,
+    name,
+    letter: memberLetters[name.slice(0, 1)] || '#',
+    team: team.name,
+    teamId,
+    position: '成员',
+    initial: name.slice(0, 1),
+    avatarTone: teamId === 'linghang' ? 'green' : teamId === 'ailinghang' ? 'red' : teamId === 'yuanhang' ? 'blue' : 'purple'
+  }))
+})
 
 const archiveCategories = [
   {

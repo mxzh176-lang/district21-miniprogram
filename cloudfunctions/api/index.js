@@ -2602,6 +2602,13 @@ function safeBirthday(value) {
   }
 }
 
+const DIRECTORY_ROSTER = {
+  org_team_linghang: ['王刚', '刘宝山', '于波', '范信银', '陈维凡', '刘金辉', '腾保国', '贾晓梅', '杨磊', '吴含', '朱连春', '蒋萧彤', '辛志武', '马玉红', '李洪志', '李力安', '侯盛楠', '王连会', '孙建', '金萍', '徐红霞', '王玉宝', '王洪伟', '王立彬', '关向星'],
+  org_team_jingying: ['王丽', '杨帆', '陈纯玉', '杨丽莹', '付艳秋', '张永祺', '孙明龙', '孙洪涛', '于永和', '张影', '周玉慧', '裴大伟', '林衍伟', '安铁', '薛允丽', '郭晓红', '张淑云', '李永生', '王继芳', '吕洪威', '任凤影', '张南翔', '程传海'],
+  org_team_ailinghang: ['陈纯颖', '王必东', '张书慧', '杨振忠', '陈冬彬', '孙显波', '王秋香', '谢志琴', '邓福友', '陈瓯', '王磊', '辛福恩', '毛烨', '吴亚娟', '杨秀娟', '张成功', '孙慧霖', '刘磊', '李红太', '刘金岭', '范晓波', '李玉博', '邰欢欢'],
+  org_team_yuanhang: ['关丙刚', '张明星', '徐双龙', '张芳', '李晶', '刘建鑫', '李姗姗', '刘圣亮', '杨景辉', '李文强', '吕媛媛', '王奇', '潘洋洋', '景树生', '徐雪峰', '胡世领', '徐铭宣', '徐春梅', '吴雪', '谭振峰', '腾飞']
+}
+
 async function organizationNameMap() {
   const result = await db.collection(COLLECTIONS.organization).limit(200).get()
   const map = {
@@ -2648,19 +2655,42 @@ function publicDirectoryMember(user, organizations = {}) {
   }
 }
 
+function staticDirectoryMembers(organizations = {}) {
+  return Object.keys(DIRECTORY_ROSTER).flatMap(organizationId =>
+    DIRECTORY_ROSTER[organizationId].map((name, index) => publicDirectoryMember({
+      id: `roster_${organizationId}_${index + 1}`,
+      name,
+      defaultOrganizationId: organizationId,
+      position: '成员',
+      status: 'active'
+    }, organizations)))
+}
+
+function findStaticDirectoryMember(id, organizations = {}) {
+  return staticDirectoryMembers(organizations).find(item => item.id === id || item._id === id) || null
+}
+
 async function listDirectoryMembers(openid) {
   await requireApproved(openid)
   const [userResult, organizations] = await Promise.all([
     db.collection(COLLECTIONS.user).limit(500).get(),
     organizationNameMap()
   ])
-  return userResult.data
+  const directory = {}
+  staticDirectoryMembers(organizations).forEach(item => {
+    directory[`${item.organizationId}:${item.name}`] = item
+  })
+  userResult.data
     .filter(item =>
       item.status !== 'disabled' &&
       cleanText(item.name, 40) &&
       !cleanText(item.name, 40).startsWith('待认证用户-')
     )
     .map(item => publicDirectoryMember(item, organizations))
+    .forEach(item => {
+      directory[`${item.organizationId}:${item.name}`] = item
+    })
+  return Object.values(directory)
     .sort((a, b) => String(a.letter || '#').localeCompare(String(b.letter || '#')) || a.name.localeCompare(b.name, 'zh-Hans-CN'))
 }
 
@@ -2691,15 +2721,18 @@ async function canManageDirectoryMember(openid, target = {}) {
 
 async function getMember(openid, event = {}) {
   await requireApproved(openid)
+  const organizations = await organizationNameMap()
   const user = await findDirectoryUser(event.id)
-  if (!user || user.status === 'disabled') {
+  const member = user && user.status !== 'disabled'
+    ? publicDirectoryMember(user, organizations)
+    : findStaticDirectoryMember(cleanText(event.id, 100), organizations)
+  if (!member) {
     throw Object.assign(new Error('未找到成员资料'), { code: 'MEMBER_NOT_FOUND' })
   }
-  const organizations = await organizationNameMap()
   return {
-    member: publicDirectoryMember(user, organizations),
+    member,
     canViewContact: true,
-    canManage: await canManageDirectoryMember(openid, user)
+    canManage: await canManageDirectoryMember(openid, member)
   }
 }
 
