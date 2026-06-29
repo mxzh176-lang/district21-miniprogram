@@ -5,16 +5,24 @@
     <view class="hero-desc">只展示已由荣誉主席核准入榜的岗位事件。</view>
     <view class="stats-row">
       <view class="stat">
-        <view class="value">{{stats.counts.good || 0}}</view>
-        <view class="label">优秀</view>
+        <view class="value">{{stats.starCounts.fiveStar || 0}}</view>
+        <view class="label">五星</view>
       </view>
       <view class="stat">
-        <view class="value">{{stats.counts.great || 0}}</view>
-        <view class="label">杰出</view>
+        <view class="value">{{stats.starCounts.fourStar || 0}}</view>
+        <view class="label">四星</view>
       </view>
       <view class="stat">
-        <view class="value">{{stats.counts.excellent || 0}}</view>
-        <view class="label">卓越</view>
+        <view class="value">{{stats.starCounts.threeStar || 0}}</view>
+        <view class="label">三星</view>
+      </view>
+      <view class="stat">
+        <view class="value">{{stats.starCounts.twoStar || 0}}</view>
+        <view class="label">二星</view>
+      </view>
+      <view class="stat">
+        <view class="value">{{stats.starCounts.oneStar || 0}}</view>
+        <view class="label">一星</view>
       </view>
     </view>
   </view>
@@ -42,9 +50,11 @@
       <view class="person-role">{{item.positionName}}</view>
     </view>
     <view class="mini-stats">
-      <text>优秀 {{item.counts.good || 0}}</text>
-      <text>杰出 {{item.counts.great || 0}}</text>
-      <text>卓越 {{item.counts.excellent || 0}}</text>
+      <text>五星 {{item.starCounts.fiveStar || 0}}</text>
+      <text>四星 {{item.starCounts.fourStar || 0}}</text>
+      <text>三星 {{item.starCounts.threeStar || 0}}</text>
+      <text>二星 {{item.starCounts.twoStar || 0}}</text>
+      <text>一星 {{item.starCounts.oneStar || 0}}</text>
     </view>
   </view>
 
@@ -53,9 +63,11 @@
   <view class="person-card" wx:for="{{stats.memberStats}}" wx:key="key">
     <view class="person-name">{{item.name || '未命名狮友'}}</view>
     <view class="mini-stats">
-      <text>优秀 {{item.counts.good || 0}}</text>
-      <text>杰出 {{item.counts.great || 0}}</text>
-      <text>卓越 {{item.counts.excellent || 0}}</text>
+      <text>五星 {{item.starCounts.fiveStar || 0}}</text>
+      <text>四星 {{item.starCounts.fourStar || 0}}</text>
+      <text>三星 {{item.starCounts.threeStar || 0}}</text>
+      <text>二星 {{item.starCounts.twoStar || 0}}</text>
+      <text>一星 {{item.starCounts.oneStar || 0}}</text>
     </view>
   </view>
 
@@ -68,7 +80,7 @@
         <view class="event-date">{{item.date}}</view>
         <view class="event-title">{{item.title}}</view>
       </view>
-      <view class="badge">{{item.honorLevelLabel || item.honorConfirmedLabel}}</view>
+      <view class="badge">{{item.honorStarLabel || item.honorLevelLabel || item.honorConfirmedLabel}}</view>
     </view>
     <view class="event-meta">
       <text>{{item.uploaderRole}}</text>

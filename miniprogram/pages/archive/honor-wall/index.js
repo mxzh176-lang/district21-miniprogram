@@ -2,14 +2,61 @@ const api = require('../../../utils/api')
 
 const LEVEL_FILTERS = [
   { value: '', label: '全部' },
-  { value: 'good', label: '优秀' },
-  { value: 'great', label: '杰出' },
-  { value: 'excellent', label: '卓越' }
+  { value: 'excellent', label: '五星' },
+  { value: 'great', label: '四星' },
+  { value: 'good', label: '三星' },
+  { value: 'twoStar', label: '二星' },
+  { value: 'oneStar', label: '一星' }
 ]
+
+function normalizeCounts(counts = {}) {
+  return {
+    fiveStar: counts.fiveStar || counts.excellent || 0,
+    fourStar: counts.fourStar || counts.great || 0,
+    threeStar: counts.threeStar || counts.good || 0,
+    twoStar: counts.twoStar || 0,
+    oneStar: counts.oneStar || 0
+  }
+}
+
+function starLabel(value) {
+  const map = {
+    excellent: '五星',
+    great: '四星',
+    good: '三星',
+    fiveStar: '五星',
+    fourStar: '四星',
+    threeStar: '三星',
+    twoStar: '二星',
+    oneStar: '一星',
+    卓越: '五星',
+    杰出: '四星',
+    优秀: '三星'
+  }
+  return map[value] || value || ''
+}
+
+function decorateStats(stats = {}) {
+  const counts = normalizeCounts(stats.counts)
+  const decorateList = list => (list || []).map(item => ({
+    ...item,
+    starCounts: normalizeCounts(item.counts)
+  }))
+  return {
+    ...stats,
+    starCounts: counts,
+    events: (stats.events || []).map(item => ({
+      ...item,
+      honorStarLabel: starLabel(item.honorConfirmedLevel || item.honorRequestedLevel || item.honorLevelLabel || item.honorConfirmedLabel)
+    })),
+    chairStats: decorateList(stats.chairStats),
+    memberStats: decorateList(stats.memberStats)
+  }
+}
 
 function totalCount(counts) {
   counts = counts || {}
-  return (counts.good || 0) + (counts.great || 0) + (counts.excellent || 0)
+  return (counts.oneStar || 0) + (counts.twoStar || 0) + (counts.threeStar || counts.good || 0) + (counts.fourStar || counts.great || 0) + (counts.fiveStar || counts.excellent || 0)
 }
 
 Page({
@@ -19,7 +66,7 @@ Page({
     positionId: '',
     recipientUserId: '',
     termKey: '',
-    stats: { counts: { good: 0, great: 0, excellent: 0 }, events: [], chairStats: [], memberStats: [], positions: [] },
+    stats: { counts: {}, starCounts: { oneStar: 0, twoStar: 0, threeStar: 0, fourStar: 0, fiveStar: 0 }, events: [], chairStats: [], memberStats: [], positions: [] },
     levelFilters: LEVEL_FILTERS,
     levelIndex: 0,
     positionOptions: [{ id: '', name: '全部岗位' }],
@@ -62,7 +109,7 @@ Page({
       })))
       const termOptions = [{ key: '', label: '当前任期' }].concat(stats.terms || [])
       this.setData({
-        stats: stats || this.data.stats,
+        stats: decorateStats(stats || this.data.stats),
         positionOptions,
         chairOptions,
         termOptions,

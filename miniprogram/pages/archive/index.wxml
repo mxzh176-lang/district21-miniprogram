@@ -1,12 +1,4 @@
 <view class="page">
-  <view class="scope-card" bindtap="chooseOrgScope">
-    <view>
-      <view class="scope-kicker">当前范围</view>
-      <view class="scope-name">{{currentScope.orgName || '二十一协作区'}}</view>
-    </view>
-    <view class="scope-switch">切换 ▼</view>
-  </view>
-
   <view class="archive-hero">
     <view class="hero-kicker">ARCHIVE DIRECTORY</view>
     <view class="hero-title">让狮爱有迹可循</view>
@@ -27,21 +19,6 @@
     </view>
   </scroll-view>
 
-  <view class="organization-card">
-    <view class="organization-seal" style="border-color: {{selectedOrganization.color}}; color: {{selectedOrganization.color}}">
-      {{selectedOrganization.seal}}
-    </view>
-    <view class="organization-copy">
-      <view class="organization-name">{{selectedOrganization.name}}</view>
-      <view class="organization-desc">{{selectedOrganization.description}}</view>
-    </view>
-    <view wx:if="{{canManage}}" class="cloud-inline" bindtap="uploadPhotos">
-      <view class="photo-kicker">照片云盘</view>
-      <view class="photo-count-inline">{{selectedOrganization.photoCount}} 张</view>
-      <view class="upload-button">内部附件</view>
-    </view>
-  </view>
-
   <view class="confirm-entry" wx:if="{{pendingConfirmCount}}" bindtap="openConfirmations">
     <view>
       <view class="confirm-title">待直属确认</view>
@@ -61,22 +38,14 @@
     <view class="honor-heading">
       <view>
         <view class="honor-title">荣誉事件统计</view>
-        <view class="honor-desc">按当前服务队与当前任期统计已核准入榜事件</view>
+        <view class="honor-desc">按当前组织与当前任期统计已核准入榜事件</view>
       </view>
       <view class="honor-link">事件墙 ›</view>
     </view>
     <view class="honor-stats">
-      <view class="honor-stat" data-level="good" catchtap="openHonorWall">
-        <view class="honor-value">{{honorStats.counts.good || 0}}</view>
-        <view class="honor-label">优秀</view>
-      </view>
-      <view class="honor-stat" data-level="great" catchtap="openHonorWall">
-        <view class="honor-value">{{honorStats.counts.great || 0}}</view>
-        <view class="honor-label">杰出</view>
-      </view>
-      <view class="honor-stat" data-level="excellent" catchtap="openHonorWall">
-        <view class="honor-value">{{honorStats.counts.excellent || 0}}</view>
-        <view class="honor-label">卓越</view>
+      <view class="honor-stat" wx:for="{{honorLevels}}" wx:key="key" data-level="{{item.level}}" catchtap="openHonorWall">
+        <view class="honor-value">{{item.count || 0}}</view>
+        <view class="honor-label">{{item.label}}</view>
       </view>
     </view>
   </view>

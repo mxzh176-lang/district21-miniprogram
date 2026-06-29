@@ -61,9 +61,9 @@ const HONOR_ELIGIBLE_CATEGORY_IDS = [
 
 const HONOR_LEVEL_OPTIONS = [
   { value: 'none', label: '不申报', desc: '仅归档为岗位事件' },
-  { value: 'good', label: '优秀', desc: '提交给直属上级确认' },
-  { value: 'great', label: '杰出', desc: '提交给直属上级确认' },
-  { value: 'excellent', label: '卓越', desc: '提交给直属上级确认' }
+  { value: 'good', label: '三星', desc: '提交给直属上级确认' },
+  { value: 'great', label: '四星', desc: '提交给直属上级确认' },
+  { value: 'excellent', label: '五星', desc: '提交给直属上级确认' }
 ]
 
 const PARTICIPANT_TEAMS = [

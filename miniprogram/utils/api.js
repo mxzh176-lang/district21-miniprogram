@@ -147,9 +147,9 @@ const COMMITTEE_GROUPS = {
 }
 const HONOR_LEVEL_LABELS = {
   none: '不申报',
-  good: '优秀',
-  great: '杰出',
-  excellent: '卓越'
+  good: '三星',
+  great: '四星',
+  excellent: '五星'
 }
 
 function cleanPositionName(name) {

@@ -5,13 +5,14 @@ const orgScope = require('../../utils/org-scope')
 Page({
   data: {
     organizations: [],
-    selectedId: 'yuanhang',
+    selectedId: 'district',
     selectedOrganization: {},
     currentScope: orgScope.ORG_OPTIONS[0],
     loading: true,
     loadError: '',
     canManage: false,
-    honorStats: { counts: { good: 0, great: 0, excellent: 0 }, total: 0 },
+    honorStats: { counts: { oneStar: 0, twoStar: 0, threeStar: 0, fourStar: 0, fiveStar: 0 }, total: 0 },
+    honorLevels: [],
     pendingConfirmCount: 0,
     pendingVerifyCount: 0,
     session: null
@@ -19,7 +20,7 @@ Page({
 
   async onShow() {
     try {
-      const currentScope = orgScope.getCurrentScope()
+      const currentScope = orgScope.ORG_OPTIONS.find(item => item.dataId === this.data.selectedId || item.orgId === this.data.selectedId || item.teamId === this.data.selectedId) || orgScope.ORG_OPTIONS[0]
       const [organizations, session] = await Promise.all([
         api.call('listArchives'),
         api.call('getSession')
@@ -31,7 +32,7 @@ Page({
         canManage: permission.canManage(session),
         loadError: ''
       })
-      const scopedId = currentScope.orgType === 'team' ? currentScope.orgId : this.data.selectedId
+      const scopedId = this.data.selectedId || 'district'
       await this.selectOrganizationById(scopedId)
     } catch (error) {
       this.setData({ loading: false, loadError: '档案加载失败，请点击微信开发者工具“编译”后重试。' })
@@ -123,18 +124,49 @@ Page({
         api.call('listHonorConfirmations', { organizationId: this.data.selectedId }),
         api.call('listHonorVerifications', { organizationId: this.data.selectedId })
       ])
+      const normalizedHonorStats = this.normalizeHonorStats(honorStats)
       this.setData({
-        honorStats: honorStats || { counts: { good: 0, great: 0, excellent: 0 }, total: 0 },
+        honorStats: normalizedHonorStats,
+        honorLevels: this.buildHonorLevels(normalizedHonorStats),
         pendingConfirmCount: (confirmations || []).length,
         pendingVerifyCount: (verifications || []).length
       })
     } catch (error) {
+      const emptyHonorStats = this.normalizeHonorStats()
       this.setData({
-        honorStats: { counts: { good: 0, great: 0, excellent: 0 }, total: 0 },
+        honorStats: emptyHonorStats,
+        honorLevels: this.buildHonorLevels(emptyHonorStats),
         pendingConfirmCount: 0,
         pendingVerifyCount: 0
       })
     }
+  },
+
+  normalizeHonorStats(stats = {}) {
+    const counts = stats.counts || {}
+    const normalizedCounts = {
+      fiveStar: counts.fiveStar || counts.excellent || 0,
+      fourStar: counts.fourStar || counts.great || 0,
+      threeStar: counts.threeStar || counts.good || 0,
+      twoStar: counts.twoStar || 0,
+      oneStar: counts.oneStar || 0
+    }
+    return {
+      ...stats,
+      counts: normalizedCounts,
+      total: Object.keys(normalizedCounts).reduce((sum, key) => sum + (normalizedCounts[key] || 0), 0)
+    }
+  },
+
+  buildHonorLevels(stats = {}) {
+    const counts = stats.counts || {}
+    return [
+      { key: 'fiveStar', label: '五星', level: 'excellent', count: counts.fiveStar || 0 },
+      { key: 'fourStar', label: '四星', level: 'great', count: counts.fourStar || 0 },
+      { key: 'threeStar', label: '三星', level: 'good', count: counts.threeStar || 0 },
+      { key: 'twoStar', label: '二星', level: 'twoStar', count: counts.twoStar || 0 },
+      { key: 'oneStar', label: '一星', level: 'oneStar', count: counts.oneStar || 0 }
+    ]
   },
 
   openHonorWall(event) {

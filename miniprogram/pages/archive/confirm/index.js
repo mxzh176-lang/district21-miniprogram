@@ -1,9 +1,9 @@
 const api = require('../../../utils/api')
 
 const LEVEL_OPTIONS = [
-  { value: 'good', label: '优秀' },
-  { value: 'great', label: '杰出' },
-  { value: 'excellent', label: '卓越' }
+  { value: 'good', label: '三星' },
+  { value: 'great', label: '四星' },
+  { value: 'excellent', label: '五星' }
 ]
 
 Page({
@@ -35,7 +35,7 @@ Page({
         entries: (entries || []).map(item => ({
           ...item,
           selectedLevel: item.honorRequestedLevel === 'none' ? 'good' : item.honorRequestedLevel,
-          selectedLevelLabel: item.honorRequestedLabel || item.honorLevelLabel || '优秀'
+          selectedLevelLabel: item.honorRequestedLabel || item.honorLevelLabel || '三星'
         })),
         verifyEntries: verifyEntries || [],
         loading: false
