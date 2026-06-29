@@ -1,4 +1,7 @@
 {
   "navigationBarTitleText": "二十一协作区",
-  "enablePullDownRefresh": true
+  "enablePullDownRefresh": true,
+  "usingComponents": {
+    "todo-group-section": "../../components/todo-group-section/index"
+  }
 }

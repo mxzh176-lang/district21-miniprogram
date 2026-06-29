@@ -1,4 +1,8 @@
 {
   "navigationBarTitleText": "重点待办",
-  "enablePullDownRefresh": true
+  "enablePullDownRefresh": true,
+  "usingComponents": {
+    "todo-group-section": "../../components/todo-group-section/index",
+    "todo-task-card": "../../components/todo-task-card/index"
+  }
 }

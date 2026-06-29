@@ -1,5 +1,6 @@
 const api = require('../../utils/api')
 const permission = require('../../utils/permission')
+const todoDisplay = require('../../utils/todo-display')
 
 Page({
   data: {
@@ -13,8 +14,10 @@ Page({
     heroSlides: [],
     selectedTeamId: 'all',
     allTasks: [],
-    completedTasks: [],
-    allCompletedTasks: [],
+    homeTaskGroups: [],
+    homePendingCount: 0,
+    homeVisibleCount: 0,
+    homeHasMore: false,
     canCreateTask: false
   },
 
@@ -44,28 +47,24 @@ Page({
   },
 
   async loadHome() {
-    const [data, session] = await Promise.all([
+    const selectedMonth = todoDisplay.currentMonth()
+    const [data, session, monthData] = await Promise.all([
       api.call('getHome'),
-      api.call('getSession')
+      api.call('getSession'),
+      api.call('listTasks', { month: selectedMonth })
     ])
-    const tasks = (data.tasks || []).map(item => ({
-      ...item,
-      displayMonth: `${Number(String(item.month || '').slice(5, 7)) || ''}月`,
-      canComplete: permission.canCompleteTodo(session, item)
-    }))
-    const completedTasks = (data.completedTasks || []).map(item => ({
-      ...item,
-      displayMonth: `${Number(String(item.month || '').slice(5, 7)) || ''}月`,
-      canComplete: false
-    }))
+    const allTasks = todoDisplay.sortTasks((monthData.tasks || []).map(item => todoDisplay.decorateTask(item, session)))
+    const pendingCount = allTasks.filter(item => !item.completed).length
     this.setData({
       ...data,
       heroSlides: this.buildHeroSlides(data.banners || []),
-      allTasks: tasks,
-      completedTasks,
-      allCompletedTasks: completedTasks,
-      canCreateTask: permission.canPerform(session, 'tasks', 'create')
+      monthLabel: `${Number(selectedMonth.slice(5, 7))}月`,
+      summary: { ...(data.summary || {}), pendingCount },
+      allTasks,
+      homePendingCount: pendingCount,
+      canCreateTask: permission.canPerform(session, 'todo', 'create')
     })
+    this.updateHomeTaskGroups()
   },
 
   goTasks() {
@@ -78,18 +77,34 @@ Page({
 
   selectTeam(event) {
     const selectedTeamId = event.currentTarget.dataset.id
-    const tasks = selectedTeamId === 'all'
+    this.setData({ selectedTeamId })
+    this.updateHomeTaskGroups()
+  },
+
+  updateHomeTaskGroups() {
+    const tasks = this.data.selectedTeamId === 'all'
       ? this.data.allTasks
-      : this.data.allTasks.filter(item => item.teamId === selectedTeamId)
-    const completedTasks = selectedTeamId === 'all'
-      ? this.data.allCompletedTasks
-      : this.data.allCompletedTasks.filter(item => item.teamId === selectedTeamId)
-    this.setData({ selectedTeamId, tasks, completedTasks })
+      : this.data.allTasks.filter(item => todoDisplay.matchesTeam(item, this.data.selectedTeamId))
+    const homeTaskGroups = todoDisplay.buildHomeGroups(tasks)
+    const homeVisibleCount = homeTaskGroups.reduce((sum, group) => sum + group.tasks.length, 0)
+    const homePendingCount = tasks.filter(item => !item.completed).length
+    this.setData({
+      homeTaskGroups,
+      homePendingCount,
+      homeVisibleCount,
+      homeHasMore: homePendingCount > homeVisibleCount
+    })
+  },
+
+  openTask(event) {
+    const id = event.detail && event.detail.id
+    if (!id) return
+    wx.navigateTo({ url: `/pages/admin/task-edit/index?id=${id}` })
   },
 
   async completeTask(event) {
-    const id = event.currentTarget.dataset.id
-    const task = this.data.tasks.find(item => item._id === id)
+    const id = event.detail && event.detail.id ? event.detail.id : event.currentTarget.dataset.id
+    const task = this.data.allTasks.find(item => item._id === id)
     if (!task || !task.canComplete) {
       wx.showToast({ title: '仅创建人、岗位负责人或管理员可完成', icon: 'none' })
       return

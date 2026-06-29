@@ -1,0 +1,6 @@
+{
+  "component": true,
+  "usingComponents": {
+    "todo-task-card": "../todo-task-card/index"
+  }
+}
