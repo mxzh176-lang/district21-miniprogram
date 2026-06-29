@@ -208,10 +208,6 @@ function canEditServiceTeamPositions(user, organization = {}) {
   const organizationId = typeof organization === 'string'
     ? ORGANIZATION_ALIASES[organization] || organization
     : organization.cloudId || ORGANIZATION_ALIASES[organization.id] || organization.id
-  const isTeam = typeof organization === 'string'
-    ? String(organizationId || '').includes('_team_')
-    : organization.type === 'team' || String(organizationId || '').includes('_team_')
-  if (!isTeam) return false
   if (isSuperAdmin(user)) return true
   const ancestorIds = typeof organization === 'object'
     ? organization.ancestorIds || ORGANIZATION_ANCESTORS[organizationId] || []
@@ -220,7 +216,9 @@ function canEditServiceTeamPositions(user, organization = {}) {
     if (!item || typeof item !== 'object' || !isActiveAssignment(item)) return false
     const role = normalizeRole(item.role)
     if (role === 'team_admin') return item.organizationId === organizationId
-    if (role === 'area_admin') return item.organizationId === organizationId || ancestorIds.includes(item.organizationId)
+    if (['area_admin', 'region_admin', 'office_admin', 'federation_admin'].includes(role)) {
+      return item.organizationId === organizationId || ancestorIds.includes(item.organizationId)
+    }
     return false
   })
 }

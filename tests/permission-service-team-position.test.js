@@ -16,6 +16,11 @@ test('super admin can edit service team positions', () => {
 test('area admin can edit a service team under the area', () => {
   const user = { roles: [{ role: 'area_admin', organizationId: 'org_region_21_suihua', status: 'active' }] }
   assert.equal(permission.canEditServiceTeamPositions(user, yuanhang), true)
+  assert.equal(permission.canEditServiceTeamPositions(user, {
+    id: 'district',
+    cloudId: 'org_region_21_suihua',
+    type: 'region'
+  }), true)
 })
 
 test('team admin can only edit the assigned service team', () => {
@@ -29,11 +34,11 @@ test('team admin can only edit the assigned service team', () => {
   }), false)
 })
 
-test('members and non-team directories remain read only', () => {
+test('members remain read only while admins can edit non-team directories', () => {
   assert.equal(permission.canEditServiceTeamPositions({ platformRole: 'member', roles: [] }, yuanhang), false)
   assert.equal(permission.canEditServiceTeamPositions({ platformRole: 'super_admin' }, {
     id: 'district',
     cloudId: 'org_region_21_suihua',
     type: 'region'
-  }), false)
+  }), true)
 })

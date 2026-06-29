@@ -68,11 +68,36 @@
       </view>
 
       <view class="field">
-        <view class="field-head"><text class="label">参与人数</text><text class="required">必填</text></view>
-        <input class="input wide-input" type="number" style="color:#000000;-webkit-text-fill-color:#000000;font-weight:700;opacity:1;"
-          cursor-color="#7447c8" value="{{form.participantCount}}" data-field="participantCount" bindinput="onInput"
-          placeholder-class="form-placeholder" placeholder-style="color:#626d82;font-weight:500;"
-          placeholder="请输入参与人数，例如 20" />
+        <view class="field-head"><text class="label">参与狮友</text><text class="required">必选</text></view>
+        <view class="participant-summary">
+          <view>
+            <view class="participant-total">{{form.participantCount || 0}} 人</view>
+            <view class="participant-help">点击服务队展开，从成员名单中勾选参与狮友</view>
+          </view>
+        </view>
+        <view wx:if="{{legacyParticipantNote}}" class="legacy-participant-note">{{legacyParticipantNote}}</view>
+        <view class="participant-team participant-team-{{item.tone}}" wx:for="{{participantTeams}}" wx:key="id">
+          <view class="participant-team-head" data-team-id="{{item.id}}" bindtap="toggleParticipantTeam">
+            <view>
+              <view class="participant-team-name">{{item.name}}</view>
+              <view class="participant-team-count">已选 {{item.selectedCount}} / {{item.members.length}}</view>
+            </view>
+            <view class="participant-team-arrow">{{item.expanded ? '收起' : '展开'}} ›</view>
+          </view>
+          <view class="participant-member-grid" wx:if="{{item.expanded}}">
+            <view
+              class="participant-member {{member.checked ? 'checked' : ''}}"
+              wx:for="{{item.members}}"
+              wx:for-item="member"
+              wx:key="id"
+              data-id="{{member.id}}"
+              bindtap="toggleParticipant"
+            >
+              <view class="participant-checkbox">{{member.checked ? '✓' : ''}}</view>
+              <text>{{member.name}}</text>
+            </view>
+          </view>
+        </view>
       </view>
     </view>
 

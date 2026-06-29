@@ -7,7 +7,6 @@ Page({
     name: '',
     memberName: '',
     memberId: '',
-    inputMode: 'member',
     users: [],
     userIndex: 0,
     startDate: '2026-07-01',
@@ -19,8 +18,7 @@ Page({
   async onLoad(options) {
     const organizationId = decodeURIComponent(options.organizationId || '')
     const positionId = decodeURIComponent(options.positionId || '')
-    const inputMode = options.inputMode === 'manual' ? 'manual' : 'member'
-    this.setData({ organizationId, positionId, inputMode })
+    this.setData({ organizationId, positionId })
     try {
       const [directory, platformUsers] = await Promise.all([
         api.call('listPositionDirectory', { organizationId }),
@@ -40,7 +38,7 @@ Page({
         }))
       const matchedUserIndex = users.findIndex(item => item.id === position.userId)
       const userIndex = Math.max(0, matchedUserIndex)
-      const selectedUser = inputMode === 'member' && users[userIndex]
+      const selectedUser = users[userIndex]
       this.setData({
         name: position.name,
         memberName: selectedUser
@@ -60,9 +58,6 @@ Page({
   },
 
   onNameInput(event) { this.setData({ name: event.detail.value }) },
-  onMemberNameInput(event) {
-    this.setData({ memberName: event.detail.value, memberId: '' })
-  },
   onUserChange(event) {
     const userIndex = Number(event.detail.value)
     const user = this.data.users[userIndex]
@@ -78,8 +73,8 @@ Page({
   async save() {
     const name = this.data.name.trim()
     const memberName = this.data.memberName.trim()
-    if (!name || !memberName) {
-      wx.showToast({ title: '请填写职务和负责人姓名', icon: 'none' })
+    if (!name || !memberName || !this.data.memberId) {
+      wx.showToast({ title: '请选择职务负责人', icon: 'none' })
       return
     }
     this.setData({ saving: true })

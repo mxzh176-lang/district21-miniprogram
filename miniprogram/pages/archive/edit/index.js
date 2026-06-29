@@ -66,6 +66,13 @@ const HONOR_LEVEL_OPTIONS = [
   { value: 'excellent', label: '卓越', desc: '提交给直属上级确认' }
 ]
 
+const PARTICIPANT_TEAMS = [
+  { id: 'linghang', cloudId: 'org_team_linghang', name: '领航服务队', shortName: '领航', tone: 'green' },
+  { id: 'ailinghang', cloudId: 'org_team_ailinghang', name: '爱领航服务队', shortName: '爱领航', tone: 'red' },
+  { id: 'yuanhang', cloudId: 'org_team_yuanhang', name: '远航服务队', shortName: '远航', tone: 'blue' },
+  { id: 'jingying', cloudId: 'org_team_jingying', name: '精英服务队', shortName: '精英', tone: 'purple' }
+]
+
 const CONFIRM_POSITION_BY_CATEGORY = {
   secretary: '队长',
   treasurer: '队长',
@@ -116,6 +123,31 @@ function uniquePhotos(photos) {
   })
 }
 
+function normalizeTeamId(value) {
+  return String(value || '').replace(/^org_team_/, '')
+}
+
+function normalizeParticipantName(value) {
+  const text = String(value || '').trim()
+  const match = text.match(/（([^）]+)）|\(([^)]+)\)/)
+  return (match && (match[1] || match[2]) || text).trim()
+}
+
+function participantId(member) {
+  return String(member.id || member._id || `${member.teamId || member.organizationId}-${member.name}`)
+}
+
+function selectedIdsFromParticipants(participants = []) {
+  const ids = []
+  participants.forEach(group => {
+    ;(group.members || []).forEach(member => {
+      const id = String(member.id || member._id || '')
+      if (id) ids.push(id)
+    })
+  })
+  return ids
+}
+
 Page({
   data: {
     id: '',
@@ -138,6 +170,10 @@ Page({
       photoCount: 0,
       photos: []
     },
+    participantTeams: [],
+    participantMembers: [],
+    selectedParticipantIds: [],
+    legacyParticipantNote: '',
     honorOptions: HONOR_LEVEL_OPTIONS,
     honorRequestedLevel: 'none',
     honorEligible: false,
@@ -147,9 +183,10 @@ Page({
   },
 
   async onLoad(options) {
-    const [member, organizations] = await Promise.all([
+    const [member, organizations, participantMembers] = await Promise.all([
       api.call('getSession'),
-      api.call('listArchives')
+      api.call('listArchives'),
+      api.call('listOrg')
     ])
     const organization = organizations.find(
       (item) => item.id === (options.organization || 'yuanhang')
@@ -174,24 +211,33 @@ Page({
       confirmPositionName: CONFIRM_POSITION_BY_CATEGORY[categoryId] || '',
       formCopy: FORM_COPY[categoryId] || DEFAULT_FORM_COPY,
       'form.date': this.formatDate(new Date()),
-      'form.uploadedBy': member.name || member.nickname || '当前岗位负责人'
+      'form.uploadedBy': member.name || member.nickname || '当前岗位负责人',
+      participantMembers,
+      participantTeams: this.buildParticipantTeams(participantMembers, [])
     }
     this.setData(baseData)
     if (options.id) {
       const entry = await api.call('getArchiveEntry', { id: options.id })
+      const selectedParticipantIds = selectedIdsFromParticipants(entry.participants)
+      const legacyParticipantNote = !selectedParticipantIds.length && Number(entry.participantCount) > 0
+        ? `旧记录仅保存了 ${entry.participantCount} 人，未保存参与人名单；可在此补选。`
+        : ''
       this.setData({
         form: {
           date: entry.date || '',
           title: entry.title || '',
           location: entry.location || '',
-          participantCount: entry.participantCount === undefined ? '' : String(entry.participantCount),
+          participantCount: selectedParticipantIds.length ? String(selectedParticipantIds.length) : (entry.participantCount === undefined ? '' : String(entry.participantCount)),
           keywords: (entry.keywords || []).join(' '),
           summary: entry.summary || '',
           content: entry.content || '',
           uploadedBy: entry.uploadedBy || member.nickname,
           photoCount: (entry.photos || []).length,
           photos: entry.photos || []
-        }
+        },
+        selectedParticipantIds,
+        legacyParticipantNote,
+        participantTeams: this.buildParticipantTeams(participantMembers, selectedParticipantIds)
       })
     }
   },
@@ -210,6 +256,83 @@ Page({
   onInput(event) {
     const field = event.currentTarget.dataset.field
     this.setData({ [`form.${field}`]: event.detail.value })
+  },
+
+  buildParticipantTeams(members = [], selectedIds = []) {
+    const selectedSet = new Set(selectedIds.map(String))
+    const expandedMap = {}
+    ;(this.data.participantTeams || []).forEach(team => {
+      expandedMap[team.id] = Boolean(team.expanded)
+    })
+    const teams = PARTICIPANT_TEAMS.map(team => ({
+      ...team,
+      members: [],
+      selectedCount: 0,
+      expanded: Boolean(expandedMap[team.id])
+    }))
+    const teamMap = {}
+    teams.forEach(team => { teamMap[team.id] = team })
+    members.forEach(member => {
+      const teamId = normalizeTeamId(member.teamId || member.organizationId || member.defaultOrganizationId)
+      const team = teamMap[teamId]
+      if (!team) return
+      const id = participantId(member)
+      const name = normalizeParticipantName(member.name || member.nickname)
+      if (!id || !name) return
+      const checked = selectedSet.has(String(id))
+      team.members.push({
+        id,
+        name,
+        teamId: team.id,
+        teamName: team.name,
+        checked
+      })
+      if (checked) team.selectedCount += 1
+    })
+    teams.forEach(team => {
+      team.members.sort((a, b) => a.name.localeCompare(b.name, 'zh-Hans-CN'))
+    })
+    return teams
+  },
+
+  syncParticipantTeams(selectedIds) {
+    this.setData({
+      selectedParticipantIds: selectedIds,
+      'form.participantCount': String(selectedIds.length),
+      legacyParticipantNote: '',
+      participantTeams: this.buildParticipantTeams(this.data.participantMembers, selectedIds)
+    })
+  },
+
+  toggleParticipantTeam(event) {
+    const teamId = event.currentTarget.dataset.teamId
+    const participantTeams = this.data.participantTeams.map(team => {
+      if (team.id !== teamId) return team
+      return { ...team, expanded: !team.expanded }
+    })
+    this.setData({ participantTeams })
+  },
+
+  toggleParticipant(event) {
+    const id = String(event.currentTarget.dataset.id || '')
+    if (!id) return
+    const selected = new Set(this.data.selectedParticipantIds.map(String))
+    if (selected.has(id)) selected.delete(id)
+    else selected.add(id)
+    this.syncParticipantTeams(Array.from(selected))
+  },
+
+  selectedParticipantsPayload() {
+    const selected = new Set(this.data.selectedParticipantIds.map(String))
+    return this.data.participantTeams
+      .map(team => ({
+        teamId: team.id,
+        teamName: team.name,
+        members: team.members
+          .filter(member => selected.has(String(member.id)))
+          .map(member => ({ id: member.id, name: member.name }))
+      }))
+      .filter(team => team.members.length)
   },
 
   choosePhotos() {
@@ -361,14 +484,13 @@ Page({
   },
 
   validate() {
-    const { date, title, location, participantCount, content } = this.data.form
-    if (!date || !title.trim() || !location.trim() || participantCount === '' || !content.trim()) {
+    const { date, title, location, content } = this.data.form
+    if (!date || !title.trim() || !location.trim() || !content.trim()) {
       wx.showToast({ title: '请完整填写事件必填项', icon: 'none' })
       return false
     }
-    const count = Number(participantCount)
-    if (!Number.isInteger(count) || count < 0) {
-      wx.showToast({ title: '参与人数须为非负整数', icon: 'none' })
+    if (!this.data.selectedParticipantIds.length) {
+      wx.showToast({ title: '请勾选参与狮友', icon: 'none' })
       return false
     }
     return true
@@ -381,6 +503,8 @@ Page({
   async saveEntry() {
     const { id, form, organizationId, categoryId, positionId, organizationName, categoryName, honorRequestedLevel, honorEligible } = this.data
     const requestedLevel = honorEligible ? honorRequestedLevel : 'none'
+    const participants = this.selectedParticipantsPayload()
+    const participantCount = participants.reduce((sum, team) => sum + team.members.length, 0)
     const entry = await api.call('saveArchiveEntry', {
       entry: {
         _id: id || undefined,
@@ -391,7 +515,8 @@ Page({
         dateLabel: form.date,
         title: form.title.trim(),
         location: form.location.trim(),
-        participantCount: Number(form.participantCount),
+        participantCount,
+        participants,
         team: organizationName,
         uploadedBy: form.uploadedBy,
         uploaderRole: categoryName,

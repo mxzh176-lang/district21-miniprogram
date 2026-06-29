@@ -11,6 +11,16 @@
     <view class="info-row"><text class="label">负责角色</text><text>{{entry.uploaderRole}}</text></view>
     <view class="info-row"><text class="label">地点</text><text>{{entry.location || '未填写'}}</text></view>
     <view class="info-row"><text class="label">参与人数</text><text>{{entry.participantCount || 0}} 人</text></view>
+    <view class="participant-section" wx:if="{{entry.participantGroups.length}}">
+      <view class="content-title">参与狮友</view>
+      <view class="participant-group" wx:for="{{entry.participantGroups}}" wx:key="teamId">
+        <view class="participant-group-head">
+          <text>{{item.teamName}}</text>
+          <text>{{item.count}}人</text>
+        </view>
+        <view class="participant-names">{{item.names}}</view>
+      </view>
+    </view>
     <view class="info-row" wx:if="{{entry.honorStatus && entry.honorStatus !== 'none'}}">
       <text class="label">荣誉状态</text>
       <text>{{entry.honorStatusText || entry.honorStatusLabel}}</text>

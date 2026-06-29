@@ -9,11 +9,11 @@
     <view class="field-label">职务名称</view>
     <input class="input" value="{{name}}" maxlength="100" bindinput="onNameInput" placeholder="请填写职务名称" placeholder-class="input-placeholder" cursor-color="#d391ff" />
 
-    <view class="field-label">负责人姓名</view>
-    <picker wx:if="{{inputMode === 'member'}}" range="{{users}}" range-key="displayName" value="{{userIndex}}" bindchange="onUserChange">
+    <view class="field-label">文档负责人</view>
+    <picker range="{{users}}" range-key="displayName" value="{{userIndex}}" bindchange="onUserChange">
       <view class="picker-value">{{users.length ? users[userIndex].displayName : '暂无资料完整的成员'}}</view>
     </picker>
-    <input wx:else class="input member-name-input" value="{{memberName}}" maxlength="40" bindinput="onMemberNameInput" placeholder="请输入负责人姓名" placeholder-class="input-placeholder" cursor-color="#d391ff" />
+    <view class="field-tip">保存后，该成员会成为本栏目负责人，并直接获得该栏目档案的维护权限。</view>
 
     <view class="date-row">
       <view class="date-field">
@@ -25,6 +25,6 @@
         <picker mode="date" value="{{endDate}}" bindchange="onEndDateChange"><view class="picker-value">{{endDate}}</view></picker>
       </view>
     </view>
-    <button class="save-button" loading="{{saving}}" disabled="{{saving}}" bindtap="save">保存岗位资料</button>
+    <button class="save-button" loading="{{saving}}" disabled="{{saving || !users.length}}" bindtap="save">保存负责人并授权</button>
   </view>
 </view>

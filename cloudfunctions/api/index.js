@@ -50,6 +50,23 @@ function formatDate(value) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
+function cleanParticipants(value) {
+  if (!Array.isArray(value)) return []
+  return value.slice(0, 4).map(group => {
+    const members = Array.isArray(group.members)
+      ? group.members.slice(0, 300).map(member => ({
+        id: cleanText(member.id || member._id, 100),
+        name: cleanText(member.name || member.nickname, 40)
+      })).filter(member => member.id && member.name)
+      : []
+    return {
+      teamId: cleanText(group.teamId, 100),
+      teamName: cleanText(group.teamName, 80),
+      members
+    }
+  }).filter(group => group.teamId && group.teamName && group.members.length)
+}
+
 function monthLabel(month) {
   if (!month || !month.includes('-')) return month || ''
   const [year, value] = month.split('-')
@@ -233,18 +250,7 @@ async function canAdministerOrganization(userId, organizationId) {
 }
 
 async function canEditServiceTeamPositions(userId, organizationId) {
-  organizationId = canonicalOrganizationId(organizationId)
-  const organization = await requireActiveOrganization(organizationId)
-  if (organization.type !== 'team') return false
-  const roles = await platformRoles(userId)
-  if (roles.some(item => item.role === 'super_admin')) return true
-  const ancestorIds = organization.ancestorIds || []
-  return roles.some(item =>
-    item.role === 'team_admin'
-      ? item.organizationId === organizationId
-      : item.role === 'area_admin' &&
-        (item.organizationId === organizationId || ancestorIds.includes(item.organizationId))
-  )
+  return canAdministerOrganization(userId, organizationId)
 }
 
 async function requireEventEditor(openid, record = {}, action = 'update') {
@@ -1334,8 +1340,7 @@ async function listPositionDirectory(openid, event = {}) {
   const activeAssignments = assignmentResult.data.filter(item =>
     (!item.startDate || item.startDate <= today) && (!item.endDate || item.endDate >= today)
   )
-  const administrator = organization.type === 'team' &&
-    await canEditServiceTeamPositions(user.id, organizationId)
+  const administrator = await canEditServiceTeamPositions(user.id, organizationId)
   return Promise.all(positionResult.data.map(async position => {
     const assignment = activeAssignments.find(item => item.positionId === position.id)
     return {
@@ -1363,7 +1368,7 @@ async function savePositionDirectory(openid, event = {}) {
   const memberId = cleanText(input.memberId || input.userId, 100)
   const startDate = cleanText(input.startDate, 10)
   const endDate = cleanText(input.endDate, 10)
-  if (!organizationId || !positionId || !name || !memberName || !startDate || !endDate) {
+  if (!organizationId || !positionId || !name || !memberName || !memberId || !startDate || !endDate) {
     throw Object.assign(new Error('岗位、负责人和授权日期不能为空'), { code: 'INVALID_POSITION_DIRECTORY' })
   }
   if (startDate > endDate) {
@@ -1379,11 +1384,9 @@ async function savePositionDirectory(openid, event = {}) {
     throw Object.assign(new Error('无权限操作'), { code: 'PERMISSION_DENIED' })
   }
   const organization = await requireActiveOrganization(organizationId)
-  if (memberId) {
-    const member = await requireAuthorizationTarget(memberId)
-    if (member.name !== memberName) {
-      throw Object.assign(new Error('所选成员与负责人姓名不一致'), { code: 'POSITION_MEMBER_MISMATCH' })
-    }
+  const member = await requireAuthorizationTarget(memberId)
+  if (member.name !== memberName) {
+    throw Object.assign(new Error('所选成员与负责人姓名不一致'), { code: 'POSITION_MEMBER_MISMATCH' })
   }
   await db.collection(COLLECTIONS.position).doc(position._id).update({ data: { name, updatedAt: now() } })
   const assignments = await db.collection(COLLECTIONS.roleAssignment)
@@ -1804,6 +1807,10 @@ async function saveEventRecord(openid, event = {}) {
   const id = cleanText(record.id || event.id, 100) || businessId('event')
   const eventDate = cleanText(record.eventDate, 10)
   const existing = await db.collection(COLLECTIONS.eventRecord).where({ id }).limit(1).get()
+  const participants = cleanParticipants(record.participants)
+  const participantCount = participants.length
+    ? participants.reduce((sum, group) => sum + group.members.length, 0)
+    : Math.max(0, Math.floor(Number(record.participantCount) || 0))
   if (existing.data[0] && ['pending_confirm', 'pending_leader_confirm', 'pending_honor_verify', 'honor_verified', 'need_recheck'].includes(existing.data[0].honorStatus)) {
     throw Object.assign(new Error('荣誉流转中的事件暂不可修改'), { code: 'PENDING_CONFIRM_LOCKED' })
   }
@@ -1828,7 +1835,8 @@ async function saveEventRecord(openid, event = {}) {
     eventDate,
     eventMonth: eventDate && eventDate.length >= 7 ? eventDate.slice(0, 7) : '',
     location: cleanText(record.location, 120),
-    participantCount: Math.max(0, Math.floor(Number(record.participantCount) || 0)),
+    participantCount,
+    participants,
     creatorId: member.id,
     ownerName: cleanText(record.ownerName || member.name, 40),
     status: ['draft', 'pending_review', 'pending_confirm', 'pending_leader_confirm', 'published', 'rejected', 'archived'].includes(record.status)

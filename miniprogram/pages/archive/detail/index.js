@@ -13,6 +13,16 @@ function honorStatusText(status) {
   }[status] || ''
 }
 
+function participantGroups(entry = {}) {
+  return (entry.participants || [])
+    .map(group => ({
+      ...group,
+      count: (group.members || []).length,
+      names: (group.members || []).map(member => member.name).filter(Boolean).join('、')
+    }))
+    .filter(group => group.count)
+}
+
 Page({
   data: { id: '', entry: {}, photos: [], canEdit: false, canDelete: false },
 
@@ -37,7 +47,8 @@ Page({
         ...entry,
         team: entry.team || (organization && organization.name) || '',
         keywordText: (entry.keywords || []).join(' · '),
-        honorStatusText: honorStatusText(entry.honorStatus)
+        honorStatusText: honorStatusText(entry.honorStatus),
+        participantGroups: participantGroups(entry)
       },
       photos,
       canEdit: !['pending_confirm', 'pending_leader_confirm', 'pending_honor_verify', 'honor_verified', 'need_recheck'].includes(entry.honorStatus) &&
