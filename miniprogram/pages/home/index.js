@@ -14,10 +14,8 @@ Page({
     teams: [],
     banners: [],
     heroSlides: [],
-    selectedTeamId: 'all',
     currentOrg: ORG_OPTIONS[0],
     orgOptions: ORG_OPTIONS,
-    visibleTeams: [],
     honorTitle: '协作区荣誉与表彰',
     archiveTitle: '协作区档案入口',
     archiveDesc: '查看协作区与服务队岗位档案',
@@ -36,10 +34,7 @@ Page({
 
   onLoad() {
     const currentOrg = orgScope.getCurrentScope()
-    this.setData({
-      currentOrg,
-      selectedTeamId: currentOrg.teamId
-    })
+    this.setData({ currentOrg })
   },
 
   async onShow() {
@@ -101,9 +96,6 @@ Page({
         members: Number(item.members) || 0
       }))
       .filter(item => item.id !== 'district' && item.orgId !== 'district21')
-    const visibleTeams = isDistrict
-      ? teams
-      : teams.filter(item => item.id === currentOrg.orgId || item.orgId === currentOrg.orgId)
     const tasks = this.data.allTasks.filter(item => orgScope.matchesScope(item, currentOrg))
     const homeTaskGroups = todoDisplay.buildHomeGroups(tasks)
     const homeVisibleCount = homeTaskGroups.reduce((sum, group) => sum + group.tasks.length, 0)
@@ -113,7 +105,8 @@ Page({
     const activities = scopedActivities.slice(0, 3)
     const notices = this.data.allNotices.filter(item => orgScope.matchesScope(item, currentOrg) || !item.teamId).slice(0, 3)
     const baseSummary = this.data.baseSummary || {}
-    const teamMembers = currentOrg.members || (visibleTeams[0] && visibleTeams[0].members) || 0
+    const currentTeam = teams.find(item => item.id === currentOrg.orgId || item.orgId === currentOrg.orgId)
+    const teamMembers = currentOrg.members || (currentTeam && currentTeam.members) || 0
     const memberCount = isDistrict
       ? baseSummary.memberCount || teams.reduce((sum, item) => sum + (Number(item.members) || 0), 0)
       : teamMembers
@@ -122,8 +115,6 @@ Page({
       : scopedActivities.reduce((sum, item) => sum + (Number(item.photoCount) || 0), 0)
 
     this.setData({
-      visibleTeams,
-      selectedTeamId: currentOrg.teamId,
       homeTaskGroups,
       homePendingCount,
       homeVisibleCount,
@@ -151,13 +142,6 @@ Page({
 
   createTask() {
     wx.navigateTo({ url: '/pages/admin/task-edit/index' })
-  },
-
-  selectTeam(event) {
-    const selectedTeamId = event.currentTarget.dataset.id
-    const currentOrg = orgScope.setCurrentScopeByTeamId(selectedTeamId)
-    this.setData({ currentOrg })
-    this.applyOrgScope()
   },
 
   chooseOrgScope() {

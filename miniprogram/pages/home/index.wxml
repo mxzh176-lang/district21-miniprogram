@@ -27,14 +27,6 @@
     </swiper-item>
   </swiper>
 
-  <view class="team-strip">
-    <view class="team-item {{selectedTeamId === item.id ? 'active' : ''}}" wx:for="{{visibleTeams}}" wx:key="id" data-id="{{item.id}}" bindtap="selectTeam">
-      <view class="team-dot" style="background: {{item.color}}"></view>
-      <view class="team-name">{{item.shortName}}</view>
-      <view class="team-count">{{item.members}}人</view>
-    </view>
-  </view>
-
   <view class="feature-entry honor-entry" bindtap="goHonors">
     <view class="feature-icon honor-icon">誉</view>
     <view class="feature-copy">
