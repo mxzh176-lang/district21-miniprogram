@@ -137,7 +137,7 @@ Page({
   },
 
   goTasks() {
-    wx.switchTab({ url: '/pages/tasks/index' })
+    wx.navigateTo({ url: '/pages/tasks/index' })
   },
 
   createTask() {
@@ -158,7 +158,7 @@ Page({
   openTask(event) {
     const id = event.detail && event.detail.id
     if (!id) return
-    wx.navigateTo({ url: `/pages/admin/task-edit/index?id=${id}` })
+    wx.navigateTo({ url: `/pages/tasks/index?taskId=${id}` })
   },
 
   async completeTask(event) {
@@ -182,11 +182,11 @@ Page({
   },
 
   goBirthdays() {
-    wx.switchTab({ url: '/pages/tasks/index' })
+    wx.navigateTo({ url: '/pages/tasks/index?category=birthday' })
   },
 
   goMonthlyService() {
-    wx.switchTab({ url: '/pages/tasks/index' })
+    wx.navigateTo({ url: '/pages/tasks/index?category=service' })
   },
 
   goActivities() {

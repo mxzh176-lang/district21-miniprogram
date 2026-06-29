@@ -52,10 +52,6 @@
         "text": "首页"
       },
       {
-        "pagePath": "pages/tasks/index",
-        "text": "待办"
-      },
-      {
         "pagePath": "pages/archive/index",
         "text": "档案"
       },
