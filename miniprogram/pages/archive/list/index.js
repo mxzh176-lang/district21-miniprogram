@@ -42,7 +42,7 @@ const CATEGORY_NOTICES = {
 
 function flattenCategories(organization) {
   const seen = new Set()
-  return (organization.categories || []).flatMap(category => [category].concat(category.children || []))
+  const categories = (organization.categories || []).flatMap(category => [category].concat(category.children || []))
     .filter(category => {
       if (!category.id || seen.has(category.id) || category.id === 'treasurer') return false
       seen.add(category.id)
@@ -52,6 +52,7 @@ function flattenCategories(organization) {
       id: category.id,
       name: category.name || CATEGORY_NAMES[category.id] || '未命名类目'
     }))
+  return [{ id: 'all', name: '全部历史事件' }].concat(categories)
 }
 
 Page({
@@ -115,17 +116,29 @@ Page({
       this.setData({ loading: true })
       const query = {
         organizationId: this.data.organizationId,
-        categoryId,
+        categoryId: categoryId === 'all' ? '' : categoryId,
         eventMonth: this.data.eventMonth
       }
-      const [entries, allEntries] = await Promise.all([
+      let [entries, allEntries] = await Promise.all([
         api.call('listArchiveEntries', query),
         this.data.eventMonth
-          ? api.call('listArchiveEntries', { organizationId: this.data.organizationId, categoryId })
+          ? api.call('listArchiveEntries', { organizationId: this.data.organizationId, categoryId: categoryId === 'all' ? '' : categoryId })
           : Promise.resolve(null)
       ])
+      if (!entries.length) {
+        entries = await api.call('listArchiveEntries', { ...query, status: 'archived' })
+      }
+      if (allEntries && !allEntries.length) {
+        allEntries = await api.call('listArchiveEntries', {
+          organizationId: this.data.organizationId,
+          categoryId: categoryId === 'all' ? '' : categoryId,
+          status: 'archived'
+        })
+      }
       const position = permission.findArchivePosition(this.data.organization, categoryId)
-      const categoryName = position ? position.name : (CATEGORY_NAMES[categoryId] || '档案事件')
+      const categoryName = categoryId === 'all'
+        ? '全部历史事件'
+        : position ? position.name : (CATEGORY_NAMES[categoryId] || '档案事件')
       const sortedEntries = entries
         .slice()
         .sort((a, b) => (a.order || 0) - (b.order || 0) || b.date.localeCompare(a.date))
@@ -138,13 +151,13 @@ Page({
       this.setData({
         categoryId,
         categoryName,
-        positionPerson: position && position.person ? position.person : '负责人待绑定',
+        positionPerson: categoryId === 'all' ? '全部栏目' : position && position.person ? position.person : '负责人待绑定',
         categoryNotice: CATEGORY_NOTICES[categoryId] || '',
         entries: sortedEntries,
         totalEventCount: (allEntries || entries).length,
-        canCreate: permission.canMaintainArchive(this.data.member, this.data.organization, categoryId, 'create'),
-        canEdit: permission.canMaintainArchive(this.data.member, this.data.organization, categoryId, 'update'),
-        canDelete: permission.canMaintainArchive(this.data.member, this.data.organization, categoryId, 'delete'),
+        canCreate: categoryId !== 'all' && permission.canMaintainArchive(this.data.member, this.data.organization, categoryId, 'create'),
+        canEdit: categoryId !== 'all' && permission.canMaintainArchive(this.data.member, this.data.organization, categoryId, 'update'),
+        canDelete: categoryId !== 'all' && permission.canMaintainArchive(this.data.member, this.data.organization, categoryId, 'delete'),
         isSuperAdmin: permission.isSuperAdmin(this.data.member),
         loading: false,
         loadError: ''

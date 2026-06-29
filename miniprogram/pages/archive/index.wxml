@@ -50,6 +50,30 @@
     </view>
   </view>
 
+  <view class="recent-section">
+    <view class="recent-heading">
+      <view class="section-title">最近服务足迹</view>
+      <view class="history-link" bindtap="openHistoryList">查看历史 ›</view>
+    </view>
+    <scroll-view scroll-x class="recent-scroll" wx:if="{{recentEntries.length}}">
+      <view class="recent-track">
+        <view
+          class="recent-card"
+          wx:for="{{recentEntries}}"
+          wx:key="_id"
+          data-id="{{item._id}}"
+          bindtap="openRecentEntry"
+        >
+          <view class="recent-badge">{{item.coverText}}</view>
+          <view class="recent-date">{{item.dateLabel}}</view>
+          <view class="recent-title">{{item.title}}</view>
+          <view class="recent-meta">{{item.meta}}</view>
+        </view>
+      </view>
+    </scroll-view>
+    <view wx:else class="archive-empty compact-empty" bindtap="openHistoryList">暂无最近历史记录，点击查看历史事件 ›</view>
+  </view>
+
   <view class="section-row">
     <view>
       <view class="section-title">档案栏目</view>

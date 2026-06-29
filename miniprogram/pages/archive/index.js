@@ -2,6 +2,23 @@ const api = require('../../utils/api')
 const permission = require('../../utils/permission')
 const orgScope = require('../../utils/org-scope')
 
+function categoryNameMap(organization = {}) {
+  const map = {}
+  ;(organization.categories || []).forEach(category => {
+    if (category.id) map[category.id] = category.name
+    ;(category.children || []).forEach(child => {
+      if (child.id) map[child.id] = child.name
+    })
+  })
+  return map
+}
+
+function formatRecentDate(value) {
+  const text = String(value || '')
+  if (!text || text.length < 10) return text
+  return `${text.slice(0, 4)}年${Number(text.slice(5, 7))}月${Number(text.slice(8, 10))}日`
+}
+
 Page({
   data: {
     organizations: [],
@@ -13,6 +30,7 @@ Page({
     canManage: false,
     honorStats: { counts: { oneStar: 0, twoStar: 0, threeStar: 0, fourStar: 0, fiveStar: 0 }, total: 0 },
     honorLevels: [],
+    recentEntries: [],
     pendingConfirmCount: 0,
     pendingVerifyCount: 0,
     session: null
@@ -114,7 +132,39 @@ Page({
       loading: false,
       loadError: ''
     })
-    await this.loadHonorOverview()
+    await Promise.all([
+      this.loadHonorOverview(),
+      this.loadRecentEntries()
+    ])
+  },
+
+  async loadRecentEntries() {
+    try {
+      let entries = await api.call('listArchiveEntries', {
+        organizationId: this.data.selectedId
+      })
+      if (!entries || !entries.length) {
+        entries = await api.call('listArchiveEntries', {
+          organizationId: this.data.selectedId,
+          status: 'archived'
+        })
+      }
+      const categoryMap = categoryNameMap(this.data.selectedOrganization)
+      const recentEntries = (entries || [])
+        .slice()
+        .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
+        .slice(0, 5)
+        .map(item => ({
+          ...item,
+          dateLabel: formatRecentDate(item.date),
+          categoryName: categoryMap[item.categoryId] || item.uploaderRole || '历史事件',
+          coverText: String(categoryMap[item.categoryId] || item.uploaderRole || item.title || '史').slice(0, 2),
+          meta: `${item.team || this.data.selectedOrganization.shortName || this.data.selectedOrganization.name || '当前组织'} · ${item.photoCount || 0}张照片`
+        }))
+      this.setData({ recentEntries })
+    } catch (error) {
+      this.setData({ recentEntries: [] })
+    }
   },
 
   async loadHonorOverview() {
@@ -178,6 +228,16 @@ Page({
 
   openConfirmations() {
     wx.navigateTo({ url: `/pages/archive/confirm/index?organization=${this.data.selectedId}` })
+  },
+
+  openHistoryList() {
+    wx.navigateTo({
+      url: `/pages/archive/list/index?organization=${this.data.selectedId}&category=all`
+    })
+  },
+
+  openRecentEntry(event) {
+    wx.navigateTo({ url: `/pages/archive/detail/index?id=${event.currentTarget.dataset.id}` })
   },
 
   addContent(event) {
