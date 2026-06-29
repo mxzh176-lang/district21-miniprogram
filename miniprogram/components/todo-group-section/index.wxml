@@ -1,0 +1,14 @@
+<view class="todo-group {{compact ? 'compact-group' : ''}}">
+  <view class="group-heading group-{{group.key}}">
+    <view class="group-title"><text class="group-dot"></text>{{group.title}}</view>
+    <view class="group-count">{{group.count}}项活动</view>
+  </view>
+  <todo-task-card
+    wx:for="{{group.tasks}}"
+    wx:key="_id"
+    task="{{item}}"
+    compact="{{compact}}"
+    bind:open="handleOpen"
+    bind:complete="handleComplete"
+  />
+</view>

@@ -60,38 +60,21 @@
     </view>
     <view class="task-heading-actions">
       <view wx:if="{{canCreateTask}}" class="quick-add" bindtap="createTask">＋</view>
-      <view class="more" bindtap="goTasks">全部 {{summary.pendingCount}} 项 ›</view>
+      <view class="more" bindtap="goTasks">全部 {{homePendingCount}} 项 ›</view>
     </view>
   </view>
 
-  <view class="task-focus" wx:for="{{tasks}}" wx:key="_id" data-id="{{item._id}}" bindtap="goTasks">
-    <view class="date-box">
-      <view class="date-month">{{item.displayMonth}}</view>
-      <view class="date-day">{{item.day}}</view>
-    </view>
-    <view class="task-main">
-      <view class="task-top">
-        <view class="type-pill type-{{index}}">{{item.category}}</view>
-        <view wx:if="{{item.priority === 'urgent'}}" class="urgent">重要</view>
-      </view>
-      <view class="task-title">{{item.title}}</view>
-      <view class="task-meta">{{item.team}} · {{item.owner}}</view>
-    </view>
-    <view class="home-check {{item.canComplete ? '' : 'disabled'}}" data-id="{{item._id}}" catchtap="completeTask">□</view>
-  </view>
-
-  <view wx:if="{{completedTasks.length}}" class="completed-heading">{{monthLabel}}已完成</view>
-  <view class="task-focus completed" wx:for="{{completedTasks}}" wx:key="_id" data-id="{{item._id}}" bindtap="goTasks">
-    <view class="date-box completed-date">
-      <view class="date-month">{{item.displayMonth}}</view>
-      <view class="date-day">{{item.day}}</view>
-    </view>
-    <view class="task-main">
-      <view class="task-top"><view class="type-pill">{{item.category}}</view><view class="done-pill">已完成</view></view>
-      <view class="task-title">{{item.title}}</view>
-      <view class="task-meta">{{item.team}} · {{item.owner}}</view>
-    </view>
-    <view class="home-check checked">✓</view>
+  <view class="home-task-module">
+    <todo-group-section
+      wx:for="{{homeTaskGroups}}"
+      wx:key="key"
+      group="{{item}}"
+      compact="{{true}}"
+      bind:open="openTask"
+      bind:complete="completeTask"
+    />
+    <view wx:if="{{homeHasMore}}" class="task-view-all" bindtap="goTasks">还有 {{homePendingCount - homeVisibleCount}} 项待办，查看全部 ›</view>
+    <view wx:if="{{!homeTaskGroups.length}}" class="home-task-empty" bindtap="goTasks">本月暂无待办，点击进入重点待办</view>
   </view>
 
   <view class="care-row">

@@ -55,38 +55,13 @@
     </scroll-view>
   </view>
 
-  <block wx:for="{{taskGroups}}" wx:key="key" wx:for-item="group">
-    <view class="group-heading group-{{group.key}}">
-      <view class="group-title"><text class="group-dot"></text>{{group.title}}</view>
-      <view class="group-count">{{group.count}}项活动</view>
-    </view>
-    <view class="task-card tone-{{item.tone}}" wx:for="{{group.tasks}}" wx:key="_id" wx:for-item="item" data-id="{{item._id}}" bindtap="openTask">
-      <view class="category-rail">
-        <view class="category-icon">
-          <text wx:if="{{item.tone === 'service'}}">益</text>
-          <text wx:elif="{{item.tone === 'meeting'}}">会</text>
-          <text wx:elif="{{item.tone === 'birthday'}}">生</text>
-          <text wx:elif="{{item.tone === 'social'}}">联</text>
-          <text wx:elif="{{item.tone === 'visit'}}">访</text>
-          <text wx:elif="{{item.tone === 'training'}}">训</text>
-          <text wx:else>待</text>
-        </view>
-        <view class="category-name">{{item.categoryLabel}}</view>
-      </view>
-      <view class="task-body">
-        <view class="title">{{item.title}}</view>
-        <view class="info-row"><text class="info-icon">◷</text><text>{{item.dateLabel}} · {{item.timeLabel}}</text></view>
-        <view class="info-row"><text class="info-icon location-icon">⌖</text><text class="ellipsis">{{item.locationLabel}}</text></view>
-        <view class="team-label"><text class="team-label-dot"></text>{{item.teamLabel}}</view>
-      </view>
-      <view class="task-side">
-        <view class="countdown {{item.countdownCompact ? 'compact' : ''}}"><text class="countdown-prefix">{{item.countdownPrefix}}</text><text class="countdown-value">{{item.countdownValue}}</text><text class="countdown-unit">{{item.countdownUnit}}</text></view>
-        <view class="check-wrap" data-id="{{item._id}}" catchtap="completeTask">
-          <view class="check-box {{item.canComplete ? '' : 'disabled'}}"></view>
-        </view>
-      </view>
-    </view>
-  </block>
+  <todo-group-section
+    wx:for="{{taskGroups}}"
+    wx:key="key"
+    group="{{item}}"
+    bind:open="openTask"
+    bind:complete="completeTask"
+  />
 
   <view class="completed-section" wx:if="{{completedTasks.length}}">
     <view class="completed-head" bindtap="toggleCompleted">
@@ -94,19 +69,13 @@
       <view class="fold-icon {{completedExpanded ? 'expanded' : ''}}">⌄</view>
     </view>
     <view wx:if="{{completedExpanded}}">
-      <view class="task-card done tone-{{item.tone}}" wx:for="{{completedTasks}}" wx:key="_id" data-id="{{item._id}}" bindtap="openTask">
-        <view class="category-rail">
-          <view class="category-icon">✓</view>
-          <view class="category-name">{{item.categoryLabel}}</view>
-        </view>
-        <view class="task-body">
-          <view class="title">{{item.title}}</view>
-          <view class="info-row"><text class="info-icon">◷</text><text>{{item.dateLabel}} · {{item.timeLabel}}</text></view>
-          <view class="info-row"><text class="info-icon location-icon">⌖</text><text class="ellipsis">{{item.locationLabel}}</text></view>
-          <view class="team-label"><text class="team-label-dot"></text>{{item.teamLabel}}</view>
-        </view>
-        <view class="task-side"><view class="check-box checked">✓</view></view>
-      </view>
+      <todo-task-card
+        wx:for="{{completedTasks}}"
+        wx:key="_id"
+        task="{{item}}"
+        readonly="{{true}}"
+        bind:open="openTask"
+      />
     </view>
   </view>
 
