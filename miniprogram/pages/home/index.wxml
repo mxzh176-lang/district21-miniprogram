@@ -27,24 +27,6 @@
     </swiper-item>
   </swiper>
 
-  <view class="feature-entry honor-entry" bindtap="goHonors">
-    <view class="feature-icon honor-icon">誉</view>
-    <view class="feature-copy">
-      <view class="feature-title">{{honorTitle}}</view>
-      <view class="feature-desc">总览目标、达成进度与表彰记录</view>
-    </view>
-    <view class="arrow">›</view>
-  </view>
-
-  <view class="feature-entry archive-entry" bindtap="goArchive">
-    <view class="feature-icon archive-icon">档</view>
-    <view class="feature-copy">
-      <view class="feature-title">{{archiveTitle}}</view>
-      <view class="feature-desc">{{archiveDesc}}</view>
-    </view>
-    <view class="arrow">›</view>
-  </view>
-
   <view class="section-row">
     <view>
       <view class="section-kicker">JUNE PLAN</view>

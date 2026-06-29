@@ -16,9 +16,6 @@ Page({
     heroSlides: [],
     currentOrg: ORG_OPTIONS[0],
     orgOptions: ORG_OPTIONS,
-    honorTitle: '协作区荣誉与表彰',
-    archiveTitle: '协作区档案入口',
-    archiveDesc: '查看协作区与服务队岗位档案',
     historyTitle: '最近服务足迹',
     allTasks: [],
     homeTaskGroups: [],
@@ -129,9 +126,6 @@ Page({
         photoCount
       },
       careOverview: this.data.baseCareOverview || {},
-      honorTitle: `${isDistrict ? '协作区' : currentOrg.orgName}荣誉与表彰`,
-      archiveTitle: `${isDistrict ? '协作区' : currentOrg.orgName}档案入口`,
-      archiveDesc: isDistrict ? '查看协作区与服务队岗位档案' : '查看本服务队岗位档案与历史沉淀',
       historyTitle: isDistrict ? '最近服务足迹' : '服务队历史事件'
     })
   },
@@ -203,14 +197,5 @@ Page({
 
   goAdmin() {
     wx.navigateTo({ url: '/pages/admin/index' })
-  },
-
-  goHonors() {
-    const organization = this.data.currentOrg.orgType === 'team' ? this.data.currentOrg.orgId : 'district'
-    wx.navigateTo({ url: `/pages/archive/honor-wall/index?organization=${organization}` })
-  },
-
-  goArchive() {
-    wx.switchTab({ url: '/pages/archive/index' })
   }
 })
