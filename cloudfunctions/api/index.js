@@ -200,6 +200,35 @@ async function requireAuthorizationTarget(userId) {
   return user
 }
 
+async function resolvePositionDirectoryMember(userId, memberName = '') {
+  try {
+    return await requireAuthorizationTarget(userId)
+  } catch (error) {
+    const organizations = await organizationNameMap()
+    const directoryMember = findStaticDirectoryMember(userId, organizations)
+    if (!directoryMember) throw error
+    const name = cleanText(memberName, 40)
+    if (name && directoryMember.name !== name) {
+      throw Object.assign(new Error('所选成员与负责人姓名不一致'), { code: 'POSITION_MEMBER_MISMATCH' })
+    }
+    const linkedUser = await db.collection(COLLECTIONS.user)
+      .where({
+        defaultOrganizationId: directoryMember.defaultOrganizationId,
+        name: directoryMember.name
+      })
+      .limit(1)
+      .get()
+    if (hasCompleteAuthorizationProfile(linkedUser.data[0])) return linkedUser.data[0]
+    return {
+      id: directoryMember.id,
+      name: directoryMember.name,
+      defaultOrganizationId: directoryMember.defaultOrganizationId,
+      status: 'active',
+      directoryOnly: true
+    }
+  }
+}
+
 async function requireActiveOrganization(organizationId) {
   const result = await db.collection(COLLECTIONS.organization)
     .where({ id: organizationId, status: 'active' })
@@ -1384,7 +1413,7 @@ async function savePositionDirectory(openid, event = {}) {
     throw Object.assign(new Error('无权限操作'), { code: 'PERMISSION_DENIED' })
   }
   const organization = await requireActiveOrganization(organizationId)
-  const member = await requireAuthorizationTarget(memberId)
+  const member = await resolvePositionDirectoryMember(memberId, memberName)
   if (member.name !== memberName) {
     throw Object.assign(new Error('所选成员与负责人姓名不一致'), { code: 'POSITION_MEMBER_MISMATCH' })
   }

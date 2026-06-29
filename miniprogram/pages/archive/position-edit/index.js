@@ -1,5 +1,26 @@
 const api = require('../../../utils/api')
 
+function normalizeOrganizationId(value) {
+  const text = String(value || '')
+  const aliases = {
+    district: 'org_region_21_suihua',
+    linghang: 'org_team_linghang',
+    ailinghang: 'org_team_ailinghang',
+    yuanhang: 'org_team_yuanhang',
+    jingying: 'org_team_jingying'
+  }
+  return aliases[text] || text
+}
+
+function isDistrictOrganization(value) {
+  const organizationId = normalizeOrganizationId(value)
+  return organizationId === 'org_region_21_suihua' || organizationId === 'district'
+}
+
+function memberOrganizationId(member) {
+  return normalizeOrganizationId(member.defaultOrganizationId || member.organizationId || member.teamId)
+}
+
 Page({
   data: {
     organizationId: '',
@@ -20,9 +41,9 @@ Page({
     const positionId = decodeURIComponent(options.positionId || '')
     this.setData({ organizationId, positionId })
     try {
-      const [directory, platformUsers] = await Promise.all([
+      const [directory, members] = await Promise.all([
         api.call('listPositionDirectory', { organizationId }),
-        api.call('listPlatformUsers')
+        api.call('listOrg')
       ])
       const position = directory.find(item => item.id === positionId)
       if (!position || !position.canEdit) {
@@ -30,13 +51,24 @@ Page({
         setTimeout(() => wx.navigateBack(), 700)
         return
       }
-      const users = platformUsers
-        .filter(item => item.profileCompleted && item.defaultOrganizationId && item.name && !item.name.startsWith('待认证用户'))
+      const scopeOrganizationId = normalizeOrganizationId(organizationId)
+      const users = members
+        .filter(item => {
+          const name = String(item.name || item.nickname || '').trim()
+          if (!name || name.startsWith('待认证用户')) return false
+          if (isDistrictOrganization(scopeOrganizationId)) return true
+          return memberOrganizationId(item) === scopeOrganizationId
+        })
         .map(item => ({
           ...item,
-          displayName: `${item.name} · ${item.memberCode || item.accountSuffix || String(item.id).slice(-6)}`
+          id: item.id || item._id,
+          name: item.name || item.nickname,
+          displayName: `${item.name || item.nickname} · ${item.teamShortName || item.team || item.memberCode || '成员'}`
         }))
-      const matchedUserIndex = users.findIndex(item => item.id === position.userId)
+      const matchedUserIndex = users.findIndex(item =>
+        item.id === position.userId ||
+        item.name === position.person
+      )
       const userIndex = Math.max(0, matchedUserIndex)
       const selectedUser = users[userIndex]
       this.setData({
@@ -57,7 +89,6 @@ Page({
     }
   },
 
-  onNameInput(event) { this.setData({ name: event.detail.value }) },
   onUserChange(event) {
     const userIndex = Number(event.detail.value)
     const user = this.data.users[userIndex]

@@ -7,13 +7,13 @@
 
   <view class="form-card" wx:if="{{!loading}}">
     <view class="field-label">职务名称</view>
-    <input class="input" value="{{name}}" maxlength="100" bindinput="onNameInput" placeholder="请填写职务名称" placeholder-class="input-placeholder" cursor-color="#d391ff" />
+    <view class="readonly-value">{{name || '当前职务'}}</view>
 
     <view class="field-label">文档负责人</view>
     <picker range="{{users}}" range-key="displayName" value="{{userIndex}}" bindchange="onUserChange">
-      <view class="picker-value">{{users.length ? users[userIndex].displayName : '暂无资料完整的成员'}}</view>
+      <view class="picker-value">{{users.length ? users[userIndex].displayName : '暂无可选择成员'}}</view>
     </picker>
-    <view class="field-tip">保存后，该成员会成为本栏目负责人，并直接获得该栏目档案的维护权限。</view>
+    <view class="field-tip">服务队页面只显示当前服务队成员；二十一协作区页面显示协作区全员。保存后，该成员会成为本栏目负责人。</view>
 
     <view class="date-row">
       <view class="date-field">
