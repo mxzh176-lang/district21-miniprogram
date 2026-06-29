@@ -19,6 +19,7 @@ Page({
     form: {
       name: '',
       position: '',
+      birthday: '',
       company: '',
       industry: '',
       resource: '',
@@ -30,25 +31,42 @@ Page({
   },
 
   async onLoad(options) {
+    this.session = null
     const [session, teams] = await Promise.all([
       api.call('getSession'),
       api.call('listTeams')
     ])
+    this.session = session
     const serviceTeams = teams.slice(1)
+    const defaultOrganizationId = serviceTeams[0] && (serviceTeams[0].cloudId || serviceTeams[0].id)
     this.setData({
       id: options.id || '',
       teams: serviceTeams,
       canManage: permission.canPerform(session, 'contacts', options.id ? 'update' : 'create', {
-        organizationId: serviceTeams[0] && (serviceTeams[0].cloudId || serviceTeams[0].id)
+        organizationId: defaultOrganizationId,
+        cloudOrganizationId: defaultOrganizationId
       })
     })
     if (options.id) {
       const result = await api.call('getMember', { id: options.id })
       const teamIndex = Math.max(
         0,
-        serviceTeams.findIndex(item => item.id === result.member.teamId)
+        serviceTeams.findIndex(item =>
+          item.id === result.member.teamId ||
+          item.cloudId === result.member.organizationId ||
+          item.cloudId === result.member.defaultOrganizationId
+        )
       )
-      this.setData({ form: result.member, teamIndex })
+      const memberOrganizationId = result.member.organizationId || result.member.defaultOrganizationId || (serviceTeams[teamIndex] && serviceTeams[teamIndex].cloudId)
+      this.setData({
+        form: result.member,
+        teamIndex,
+        canManage: Boolean(result.canManage) || permission.canPerform(session, 'contacts', 'update', {
+          organizationId: memberOrganizationId,
+          cloudOrganizationId: memberOrganizationId,
+          teamId: result.member.teamId
+        })
+      })
     }
   },
 
@@ -81,15 +99,29 @@ Page({
       wx.showToast({ title: '请填写成员姓名', icon: 'none' })
       return
     }
+    const birthday = String(form.birthday || '').trim()
+    if (birthday && !/^(0?[1-9]|1[0-2])-(0?[1-9]|[12]\d|3[01])$/.test(birthday)) {
+      wx.showToast({ title: '生日请按 MM-DD 填写', icon: 'none' })
+      return
+    }
     const team = teams[teamIndex]
+    if (!team) {
+      wx.showToast({ title: '请选择所属服务队', icon: 'none' })
+      return
+    }
+    const normalizedBirthday = birthday
+      ? birthday.split('-').map(part => part.padStart(2, '0')).join('-')
+      : ''
     await api.call('saveMember', {
       member: {
         ...form,
         _id: id || form._id,
         name: form.name.trim(),
+        birthday: normalizedBirthday,
         letter: SURNAME_LETTERS[form.name.trim().slice(0, 1)] || '#',
         team: team.name,
         teamId: team.id,
+        organizationId: team.cloudId || team.id,
         initial: form.name.trim().slice(0, 1),
         avatarTone: form.avatarTone || 'green'
       }

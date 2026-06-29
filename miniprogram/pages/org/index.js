@@ -3,6 +3,26 @@ const permission = require('../../utils/permission')
 const orgScope = require('../../utils/org-scope')
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
+const TEAM_COLORS = {
+  linghang: { tone: 'green', color: '#24d18f', name: '领航' },
+  ailinghang: { tone: 'red', color: '#ff5e7a', name: '爱领航' },
+  yuanhang: { tone: 'blue', color: '#4fb0ff', name: '远航' },
+  jingying: { tone: 'purple', color: '#b96eff', name: '精英' },
+  district: { tone: 'gold', color: '#e3c78e', name: '协作区' },
+  all: { tone: 'gold', color: '#e3c78e', name: '协作区' }
+}
+
+function normalizeTeamId(value) {
+  return orgScope.normalizeTeamId(value || 'district') || 'district'
+}
+
+function birthdayLabel(value) {
+  const text = String(value || '').trim()
+  if (!text) return ''
+  const match = text.match(/^(?:\d{4}-)?(\d{1,2})-(\d{1,2})$/)
+  if (!match) return text
+  return `${Number(match[1])}月${Number(match[2])}日`
+}
 
 Page({
   data: {
@@ -29,13 +49,33 @@ Page({
       api.call('getSession')
     ])
     this.setData({
-      members,
-      teams: teams.slice(1),
+      members: this.decorateMembers(members),
+      teams: teams.slice(1).map(item => {
+        const meta = TEAM_COLORS[normalizeTeamId(item.id)] || TEAM_COLORS.district
+        return { ...item, tone: meta.tone, color: item.color || meta.color }
+      }),
       currentScope,
       teamId: currentScope.teamId || 'all',
       canManage: permission.canPerform(session, 'contacts', 'update') || permission.canPerform(session, 'contacts', 'create')
     })
     this.applyFilter()
+  },
+
+  decorateMembers(members = []) {
+    return members.map(item => {
+      const teamId = normalizeTeamId(item.teamId || item.organizationId || item.defaultOrganizationId)
+      const meta = TEAM_COLORS[teamId] || TEAM_COLORS.district
+      return {
+        ...item,
+        teamId,
+        teamTone: meta.tone,
+        teamColor: item.teamColor || meta.color,
+        teamShortName: item.teamShortName || meta.name,
+        birthdayLabel: birthdayLabel(item.birthday),
+        memberCodeLabel: item.memberCode || item.accountSuffix || '',
+        position: item.position || '成员'
+      }
+    })
   },
 
   selectTeam(event) {
@@ -66,18 +106,19 @@ Page({
     const filteredMembers = this.data.members
       .filter(item => {
         const teamMatch = this.data.teamId === 'all' || item.teamId === this.data.teamId
-        const text = `${item.name}${item.team}${item.position}`.toLowerCase()
+        const text = `${item.name}${item.team}${item.teamShortName}${item.position}${item.memberCodeLabel}`.toLowerCase()
         return teamMatch && (!keyword || text.includes(keyword))
       })
       .sort((a, b) =>
-        a.letter.localeCompare(b.letter) ||
+        String(a.letter || '#').localeCompare(String(b.letter || '#')) ||
         a.name.localeCompare(b.name, 'zh-Hans-CN')
       )
 
     const map = {}
     filteredMembers.forEach(item => {
-      if (!map[item.letter]) map[item.letter] = []
-      map[item.letter].push(item)
+      const letter = item.letter || '#'
+      if (!map[letter]) map[letter] = []
+      map[letter].push(item)
     })
     const groups = Object.keys(map).sort().map(letter => ({ letter, members: map[letter] }))
     let offset = 0
@@ -115,6 +156,10 @@ Page({
 
   openMember(event) {
     wx.navigateTo({ url: `/pages/org/detail/index?id=${event.currentTarget.dataset.id}` })
+  },
+
+  editMember(event) {
+    wx.navigateTo({ url: `/pages/org/edit/index?id=${event.currentTarget.dataset.id}` })
   },
 
   addMember() {

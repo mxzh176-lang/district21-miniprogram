@@ -15,7 +15,6 @@ const READ_ACTIONS = [
   'savePositionDirectory',
   'listArchives',
   'listTeams',
-  'listOrg',
   'getOrg',
   'listStructure'
 ]

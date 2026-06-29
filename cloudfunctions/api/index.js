@@ -380,6 +380,7 @@ async function activePermissionGrants(userId) {
 const PORT_PERMISSION_ACTIONS = {
   history: ['read', 'create', 'update', 'delete', 'upload'],
   archive: ['read', 'update', 'upload', 'delete'],
+  contacts: ['read', 'create', 'update', 'delete'],
   todo: ['read', 'create', 'update', 'complete', 'delete'],
   finance: ['read', 'create', 'update', 'delete'],
   member: ['read', 'create', 'update', 'delete'],
@@ -2561,6 +2562,202 @@ async function listOrg(openid) {
   return activeItems(result.data)
 }
 
+function memberInitial(name) {
+  return cleanText(name, 40).slice(0, 1) || '成'
+}
+
+function memberLetter(name) {
+  const first = memberInitial(name)
+  const map = {
+    安: 'A', 白: 'B', 陈: 'C', 崔: 'C', 丁: 'D', 董: 'D', 付: 'F', 冯: 'F',
+    高: 'G', 郭: 'G', 关: 'G', 韩: 'H', 何: 'H', 胡: 'H', 黄: 'H',
+    荆: 'J', 景: 'J', 姜: 'J', 孔: 'K', 李: 'L', 刘: 'L', 吕: 'L',
+    梁: 'L', 林: 'L', 米: 'M', 马: 'M', 潘: 'P', 彭: 'P', 任: 'R',
+    宋: 'S', 孙: 'S', 滕: 'T', 田: 'T', 王: 'W', 吴: 'W', 徐: 'X',
+    许: 'X', 谢: 'X', 杨: 'Y', 姚: 'Y', 张: 'Z', 赵: 'Z', 周: 'Z'
+  }
+  return map[first] || '#'
+}
+
+function normalizeBirthday(value) {
+  const text = cleanText(value, 10)
+  if (!text) return ''
+  const match = text.match(/^(?:\d{4}-)?(\d{1,2})-(\d{1,2})$/)
+  if (!match) {
+    throw Object.assign(new Error('生日请按 MM-DD 填写'), { code: 'INVALID_BIRTHDAY' })
+  }
+  const month = Number(match[1])
+  const day = Number(match[2])
+  if (month < 1 || month > 12 || day < 1 || day > 31) {
+    throw Object.assign(new Error('生日日期格式不正确'), { code: 'INVALID_BIRTHDAY' })
+  }
+  return `${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}
+
+function safeBirthday(value) {
+  try {
+    return normalizeBirthday(value)
+  } catch (error) {
+    return ''
+  }
+}
+
+async function organizationNameMap() {
+  const result = await db.collection(COLLECTIONS.organization).limit(200).get()
+  const map = {
+    org_region_21_suihua: { name: '二十一协作区', shortName: '协作区', type: 'region' },
+    org_team_linghang: { name: '领航服务队', shortName: '领航', type: 'team' },
+    org_team_ailinghang: { name: '爱领航服务队', shortName: '爱领航', type: 'team' },
+    org_team_yuanhang: { name: '远航服务队', shortName: '远航', type: 'team' },
+    org_team_jingying: { name: '精英服务队', shortName: '精英', type: 'team' }
+  }
+  result.data.forEach(item => {
+    map[item.id] = {
+      name: item.name,
+      shortName: item.shortName || item.name,
+      type: item.type
+    }
+  })
+  return map
+}
+
+function publicDirectoryMember(user, organizations = {}) {
+  const organizationId = canonicalOrganizationId(user.defaultOrganizationId || user.organizationId)
+  const organization = organizations[organizationId] || {}
+  const name = cleanText(user.name || user.nickname, 40)
+  return {
+    _id: user.id || user._id,
+    id: user.id || user._id,
+    name,
+    nickname: name,
+    team: organization.name || cleanText(user.team, 80) || '未分配服务队',
+    teamShortName: organization.shortName || '',
+    teamId: organizationId,
+    organizationId,
+    defaultOrganizationId: organizationId,
+    position: cleanText(user.position, 80) || cleanText(user.roleName, 80) || '成员',
+    birthday: safeBirthday(user.birthday),
+    memberCode: cleanText(user.memberCode, 30),
+    accountSuffix: String(user.id || user._id || '').slice(-6),
+    resource: cleanText(user.resource, 100),
+    avatarUrl: user.avatar || user.avatarUrl || '',
+    initial: memberInitial(name),
+    letter: cleanText(user.letter, 2) || memberLetter(name),
+    avatarTone: cleanText(user.avatarTone, 20) || 'green',
+    status: user.status || 'active'
+  }
+}
+
+async function listDirectoryMembers(openid) {
+  await requireApproved(openid)
+  const [userResult, organizations] = await Promise.all([
+    db.collection(COLLECTIONS.user).limit(500).get(),
+    organizationNameMap()
+  ])
+  return userResult.data
+    .filter(item =>
+      item.status !== 'disabled' &&
+      cleanText(item.name, 40) &&
+      !cleanText(item.name, 40).startsWith('待认证用户-')
+    )
+    .map(item => publicDirectoryMember(item, organizations))
+    .sort((a, b) => String(a.letter || '#').localeCompare(String(b.letter || '#')) || a.name.localeCompare(b.name, 'zh-Hans-CN'))
+}
+
+async function findDirectoryUser(id) {
+  const value = cleanText(id, 100)
+  if (!value) return null
+  const byBusinessId = await db.collection(COLLECTIONS.user).where({ id: value }).limit(1).get()
+  if (byBusinessId.data[0]) return byBusinessId.data[0]
+  try {
+    const byDoc = await db.collection(COLLECTIONS.user).doc(value).get()
+    return byDoc.data || null
+  } catch (error) {
+    return null
+  }
+}
+
+async function canManageDirectoryMember(openid, target = {}) {
+  const platformUser = await findPlatformUser(openid)
+  if (platformUser && platformUser.status === 'active') {
+    const state = await portPermissionState(platformUser.id, 'contacts', target.id ? 'update' : 'create', {
+      organizationId: target.defaultOrganizationId || target.organizationId
+    })
+    if (state.allowed) return true
+  }
+  const legacy = await requireApproved(openid)
+  return ['superadmin', 'editor', 'admin'].includes(legacy.role)
+}
+
+async function getMember(openid, event = {}) {
+  await requireApproved(openid)
+  const user = await findDirectoryUser(event.id)
+  if (!user || user.status === 'disabled') {
+    throw Object.assign(new Error('未找到成员资料'), { code: 'MEMBER_NOT_FOUND' })
+  }
+  const organizations = await organizationNameMap()
+  return {
+    member: publicDirectoryMember(user, organizations),
+    canViewContact: true,
+    canManage: await canManageDirectoryMember(openid, user)
+  }
+}
+
+async function saveMember(openid, event = {}) {
+  const input = event.member || {}
+  const id = cleanText(input.id || input._id, 100)
+  const existing = id ? await findDirectoryUser(id) : null
+  const organizationId = canonicalOrganizationId(input.organizationId || input.defaultOrganizationId || input.teamId || (existing && existing.defaultOrganizationId))
+  const operator = await requireLegacyPortEditor(openid, 'contacts', existing ? 'update' : 'create', { organizationId })
+  const platformOperator = await findPlatformUser(openid)
+  const organization = await requireActiveOrganization(organizationId)
+  if (!['region', 'team'].includes(organization.type)) {
+    throw Object.assign(new Error('请选择协作区或服务队'), { code: 'INVALID_MEMBER_ORGANIZATION' })
+  }
+  const name = cleanText(input.name || input.nickname, 40)
+  if (!name || name.length < 2) {
+    throw Object.assign(new Error('请填写至少两个字的成员姓名'), { code: 'INVALID_MEMBER_NAME' })
+  }
+  const data = {
+    id: existing ? existing.id : businessId('user'),
+    name,
+    defaultOrganizationId: organizationId,
+    position: cleanText(input.position, 80) || '成员',
+    birthday: normalizeBirthday(input.birthday),
+    resource: cleanText(input.resource, 100),
+    avatar: cleanText(input.avatarUrl || input.avatar, 1000),
+    letter: cleanText(input.letter, 2) || memberLetter(name),
+    status: cleanText(input.status, 20) || (existing && existing.status) || 'active',
+    profileCompleted: true,
+    updatedAt: now()
+  }
+  if (cleanText(input.memberCode, 30)) data.memberCode = cleanText(input.memberCode, 30).toUpperCase()
+  if (existing) {
+    await db.collection(COLLECTIONS.user).doc(existing._id).update({ data })
+    await writePlatformLog(platformOperator || { id: operator._id, defaultOrganizationId: organizationId }, 'update', 'user', data.id, { name, organizationId, birthday: data.birthday })
+  } else {
+    data.createdAt = now()
+    await db.collection(COLLECTIONS.user).add({ data })
+    await writePlatformLog(platformOperator || { id: operator._id, defaultOrganizationId: organizationId }, 'create', 'user', data.id, { name, organizationId, birthday: data.birthday })
+  }
+  const organizations = await organizationNameMap()
+  return publicDirectoryMember({ ...existing, ...data }, organizations)
+}
+
+async function deleteMember(openid, event = {}) {
+  const existing = await findDirectoryUser(event.id)
+  if (!existing) return true
+  const operator = await requireLegacyPortEditor(openid, 'contacts', 'delete', {
+    organizationId: existing.defaultOrganizationId
+  })
+  const platformOperator = await findPlatformUser(openid)
+  await db.collection(COLLECTIONS.user).doc(existing._id).update({
+    data: { status: 'disabled', deletedAt: now(), updatedAt: now() }
+  })
+  await writePlatformLog(platformOperator || { id: operator._id, defaultOrganizationId: existing.defaultOrganizationId }, 'delete', 'user', existing.id, { name: existing.name })
+  return true
+}
+
 async function getOrg(openid, event) {
   await requireEditor(openid)
   const result = await db.collection(COLLECTIONS.org).doc(cleanText(event.id, 80)).get()
@@ -3057,6 +3254,10 @@ const handlers = {
   getTask,
   saveTask,
   deleteTask,
+  listMembers: listDirectoryMembers,
+  getMember,
+  saveMember,
+  deleteMember,
   listOrg,
   getOrg,
   saveOrg,

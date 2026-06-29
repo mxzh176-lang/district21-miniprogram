@@ -128,6 +128,7 @@ function portScopeMatches(grant, user, context = {}) {
 }
 
 function hasPortPermission(user, module, action = 'read', context = {}) {
+  const originalModule = module
   module = MODULE_ALIASES[module] || module
   const organizationId = context.cloudOrganizationId || context.organizationId || context.teamId
   if (organizationId && isTeamFullAccessManager(user, organizationId)) return true
@@ -136,7 +137,8 @@ function hasPortPermission(user, module, action = 'read', context = {}) {
     context.positionId || context.categoryId || context.creatorId || context.createdBy
   )
   return activePortPermissions(user).some(grant =>
-    (((grant.permissions || {})[module]) || []).includes(action) &&
+    ((((grant.permissions || {})[module]) || []).includes(action) ||
+      (((grant.permissions || {})[originalModule]) || []).includes(action)) &&
     (!hasScopeContext || grant.dataScope === 'self' && action === 'create' || portScopeMatches(grant, user, context))
   )
 }

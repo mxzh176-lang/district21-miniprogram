@@ -10,6 +10,7 @@
     <view class="field"><text class="label">姓名</text><input class="member-input" value="{{form.name}}" data-field="name" bindinput="onInput" placeholder="狮友姓名" placeholder-class="member-placeholder" cursor-color="#7be4ff" always-embed="{{true}}" /></view>
     <view class="field"><text class="label">所属服务队</text><picker range="{{teams}}" range-key="name" value="{{teamIndex}}" bindchange="onTeamChange"><view class="picker">{{teams[teamIndex].name}}</view></picker></view>
     <view class="field"><text class="label">岗位</text><input class="member-input" value="{{form.position}}" data-field="position" bindinput="onInput" placeholder="例如：新闻宣传主席" placeholder-class="member-placeholder" cursor-color="#7be4ff" always-embed="{{true}}" /></view>
+    <view class="field"><text class="label">生日（月日）</text><input class="member-input" value="{{form.birthday}}" data-field="birthday" bindinput="onInput" placeholder="例如：06-12" placeholder-class="member-placeholder" cursor-color="#7be4ff" always-embed="{{true}}" /></view>
     <button class="save-button" bindtap="save">保存狮友资料</button>
   </view>
 </view>

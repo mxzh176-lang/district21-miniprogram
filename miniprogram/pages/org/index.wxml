@@ -39,9 +39,10 @@
   >
     <view class="contact-group" wx:for="{{groups}}" wx:key="letter" id="letter-{{item.letter}}">
       <view class="group-letter">{{item.letter}}</view>
-      <view class="contact-card" wx:for="{{item.members}}" wx:for-item="member" wx:key="_id"
+      <view class="contact-card contact-card-{{member.teamTone}}" wx:for="{{item.members}}" wx:for-item="member" wx:key="_id"
         data-id="{{member._id}}" bindtap="openMember">
-        <view class="avatar avatar-{{member.avatarTone}}">
+        <view class="team-ribbon"></view>
+        <view class="avatar avatar-{{member.teamTone}}">
           <image wx:if="{{member.avatarUrl}}" class="avatar-image" src="{{member.avatarUrl}}" mode="aspectFill" />
           <text wx:else>{{member.initial}}</text>
         </view>
@@ -50,10 +51,16 @@
             <view class="identity">
               <text class="name">{{member.name}}</text>
             </view>
-            <view class="team-name">{{member.team}}</view>
+            <view class="team-name">{{member.teamShortName || member.team}}</view>
           </view>
           <view class="position">{{member.position}}</view>
+          <view class="member-info">
+            <text wx:if="{{member.birthdayLabel}}">生日 {{member.birthdayLabel}}</text>
+            <text wx:if="{{member.memberCodeLabel}}">编号 {{member.memberCodeLabel}}</text>
+            <text wx:if="{{member.resource}}">资源 {{member.resource}}</text>
+          </view>
         </view>
+        <view wx:if="{{canManage}}" class="edit-chip" data-id="{{member._id}}" catchtap="editMember">编辑</view>
         <view class="contact-arrow">›</view>
       </view>
     </view>

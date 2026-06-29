@@ -1,6 +1,6 @@
 <view class="page" wx:if="{{member._id}}">
-  <view class="profile-card">
-    <view class="avatar avatar-{{member.avatarTone}}">
+  <view class="profile-card profile-card-{{member.teamTone}}">
+    <view class="avatar avatar-{{member.teamTone}}">
       <image wx:if="{{member.avatarUrl}}" class="avatar-image" src="{{member.avatarUrl}}" mode="aspectFill" />
       <text wx:else>{{member.initial}}</text>
     </view>
@@ -10,5 +10,14 @@
     <button wx:if="{{canManage}}" class="edit-button" bindtap="editMember">编辑资料</button>
   </view>
 
-  <view class="privacy-note">本页仅展示内部成员姓名、所属服务队和岗位，不收集或展示企业、地址、电话等非必要信息。</view>
+  <view class="card">
+    <view class="section-title">成员信息</view>
+    <view class="row"><text class="label">所属服务队</text><text>{{member.team}}</text></view>
+    <view class="row"><text class="label">岗位</text><text>{{member.position}}</text></view>
+    <view class="row" wx:if="{{member.birthdayLabel}}"><text class="label">生日</text><text>{{member.birthdayLabel}}</text></view>
+    <view class="row" wx:if="{{member.memberCodeLabel}}"><text class="label">内部编号</text><text>{{member.memberCodeLabel}}</text></view>
+    <view class="row" wx:if="{{member.resource}}"><text class="label">公益资源</text><text>{{member.resource}}</text></view>
+  </view>
+
+  <view class="privacy-note">本页仅展示内部成员姓名、所属服务队、岗位和生日月日等必要资料，不展示身份证、手机号等敏感信息。</view>
 </view>

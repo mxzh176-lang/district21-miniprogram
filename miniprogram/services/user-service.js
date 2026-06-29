@@ -18,8 +18,10 @@ const ACTIONS = [
   'revokePermissionGrant',
   'revokeUserPermissions',
   'saveRoleAssignment',
+  'listOrg',
   'getMember',
   'saveMember',
+  'deleteMember',
   'listAppointments',
   'listAdminMembers',
   'listAdminCandidates',
@@ -55,6 +57,8 @@ async function execute(action, payload, localFallback) {
   ].includes(action)) {
     return cloudbase.invoke(action, payload)
   }
+  if (action === 'listOrg') return cloudbase.invoke('listMembers', payload)
+  if (['getMember', 'saveMember', 'deleteMember'].includes(action)) return cloudbase.invoke(action, payload)
   return localFallback(action, payload)
 }
 

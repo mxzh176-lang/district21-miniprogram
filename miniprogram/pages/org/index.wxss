@@ -133,12 +133,23 @@
 }
 
 .contact-card {
+  position: relative;
   display: flex;
   align-items: center;
   margin-bottom: 10rpx;
   padding: 18rpx;
+  overflow: hidden;
   border-radius: 19rpx;
   background: #1b153b;
+}
+
+.team-ribbon {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 8rpx;
+  height: 100%;
+  background: #7be4ff;
 }
 
 .avatar {
@@ -161,10 +172,11 @@
   border-radius: 50%;
 }
 
-.avatar-green { background: #2f6d5d; }
-.avatar-red { background: #b55d57; }
-.avatar-blue { background: #346b8c; }
-.avatar-purple { background: #7a5b91; }
+.avatar-green { background: linear-gradient(145deg, #2ed18b, #1c6c54); }
+.avatar-red { background: linear-gradient(145deg, #ff6a82, #8f273b); }
+.avatar-blue { background: linear-gradient(145deg, #52b6ff, #245e9f); }
+.avatar-purple { background: linear-gradient(145deg, #bd76ff, #6333a5); }
+.avatar-gold { background: linear-gradient(145deg, #e3c78e, #9c6e2e); }
 
 .contact-copy {
   flex: 1;
@@ -205,7 +217,10 @@
 }
 
 .team-name {
-  color: #c982ff;
+  padding: 5rpx 12rpx;
+  border-radius: 999rpx;
+  color: #f4eaff;
+  background: rgba(201, 130, 255, 0.16);
   font-size: 17rpx;
   font-weight: 700;
 }
@@ -214,6 +229,37 @@
   margin-top: 4rpx;
   color: #60716b;
   font-size: 18rpx;
+}
+
+.member-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8rpx;
+  margin-top: 10rpx;
+}
+
+.member-info text {
+  max-width: 100%;
+  padding: 5rpx 10rpx;
+  overflow: hidden;
+  border-radius: 999rpx;
+  color: #d7cfff;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 17rpx;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.edit-chip {
+  flex: none;
+  margin-left: 8rpx;
+  padding: 9rpx 14rpx;
+  border: 1rpx solid rgba(123, 228, 255, .38);
+  border-radius: 999rpx;
+  color: #7be4ff;
+  background: rgba(123, 228, 255, .11);
+  font-size: 18rpx;
+  font-weight: 800;
 }
 
 .company {
@@ -329,12 +375,21 @@
 }
 .contact-card{padding:20rpx}.position{color:#aaa2bf}.search-box input{color:#fff;background:transparent}.search-box{background:rgba(12,10,38,.3)}
 
-.avatar-green,
-.avatar-red,
-.avatar-blue,
-.avatar-purple {
-  background: linear-gradient(145deg, #b96eff, #388ee4);
-}
+.contact-card-green { border-color: rgba(36, 209, 143, .42); }
+.contact-card-red { border-color: rgba(255, 94, 122, .42); }
+.contact-card-blue { border-color: rgba(79, 176, 255, .42); }
+.contact-card-purple { border-color: rgba(185, 110, 255, .42); }
+.contact-card-gold { border-color: rgba(227, 199, 142, .42); }
+.contact-card-green .team-ribbon,
+.contact-card-green .team-name { background: rgba(36, 209, 143, .18); color: #a6f6d6; }
+.contact-card-red .team-ribbon,
+.contact-card-red .team-name { background: rgba(255, 94, 122, .2); color: #ffc0ca; }
+.contact-card-blue .team-ribbon,
+.contact-card-blue .team-name { background: rgba(79, 176, 255, .18); color: #c2e6ff; }
+.contact-card-purple .team-ribbon,
+.contact-card-purple .team-name { background: rgba(185, 110, 255, .2); color: #ead1ff; }
+.contact-card-gold .team-ribbon,
+.contact-card-gold .team-name { background: rgba(227, 199, 142, .2); color: #ffe5ae; }
 
 .alphabet-letter {
   color: #8f86ad;
