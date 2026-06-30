@@ -213,14 +213,27 @@
 .recent-card {
   display: block;
   box-sizing: border-box;
-  width: 340rpx;
-  min-height: 300rpx;
+  width: 360rpx;
+  min-height: 390rpx;
   margin-bottom: 0;
-  padding: 26rpx 24rpx;
+  overflow: hidden;
+  padding: 0 0 24rpx;
   border: 1rpx solid rgba(123, 228, 255, .18);
   border-radius: 22rpx;
   background: linear-gradient(145deg, rgba(86, 54, 150, .96), rgba(28, 71, 132, .92));
   box-shadow: 0 16rpx 38rpx rgba(4, 4, 22, .22);
+}
+
+.recent-swiper {
+  width: 100%;
+  height: 180rpx;
+  background: rgba(255, 255, 255, .06);
+}
+
+.recent-photo {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
 .recent-badge {
@@ -229,7 +242,7 @@
   justify-content: center;
   width: 70rpx;
   height: 70rpx;
-  margin-bottom: 18rpx;
+  margin: 24rpx 24rpx 18rpx;
   border: 2rpx solid rgba(232, 196, 255, .78);
   border-radius: 50%;
   color: #fff;
@@ -240,7 +253,7 @@
 .recent-category {
   display: inline-flex;
   max-width: 100%;
-  margin-bottom: 14rpx;
+  margin: 20rpx 24rpx 14rpx;
   padding: 6rpx 14rpx;
   border-radius: 999rpx;
   color: #7be4ff;
@@ -275,6 +288,7 @@
 }
 
 .recent-date {
+  margin: 0 24rpx;
   color: #b4acc6;
   font-size: 20rpx;
 }
@@ -282,7 +296,7 @@
 .recent-title {
   overflow: hidden;
   display: -webkit-box;
-  margin-top: 12rpx;
+  margin: 12rpx 24rpx 0;
   color: #f7f3ff;
   font-size: 26rpx;
   font-weight: 900;
@@ -296,7 +310,7 @@
 .recent-summary {
   overflow: hidden;
   display: -webkit-box;
-  margin-top: 10rpx;
+  margin: 10rpx 24rpx 0;
   color: #bfb7d3;
   font-size: 18rpx;
   line-height: 1.45;
@@ -307,7 +321,7 @@
 
 .recent-meta {
   overflow: hidden;
-  margin-top: 12rpx;
+  margin: 12rpx 24rpx 0;
   color: #d9d2e8;
   font-size: 19rpx;
   text-overflow: ellipsis;

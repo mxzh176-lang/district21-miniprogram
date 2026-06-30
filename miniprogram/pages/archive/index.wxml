@@ -64,7 +64,22 @@
           data-id="{{item._id}}"
           bindtap="openRecentEntry"
         >
-          <view class="recent-badge">{{item.coverText}}</view>
+          <swiper
+            wx:if="{{item.carouselPhotos.length}}"
+            class="recent-swiper"
+            circular
+            autoplay
+            interval="3600"
+            duration="450"
+            indicator-dots="{{item.carouselPhotos.length > 1}}"
+            indicator-color="rgba(255,255,255,.35)"
+            indicator-active-color="#ffffff"
+          >
+            <swiper-item wx:for="{{item.carouselPhotos}}" wx:for-item="photo" wx:key="*this">
+              <image class="recent-photo" src="{{photo}}" mode="aspectFill" />
+            </swiper-item>
+          </swiper>
+          <view wx:else class="recent-badge">{{item.coverText}}</view>
           <view class="recent-category">{{item.categoryName}}</view>
           <view class="recent-date">{{item.dateLabel}}</view>
           <view class="recent-title">{{item.title}}</view>

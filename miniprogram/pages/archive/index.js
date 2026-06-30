@@ -154,15 +154,25 @@ Page({
         })
       }
       const categoryMap = categoryNameMap(this.data.selectedOrganization)
-      const recentEntries = (entries || [])
+      const latestEntries = (entries || [])
         .slice()
         .sort((a, b) => archiveSortTime(b).localeCompare(archiveSortTime(a)))
         .slice(0, 5)
+      const detailedEntries = await Promise.all(latestEntries.map(async item => {
+        try {
+          const detail = await api.call('getArchiveEntry', { id: item._id })
+          return { ...item, ...detail }
+        } catch (error) {
+          return item
+        }
+      }))
+      const recentEntries = detailedEntries
         .map(item => ({
           ...item,
           dateLabel: formatRecentDate(item.date),
           categoryName: categoryMap[item.categoryId] || item.uploaderRole || '历史事件',
           coverText: '档',
+          carouselPhotos: (item.photos || []).filter(Boolean).slice(0, 5),
           summaryText: item.summary || item.content || item.location || '点击查看历史事件详情',
           meta: `${categoryMap[item.categoryId] || item.uploaderRole || '档案'} · ${item.uploadedBy || item.ownerName || '已归档'}`
         }))
