@@ -92,7 +92,22 @@
   <scroll-view scroll-x class="event-scroll">
     <view class="event-row">
       <view class="event-card tone-{{item.tone}}" wx:for="{{activities}}" wx:key="_id" data-id="{{item._id}}" bindtap="openActivity">
-        <view class="event-mark">{{item.mark}}</view>
+        <swiper
+          wx:if="{{item.carouselPhotos.length}}"
+          class="event-swiper"
+          circular
+          autoplay
+          interval="3600"
+          duration="450"
+          indicator-dots="{{item.carouselPhotos.length > 1}}"
+          indicator-color="rgba(255,255,255,.35)"
+          indicator-active-color="#ffffff"
+        >
+          <swiper-item wx:for="{{item.carouselPhotos}}" wx:for-item="photo" wx:key="*this">
+            <image class="event-photo" src="{{photo}}" mode="aspectFill" />
+          </swiper-item>
+        </swiper>
+        <view wx:else class="event-mark">{{item.mark}}</view>
         <view class="event-date">{{item.dateLabel}}</view>
         <view class="event-title">{{item.title}}</view>
         <view class="event-team">{{item.team}} · {{item.photoCount}}张照片</view>

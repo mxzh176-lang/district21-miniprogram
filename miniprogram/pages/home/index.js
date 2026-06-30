@@ -5,6 +5,20 @@ const todoDisplay = require('../../utils/todo-display')
 
 const ORG_OPTIONS = orgScope.ORG_OPTIONS
 
+function archiveOrganizationId(scope = {}) {
+  return scope.dataId || scope.orgId || 'district'
+}
+
+function formatArchiveDate(value) {
+  const text = String(value || '')
+  if (text.length < 10) return text
+  return `${text.slice(0, 4)}年${Number(text.slice(5, 7))}月${Number(text.slice(8, 10))}日`
+}
+
+function archiveSortTime(item = {}) {
+  return String(item.updatedAt || item.createdAt || item.date || '')
+}
+
 Page({
   data: {
     summary: {},
@@ -99,7 +113,6 @@ Page({
     const homePendingCount = tasks.filter(item => !item.completed).length
     const completedCount = tasks.filter(item => item.completed).length
     const scopedActivities = this.data.allActivities.filter(item => orgScope.matchesScope(item, currentOrg))
-    const activities = scopedActivities.slice(0, 3)
     const notices = this.data.allNotices.filter(item => orgScope.matchesScope(item, currentOrg) || !item.teamId).slice(0, 3)
     const baseSummary = this.data.baseSummary || {}
     const currentTeam = teams.find(item => item.id === currentOrg.orgId || item.orgId === currentOrg.orgId)
@@ -116,7 +129,7 @@ Page({
       homePendingCount,
       homeVisibleCount,
       homeHasMore: homePendingCount > homeVisibleCount,
-      activities,
+      activities: [],
       notices,
       summary: {
         ...baseSummary,
@@ -126,8 +139,43 @@ Page({
         photoCount
       },
       careOverview: this.data.baseCareOverview || {},
-      historyTitle: isDistrict ? '最近服务足迹' : '服务队历史事件'
+      historyTitle: '最新归档'
     })
+    this.loadArchiveEventsForHome()
+  },
+
+  async loadArchiveEventsForHome() {
+    const organizationId = archiveOrganizationId(this.data.currentOrg)
+    try {
+      let entries = await api.call('listArchiveEntries', { organizationId })
+      if (!entries || !entries.length) entries = await api.call('listArchiveEntries', { organizationId, status: 'archived' })
+      const latestEntries = (entries || [])
+        .slice()
+        .sort((a, b) => archiveSortTime(b).localeCompare(archiveSortTime(a)))
+        .slice(0, 5)
+      const detailedEntries = await Promise.all(latestEntries.map(async item => {
+        try {
+          const detail = await api.call('getArchiveEntry', { id: item._id })
+          return { ...item, ...detail }
+        } catch (error) {
+          return item
+        }
+      }))
+      const activities = detailedEntries.map(item => ({
+        ...item,
+        mark: '档',
+        dateLabel: formatArchiveDate(item.date),
+        carouselPhotos: (item.photos || []).filter(Boolean).slice(0, 5),
+        team: item.team || this.data.currentOrg.orgName,
+        photoCount: item.photoCount || (item.photos || []).length || 0,
+        tone: item.tone || 'blue'
+      }))
+      if (archiveOrganizationId(this.data.currentOrg) === organizationId) {
+        this.setData({ activities })
+      }
+    } catch (error) {
+      this.setData({ activities: [] })
+    }
   },
 
   goTasks() {
@@ -184,11 +232,11 @@ Page({
   },
 
   goActivities() {
-    wx.navigateTo({ url: '/pages/history/index' })
+    wx.navigateTo({ url: `/pages/archive/list/index?organization=${archiveOrganizationId(this.data.currentOrg)}&category=all` })
   },
 
   openActivity(event) {
-    wx.navigateTo({ url: `/pages/activities/detail/index?id=${event.currentTarget.dataset.id}` })
+    wx.navigateTo({ url: `/pages/archive/detail/index?id=${event.currentTarget.dataset.id}` })
   },
 
   goNotices() {
