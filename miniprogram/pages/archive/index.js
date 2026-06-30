@@ -19,6 +19,10 @@ function formatRecentDate(value) {
   return `${text.slice(0, 4)}年${Number(text.slice(5, 7))}月${Number(text.slice(8, 10))}日`
 }
 
+function archiveSortTime(item = {}) {
+  return String(item.updatedAt || item.createdAt || item.date || '')
+}
+
 Page({
   data: {
     organizations: [],
@@ -152,14 +156,15 @@ Page({
       const categoryMap = categoryNameMap(this.data.selectedOrganization)
       const recentEntries = (entries || [])
         .slice()
-        .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
+        .sort((a, b) => archiveSortTime(b).localeCompare(archiveSortTime(a)))
         .slice(0, 5)
         .map(item => ({
           ...item,
           dateLabel: formatRecentDate(item.date),
           categoryName: categoryMap[item.categoryId] || item.uploaderRole || '历史事件',
-          coverText: String(categoryMap[item.categoryId] || item.uploaderRole || item.title || '史').slice(0, 2),
-          meta: `${item.team || this.data.selectedOrganization.shortName || this.data.selectedOrganization.name || '当前组织'} · ${item.photoCount || 0}张照片`
+          coverText: '档',
+          summaryText: item.summary || item.content || item.location || '点击查看历史事件详情',
+          meta: `${categoryMap[item.categoryId] || item.uploaderRole || '档案'} · ${item.uploadedBy || item.ownerName || '已归档'}`
         }))
       this.setData({ recentEntries })
     } catch (error) {
