@@ -8,9 +8,9 @@ pages
       -> organization-service
       -> user-service
       -> event-service
-      -> assistant-service
-          -> providers/cloudbase-adapter
-              -> cloudfunctions/api
+      -> honor-service
+      -> providers/cloudbase-adapter
+          -> cloudfunctions/api
 ```
 
 - 页面不直接访问数据库或调用云函数。
@@ -39,15 +39,14 @@ district21-miniprogram/
 │   │   ├── organization-service.js
 │   │   ├── user-service.js
 │   │   ├── event-service.js
-│   │   ├── assistant-service.js
+│   │   ├── honor-service.js
 │   │   ├── platform-service.js
 │   │   └── providers/
 │   │       └── cloudbase-adapter.js
 │   └── utils/
 │       ├── api.js                  # 页面统一 API 入口
 │       ├── permission.js           # 角色、组织、菜单、岗位权限
-│       ├── auth.js
-│       └── assistant.js
+│       └── auth.js
 └── docs/
     └── architecture/
 ```

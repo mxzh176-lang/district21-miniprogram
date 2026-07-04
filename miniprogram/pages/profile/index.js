@@ -39,10 +39,6 @@ Page({
     wx.navigateTo({ url: '/pages/notices/index' })
   },
 
-  goKnowledge() {
-    wx.navigateTo({ url: '/pages/knowledge/index' })
-  },
-
   goHistory() {
     wx.navigateTo({ url: '/pages/history/index' })
   },

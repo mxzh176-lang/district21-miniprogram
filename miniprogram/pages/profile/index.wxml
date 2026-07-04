@@ -35,11 +35,6 @@
     <view class="menu-copy"><view class="menu-title">通知公告</view><view class="menu-desc">岗位交接与公益服务通知</view></view>
     <view class="arrow">›</view>
   </view>
-  <view class="menu-card" bindtap="goKnowledge">
-    <view class="menu-icon knowledge">知</view>
-    <view class="menu-copy"><view class="menu-title">中国狮子联会知识库</view><view class="menu-desc">官方资料、制度索引与服务知识</view></view>
-    <view class="arrow">›</view>
-  </view>
   <view class="menu-card" bindtap="goHistory">
     <view class="menu-icon green">史</view>
     <view class="menu-copy"><view class="menu-title">协作区与四队发展历史</view><view class="menu-desc">按年份保存重要服务与里程碑</view></view>

@@ -1,5 +1,4 @@
 const data = require('../data/mock-data')
-const knowledgeBase = require('../data/knowledge-base')
 const platformService = require('../services/platform-service')
 const organizationService = require('../services/organization-service')
 const eventService = require('../services/event-service')
@@ -968,15 +967,6 @@ function localCall(action, payload = {}) {
       break
     case 'listContent':
       result = payload.type === 'history' ? data.history : data.notices
-      break
-    case 'listKnowledge':
-      result = {
-        categories: knowledgeBase.categories,
-        items: knowledgeBase.items
-      }
-      break
-    case 'getKnowledge':
-      result = findById(knowledgeBase.items, payload.id) || {}
       break
     case 'getAdminStats':
       result = { taskCount: 6, orgCount: 8, activityCount: 6, memberCount: 120, photoCount: 1248, hasSeedData: true }
