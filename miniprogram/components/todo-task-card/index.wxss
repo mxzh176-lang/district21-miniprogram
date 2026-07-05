@@ -240,3 +240,70 @@
 .compact-card .countdown-unit {
   font-size: 18rpx;
 }
+
+/* Feishu-style refresh */
+.task-card,
+.task-card.tone-service,
+.task-card.tone-meeting,
+.task-card.tone-birthday,
+.task-card.tone-social,
+.task-card.tone-visit,
+.task-card.tone-training {
+  border: 1rpx solid #eef0f5;
+  background: #fff;
+  box-shadow: 0 10rpx 30rpx rgba(31, 35, 41, .06);
+}
+
+.category-rail {
+  border-right: 1rpx solid #eef0f5;
+  background: #f7f8fa;
+}
+
+.category-icon {
+  border: 0;
+  color: #1456f0;
+  background: #eff4ff;
+}
+
+.category-name,
+.title {
+  color: #1f2329;
+}
+
+.info-row,
+.info-icon {
+  color: #646a73;
+}
+
+.team-label {
+  color: #1456f0;
+  background: #eff4ff;
+}
+
+.countdown,
+.tone-service .countdown,
+.tone-meeting .countdown,
+.tone-birthday .countdown,
+.tone-social .countdown,
+.tone-visit .countdown,
+.tone-training .countdown {
+  color: #1456f0;
+  text-shadow: none;
+}
+
+.check-box {
+  border-color: #c9cdd4;
+  color: #fff;
+  background: #fff;
+}
+
+.check-box.checked {
+  border-color: #0c9b6b;
+  color: #fff;
+  background: #0c9b6b;
+}
+
+.task-card.done {
+  opacity: .72;
+  filter: none;
+}

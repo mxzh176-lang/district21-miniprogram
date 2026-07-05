@@ -399,3 +399,110 @@
   background: linear-gradient(135deg, #b15df0, #4f8be4);
   box-shadow: 0 0 22rpx rgba(201, 130, 255, 0.54);
 }
+
+/* Feishu-style refresh */
+.contacts-page {
+  background: #f7f8fa;
+  color: #1f2329;
+}
+
+.scope-card,
+.member-hero,
+.contact-card {
+  border: 1rpx solid #eef0f5;
+  color: #1f2329;
+  background: #fff;
+  box-shadow: 0 10rpx 30rpx rgba(31, 35, 41, .06);
+}
+
+.scope-kicker,
+.hero-kicker,
+.group-letter,
+.search-icon {
+  color: #1456f0;
+}
+
+.scope-name,
+.hero-title,
+.name {
+  color: #1f2329;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+.scope-switch,
+.team-filter.active,
+.edit-chip {
+  color: #1456f0;
+  background: #eff4ff;
+}
+
+.member-hero {
+  background:
+    radial-gradient(circle at 88% 8%, rgba(20, 86, 240, .11), transparent 30%),
+    #fff;
+}
+
+.add-member {
+  border: 0;
+  color: #fff;
+  background: #1456f0;
+}
+
+.search-box {
+  border: 1rpx solid #e8eaf0;
+  background: #f7f8fa;
+}
+
+.search-box input {
+  color: #1f2329;
+}
+
+.team-filter {
+  border: 1rpx solid #e8eaf0;
+  color: #646a73;
+  background: #fff;
+}
+
+.team-filter.active {
+  border-color: #d0d7ff;
+}
+
+.position,
+.company,
+.contact-arrow {
+  color: #646a73;
+}
+
+.member-info text,
+.team-name {
+  color: #1456f0;
+  background: #eff4ff;
+}
+
+.edit-chip {
+  border-color: #d0d7ff;
+}
+
+.contact-card-green,
+.contact-card-red,
+.contact-card-blue,
+.contact-card-purple,
+.contact-card-gold {
+  border-color: #eef0f5;
+}
+
+.contact-card-green .team-ribbon { background: #14c9c9; }
+.contact-card-red .team-ribbon { background: #f54a45; }
+.contact-card-blue .team-ribbon { background: #3370ff; }
+.contact-card-purple .team-ribbon { background: #7b7df7; }
+.contact-card-gold .team-ribbon { background: #f59e0b; }
+
+.alphabet-letter {
+  color: #8f959e;
+}
+
+.alphabet-letter.active,
+.letter-bubble {
+  background: #1456f0;
+  box-shadow: 0 8rpx 20rpx rgba(20, 86, 240, .24);
+}

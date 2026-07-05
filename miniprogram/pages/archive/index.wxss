@@ -562,3 +562,130 @@
   color: #e3bcff;
   background: linear-gradient(145deg, rgba(159, 88, 225, 0.3), rgba(61, 111, 180, 0.26));
 }
+
+/* Feishu-style refresh */
+.page {
+  min-height: 100vh;
+  padding: 24rpx;
+  background: #f7f8fa;
+  color: #1f2329;
+}
+
+.archive-hero {
+  border: 0;
+  color: #fff;
+  background:
+    radial-gradient(circle at 86% 12%, rgba(255, 255, 255, .38), transparent 30%),
+    linear-gradient(135deg, #3370ff, #7b7df7);
+  box-shadow: 0 18rpx 42rpx rgba(20, 86, 240, .14);
+}
+
+.hero-kicker,
+.photo-kicker,
+.history-link,
+.honor-link,
+.record-count {
+  color: #1456f0;
+}
+
+.archive-hero .hero-kicker,
+.archive-hero .hero-title,
+.archive-hero .hero-desc {
+  color: #fff;
+}
+
+.hero-title,
+.category-name,
+.committee-name,
+.section-title,
+.honor-title,
+.recent-title {
+  color: #1f2329;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+.organization-tab {
+  border: 1rpx solid #e8eaf0;
+  color: #646a73;
+  background: #fff;
+}
+
+.organization-tab.active {
+  color: #fff;
+  border-color: #1456f0;
+  background: #1456f0;
+}
+
+.confirm-entry,
+.honor-overview,
+.organization-card,
+.category-card,
+.recent-card,
+.archive-empty {
+  border: 1rpx solid #eef0f5;
+  color: #1f2329;
+  background: #fff;
+  box-shadow: 0 10rpx 30rpx rgba(31, 35, 41, .06);
+}
+
+.confirm-title,
+.confirm-action,
+.category-person,
+.committee-role,
+.category-footer,
+.position-edit {
+  color: #1456f0;
+}
+
+.confirm-desc,
+.honor-desc,
+.section-desc,
+.organization-desc,
+.recent-date,
+.recent-summary,
+.recent-meta,
+.ledger-note {
+  color: #646a73;
+}
+
+.honor-stat,
+.committee-list {
+  background: #f7f8fa;
+}
+
+.honor-value {
+  color: #1456f0;
+}
+
+.honor-label,
+.committee-item,
+.committee-arrow {
+  color: #646a73;
+}
+
+.committee-item {
+  border: 1rpx solid #eef0f5;
+  background: #fff;
+}
+
+.recent-category,
+.compact-empty {
+  color: #1456f0;
+  background: #eff4ff;
+}
+
+.recent-placeholder,
+.recent-badge {
+  color: #1456f0;
+  border-color: #d0d7ff;
+  background: #eff4ff;
+}
+
+.position-edit {
+  border-color: #d0d7ff;
+  background: #eff4ff;
+}
+
+.category-footer {
+  border-top-color: #eef0f5;
+}

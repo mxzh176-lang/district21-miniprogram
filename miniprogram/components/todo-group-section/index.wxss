@@ -41,3 +41,23 @@
 .compact-group .group-count {
   font-size: 18rpx;
 }
+
+/* Feishu-style refresh */
+.group-title {
+  color: #1f2329;
+}
+
+.group-dot {
+  background: #3370ff;
+  box-shadow: none;
+}
+
+.group-today .group-title { color: #1456f0; }
+.group-tomorrow .group-title { color: #d97008; }
+.group-week .group-title { color: #7b7df7; }
+.group-later .group-title { color: #646a73; }
+.group-completed .group-title { color: #0c9b6b; }
+
+.group-count {
+  color: #8f959e;
+}

@@ -205,3 +205,86 @@
 .privacy-title {
   color: #f2efff;
 }
+
+/* Feishu-style refresh */
+.page {
+  min-height: 100vh;
+  padding: 24rpx 24rpx 42rpx;
+  background: #f7f8fa;
+  color: #1f2329;
+}
+
+.scope-card,
+.profile-hero,
+.demo-note,
+.menu-card,
+.privacy-card,
+.identity-warning {
+  border: 1rpx solid #eef0f5;
+  color: #1f2329;
+  background: #fff;
+  box-shadow: 0 10rpx 30rpx rgba(31, 35, 41, .06);
+}
+
+.scope-kicker {
+  color: #1456f0;
+}
+
+.scope-name,
+.name,
+.demo-title,
+.menu-title,
+.privacy-title,
+.identity-warning-title,
+.section-title {
+  color: #1f2329;
+}
+
+.scope-switch {
+  color: #1456f0;
+  background: #eff4ff;
+}
+
+.profile-hero {
+  background:
+    radial-gradient(circle at 82% 10%, rgba(20, 86, 240, .11), transparent 32%),
+    #fff;
+}
+
+.profile-hero .avatar {
+  border: 0;
+  color: #1456f0;
+  background: #eff4ff;
+  box-shadow: none;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+.role {
+  color: #1456f0;
+}
+
+.organization,
+.demo-desc,
+.menu-desc,
+.privacy-text,
+.identity-warning-text,
+.version {
+  color: #646a73;
+}
+
+.demo-icon,
+.menu-icon.gold,
+.menu-icon.green,
+.menu-icon.blue {
+  color: #1456f0;
+  background: #eff4ff;
+}
+
+.reconnect-button {
+  color: #fff;
+  background: #1456f0;
+}
+
+.arrow {
+  color: #8f959e;
+}

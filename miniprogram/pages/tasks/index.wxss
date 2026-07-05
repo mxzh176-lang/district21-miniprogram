@@ -215,3 +215,141 @@
 .empty-icon { display: flex; align-items: center; justify-content: center; width: 78rpx; height: 78rpx; margin: 0 auto; border-radius: 24rpx; color: #a996ff; background: rgba(105, 76, 196, .25); font-size: 30rpx; font-weight: 800; }
 .empty-title { margin-top: 20rpx; color: #c8c3d7; font-size: 25rpx; font-weight: 700; }
 .empty-desc { margin-top: 8rpx; color: #77728d; font-size: 20rpx; }
+
+/* Feishu-style refresh */
+.tasks-page {
+  min-height: 100vh;
+  padding: 24rpx 24rpx 64rpx;
+  background: #f7f8fa;
+  color: #1f2329;
+}
+
+.scope-card,
+.task-hero,
+.filter-panel,
+.empty {
+  border: 1rpx solid #eef0f5;
+  color: #1f2329;
+  background: #fff;
+  box-shadow: 0 10rpx 30rpx rgba(31, 35, 41, .06);
+}
+
+.scope-kicker,
+.hero-kicker {
+  color: #1456f0;
+}
+
+.scope-name,
+.hero-title,
+.empty-title,
+.group-title,
+.title,
+.category-name {
+  color: #1f2329;
+}
+
+.scope-switch,
+.category.active,
+.date-chip.active {
+  color: #1456f0;
+  background: #eff4ff;
+}
+
+.hero-desc,
+.progress-summary,
+.progress-label,
+.info-row,
+.info-icon,
+.empty-desc {
+  color: #646a73;
+}
+
+.progress-number {
+  color: #1456f0;
+}
+
+.create-button {
+  background: #1456f0;
+  box-shadow: 0 8rpx 20rpx rgba(20, 86, 240, .22);
+}
+
+.status-row {
+  border-color: #e8eaf0;
+  background: #f7f8fa;
+}
+
+.status-chip {
+  color: #646a73;
+}
+
+.status-chip.active {
+  color: #1456f0;
+  background: #fff;
+  box-shadow: 0 6rpx 18rpx rgba(31, 35, 41, .08);
+}
+
+.team-chip,
+.category,
+.date-chip {
+  border: 1rpx solid #e8eaf0;
+  color: #646a73;
+  background: #fff;
+}
+
+.team-chip.active {
+  border-color: #d0d7ff;
+  color: #1456f0;
+  background: #eff4ff;
+}
+
+.task-card,
+.task-card.tone-service,
+.task-card.tone-meeting,
+.task-card.tone-birthday,
+.task-card.tone-social,
+.task-card.tone-visit,
+.task-card.tone-training {
+  border-color: #eef0f5;
+  background: #fff;
+  box-shadow: 0 10rpx 30rpx rgba(31, 35, 41, .06);
+}
+
+.category-rail {
+  border-right-color: #eef0f5;
+  background: #f7f8fa;
+}
+
+.category-icon,
+.empty-icon {
+  border: 0;
+  color: #1456f0;
+  background: #eff4ff;
+}
+
+.team-label {
+  color: #1456f0;
+  background: #eff4ff;
+}
+
+.countdown,
+.tone-service .countdown,
+.tone-meeting .countdown,
+.tone-birthday .countdown,
+.tone-social .countdown,
+.tone-visit .countdown,
+.tone-training .countdown {
+  color: #1456f0;
+  text-shadow: none;
+}
+
+.check-box {
+  border-color: #c9cdd4;
+  color: #fff;
+  background: #fff;
+}
+
+.check-box.checked {
+  border-color: #0c9b6b;
+  color: #fff;
+  background: #0c9b6b;
+}

@@ -35,16 +35,16 @@
   ],
   "window": {
     "navigationBarTitleText": "二十一协作区",
-    "navigationBarBackgroundColor": "#171033",
-    "navigationBarTextStyle": "white",
-    "backgroundColor": "#0b1024",
-    "backgroundTextStyle": "light"
+    "navigationBarBackgroundColor": "#F7F8FA",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#F7F8FA",
+    "backgroundTextStyle": "dark"
   },
   "tabBar": {
-    "color": "#80799f",
-    "selectedColor": "#c982ff",
-    "backgroundColor": "#120d2b",
-    "borderStyle": "black",
+    "color": "#8F959E",
+    "selectedColor": "#1456F0",
+    "backgroundColor": "#FFFFFF",
+    "borderStyle": "white",
     "list": [
       {
         "pagePath": "pages/home/index",
