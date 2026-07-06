@@ -46,7 +46,7 @@ function toLocalOrganizationId(id) {
 
 function recordToArchiveEntry(record) {
   const images = record.images || []
-  const photos = images.map(item => item.fileId || item.imageUrl).filter(Boolean)
+  const photos = images.map(item => item.imageUrl || item.fileId).filter(Boolean)
   return {
     _id: record.id,
     cloudDocumentId: record._id,

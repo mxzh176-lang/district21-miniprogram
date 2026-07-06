@@ -67,6 +67,29 @@ function cleanParticipants(value) {
   }).filter(group => group.teamId && group.teamName && group.members.length)
 }
 
+async function attachImageUrls(images = []) {
+  const normalized = images.map(item => ({ ...item }))
+  const fileIds = Array.from(new Set(normalized
+    .map(item => cleanText(item.fileId, 1000))
+    .filter(fileId => fileId && fileId.startsWith('cloud://'))))
+  if (!fileIds.length || typeof cloud.getTempFileURL !== 'function') return normalized
+  const urlMap = {}
+  for (let index = 0; index < fileIds.length; index += 50) {
+    try {
+      const response = await cloud.getTempFileURL({ fileList: fileIds.slice(index, index + 50) })
+      ;(response.fileList || []).forEach(item => {
+        if (item.fileID && item.tempFileURL) urlMap[item.fileID] = item.tempFileURL
+      })
+    } catch (error) {
+      console.warn('获取图片临时访问链接失败', error.message)
+    }
+  }
+  return normalized.map(item => ({
+    ...item,
+    imageUrl: urlMap[item.fileId] || item.imageUrl || ''
+  }))
+}
+
 function monthLabel(month) {
   if (!month || !month.includes('-')) return month || ''
   const [year, value] = month.split('-')
@@ -1823,7 +1846,14 @@ async function listEventRecords(openid, event = {}) {
         if (!imageMap[item.eventId]) imageMap[item.eventId] = []
         imageMap[item.eventId].push(item)
       })
-    return records.map(item => ({ ...item, images: imageMap[item.id] || [] }))
+    const imageEntries = Object.values(imageMap).flat()
+    const imageEntriesWithUrls = await attachImageUrls(imageEntries)
+    const resolvedImageMap = {}
+    imageEntriesWithUrls.forEach(item => {
+      if (!resolvedImageMap[item.eventId]) resolvedImageMap[item.eventId] = []
+      resolvedImageMap[item.eventId].push(item)
+    })
+    return records.map(item => ({ ...item, images: resolvedImageMap[item.id] || [] }))
   } catch (error) {
     console.warn('event_image list unavailable', error.message)
     return records
@@ -1920,7 +1950,7 @@ async function getEventRecord(openid, event = {}) {
     .orderBy('sortOrder', 'asc')
     .limit(200)
     .get()
-  return { ...record, images: images.data }
+  return { ...record, images: await attachImageUrls(images.data) }
 }
 
 async function archiveEventRecord(openid, event = {}) {
@@ -2195,7 +2225,7 @@ async function listEventImages(openid, event = {}) {
     .orderBy('sortOrder', 'asc')
     .limit(200)
     .get()
-  return result.data
+  return attachImageUrls(result.data)
 }
 
 async function saveEventImages(openid, event = {}) {
