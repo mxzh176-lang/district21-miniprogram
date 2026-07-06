@@ -6,7 +6,7 @@
   </view>
 
   <view class="denied" wx:if="{{!canImport}}">
-    当前账号无 Word 导入权限。岗位管理员可返回档案窗口录入单条事件。
+    当前账号无 Word 导入权限。栏目负责人可返回档案窗口录入单条事件。
   </view>
 
   <block wx:if="{{canImport}}">

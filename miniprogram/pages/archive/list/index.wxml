@@ -15,8 +15,8 @@
 
   <view class="permission-note">
     <text wx:if="{{categoryId === 'treasurer'}}">账目公开透明，所有成员可查看；仅管理员和当前有效司库可维护。</text>
-    <text wx:elif="{{isSuperAdmin}}">只有最高管理员可批量导入 Word；岗位管理员可新增本栏目的单条事件。</text>
-    <text wx:elif="{{canEdit}}">你可以新增和维护本岗位的内部事件。</text>
+    <text wx:elif="{{isSuperAdmin}}">只有最高管理员可批量导入 Word；栏目负责人可新增本栏目的单条事件。</text>
+    <text wx:elif="{{canEdit}}">你是本栏目负责人，可以新增和维护本栏目的内部事件。</text>
     <text wx:else>当前账号只有查看权限。</text>
   </view>
   <view class="permission-note category-notice" wx:if="{{categoryNotice}}">{{categoryNotice}}</view>

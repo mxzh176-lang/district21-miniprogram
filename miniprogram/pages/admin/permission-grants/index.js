@@ -28,17 +28,17 @@ const ACTION_OPTIONS = [
 ]
 
 const ROLE_PRESETS = [
-  { label: '岗位职务与负责人维护', module: 'archives', scopeType: 'position', actions: ['read', 'update'] },
-  { label: '单岗位档案负责人', module: 'archives', scopeType: 'position' },
-  { label: '副队长团队负责人', module: 'archives', scopeType: 'position_tree' },
-  { label: '服务队档案管理员', module: 'archives', scopeType: 'organization' },
-  { label: '服务队通讯录管理员', module: 'contacts', scopeType: 'organization' },
-  { label: '服务队待办管理员', module: 'tasks', scopeType: 'organization' },
-  { label: '服务队历史事件管理员', module: 'history', scopeType: 'organization' },
-  { label: '服务队荣誉录入员', module: 'honors', scopeType: 'organization' },
-  { label: '岗位荣誉录入员', module: 'honors', scopeType: 'position' },
-  { label: '服务队全内容管理员', module: 'all', scopeType: 'organization' },
-  { label: '协作区全内容管理员', module: 'all', scopeType: 'organization_tree' }
+  { label: '栏目负责人：维护单个档案类目', module: 'archives', scopeType: 'position', actions: ['read', 'create', 'update'] },
+  { label: '分管负责人：维护岗位及子类目', module: 'archives', scopeType: 'position_tree', actions: ['read', 'create', 'update'] },
+  { label: '栏目负责人：维护职务与负责人资料', module: 'archives', scopeType: 'position', actions: ['read', 'update'] },
+  { label: '服务队档案统筹员：维护本队档案', module: 'archives', scopeType: 'organization', actions: ['read', 'create', 'update'] },
+  { label: '服务队通讯录维护员', module: 'contacts', scopeType: 'organization', actions: ['read', 'create', 'update'] },
+  { label: '服务队待办协调员', module: 'tasks', scopeType: 'organization', actions: ['read', 'create', 'update'] },
+  { label: '服务队历史维护员', module: 'history', scopeType: 'organization', actions: ['read', 'create', 'update'] },
+  { label: '服务队荣誉记录员', module: 'honors', scopeType: 'organization', actions: ['read', 'create', 'update'] },
+  { label: '岗位荣誉记录员', module: 'honors', scopeType: 'position', actions: ['read', 'create', 'update'] },
+  { label: '服务队全内容管理员', module: 'all', scopeType: 'organization', actions: ['read', 'create', 'update', 'delete'] },
+  { label: '协作区全内容管理员', module: 'all', scopeType: 'organization_tree', actions: ['read', 'create', 'update', 'delete'] }
 ]
 
 Page({
@@ -144,7 +144,7 @@ Page({
     const preset = this.data.rolePresets[rolePresetIndex]
     const moduleIndex = Math.max(0, this.data.moduleOptions.findIndex(item => item.value === preset.module))
     const scopeIndex = Math.max(0, this.data.scopeOptions.findIndex(item => item.value === preset.scopeType))
-    const actions = preset.actions || ['read', 'create', 'update', 'delete']
+    const actions = preset.actions || ['read', 'create', 'update']
     this.setData({
       rolePresetIndex,
       moduleIndex,

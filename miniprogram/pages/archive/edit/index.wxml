@@ -15,8 +15,8 @@
   <view class="permission-tip" wx:if="{{canEdit}}">
     <view class="tip-icon">✓</view>
     <view>
-      <view class="tip-title">当前账号可以录入</view>
-      <view class="tip-text">事件自动关联当前服务队、岗位和录入账号。</view>
+      <view class="tip-title">当前账号是本栏目负责人</view>
+      <view class="tip-text">事件自动关联当前服务队、栏目和录入账号，不会获得管理员权限。</view>
     </view>
   </view>
   <view class="permission-tip denied" wx:else>

@@ -2,7 +2,7 @@
   <view class="grant-hero">
     <view class="hero-kicker">GRANULAR ACCESS</view>
     <view class="hero-title">人员精细授权</view>
-    <view class="hero-desc">权限可以重复并自动叠加。每条授权独立设置组织、模块、数据范围、操作和任期。</view>
+    <view class="hero-desc">类目专人优先授权为“栏目负责人”，只维护自己负责的类目；不要直接升为管理员。</view>
   </view>
   <view class="readonly-note" wx:if="{{!canEdit}}">当前为只读模式，只有协作区管理员可分配或取消模块权限。</view>
 
@@ -16,6 +16,7 @@
     <picker range="{{rolePresets}}" range-key="label" value="{{rolePresetIndex}}" bindchange="onRolePresetChange">
       <view class="picker-value">{{rolePresets[rolePresetIndex].label}}</view>
     </picker>
+    <view class="identity-tip">建议：每个类目事件专人选择“栏目负责人”或“分管负责人”，默认只有查看、新增和修改权限；删除和全组织权限只给真正管理员。</view>
     <view class="field-label">授权给谁</view>
     <picker range="{{users}}" range-key="displayName" value="{{userIndex}}" bindchange="onUserChange">
       <view class="picker-value">{{users.length ? users[userIndex].displayName : '暂无资料完整的成员'}}</view>
@@ -27,7 +28,7 @@
       <view class="picker-value">{{organizations.length ? organizations[organizationIndex].name : '暂无组织'}}</view>
     </picker>
 
-    <view class="field-label">管理模块</view>
+    <view class="field-label">授权模块</view>
     <picker range="{{moduleOptions}}" range-key="label" value="{{moduleIndex}}" bindchange="onModuleChange">
       <view class="picker-value">{{moduleOptions[moduleIndex].label}}</view>
     </picker>
