@@ -2,11 +2,40 @@ const api = require('../../utils/api')
 const permission = require('../../utils/permission')
 const orgScope = require('../../utils/org-scope')
 const todoDisplay = require('../../utils/todo-display')
+const { uploadOrgFile } = require('../../services/file-upload-service')
 
 const ORG_OPTIONS = orgScope.ORG_OPTIONS
+const BANNER_ORGANIZATION_IDS = {
+  district: 'org_region_21_suihua',
+  district21: 'org_region_21_suihua',
+  linghang: 'org_team_linghang',
+  ailinghang: 'org_team_ailinghang',
+  yuanhang: 'org_team_yuanhang',
+  jingying: 'org_team_jingying'
+}
+const TEAM_BANNER_ORGANIZATIONS = [
+  'org_team_linghang',
+  'org_team_ailinghang',
+  'org_team_yuanhang',
+  'org_team_jingying'
+]
 
 function archiveOrganizationId(scope = {}) {
   return scope.dataId || scope.orgId || 'district'
+}
+
+function bannerOrganizationId(scope = {}) {
+  const rawId = scope.cloudId || scope.organizationId || scope.orgId || scope.dataId || 'district'
+  return BANNER_ORGANIZATION_IDS[rawId] || rawId || 'org_region_21_suihua'
+}
+
+function bannerOrganizationContext(scope = {}) {
+  const id = bannerOrganizationId(scope)
+  return {
+    id,
+    cloudId: id,
+    ancestorIds: TEAM_BANNER_ORGANIZATIONS.includes(id) ? ['org_region_21_suihua'] : []
+  }
 }
 
 function formatArchiveDate(value) {
@@ -40,7 +69,11 @@ Page({
     allNotices: [],
     baseSummary: {},
     baseCareOverview: {},
-    canCreateTask: false
+    baseBanners: [],
+    session: null,
+    canCreateTask: false,
+    canManageBanners: false,
+    bannerSaving: false
   },
 
   onLoad() {
@@ -73,6 +106,36 @@ Page({
     ]
   },
 
+  bannerSources(items = []) {
+    return items
+      .map(item => typeof item === 'string' ? item : item.src || item.imageUrl || item.fileID || item.fileId || '')
+      .filter(Boolean)
+  },
+
+  refreshBannerPermission(session = this.data.session, currentOrg = this.data.currentOrg) {
+    const canManageBanners = permission.canAccessOrganization(session, bannerOrganizationContext(currentOrg))
+    this.setData({ canManageBanners })
+  },
+
+  async loadHomeBannersForScope() {
+    const currentOrg = this.data.currentOrg || ORG_OPTIONS[0]
+    const organizationId = bannerOrganizationId(currentOrg)
+    try {
+      const banners = await api.call('listHomeBanners', { organizationId })
+      const sources = this.bannerSources(banners)
+      this.setData({
+        banners: sources,
+        heroSlides: this.buildHeroSlides(sources.length ? sources : this.data.baseBanners)
+      })
+    } catch (error) {
+      const fallback = this.data.baseBanners || []
+      this.setData({
+        banners: fallback,
+        heroSlides: this.buildHeroSlides(fallback)
+      })
+    }
+  },
+
   async loadHome() {
     const selectedMonth = todoDisplay.currentMonth()
     const [data, session, monthData] = await Promise.all([
@@ -90,9 +153,13 @@ Page({
       allNotices: data.notices || [],
       baseSummary: data.summary || {},
       baseCareOverview: data.careOverview || {},
+      baseBanners: data.banners || [],
+      session,
       canCreateTask: permission.canPerform(session, 'todo', 'create')
     })
+    this.refreshBannerPermission(session)
     this.applyOrgScope()
+    await this.loadHomeBannersForScope()
   },
 
   applyOrgScope() {
@@ -192,9 +259,94 @@ Page({
       success: result => {
         const currentOrg = orgScope.setCurrentScope(ORG_OPTIONS[result.tapIndex])
         this.setData({ currentOrg })
+        this.refreshBannerPermission()
         this.applyOrgScope()
+        this.loadHomeBannersForScope()
       }
     })
+  },
+
+  editHomeBanners() {
+    if (!this.data.canManageBanners || this.data.bannerSaving) return
+    wx.showActionSheet({
+      itemList: ['替换当前轮播图', '清空当前轮播图'],
+      success: result => {
+        if (result.tapIndex === 0) this.chooseHomeBanners()
+        if (result.tapIndex === 1) this.clearHomeBanners()
+      }
+    })
+  },
+
+  async chooseHomeBanners() {
+    try {
+      const media = await new Promise((resolve, reject) => {
+        wx.chooseMedia({
+          count: 9,
+          mediaType: ['image'],
+          sourceType: ['album', 'camera'],
+          sizeType: ['compressed'],
+          success: resolve,
+          fail: reject
+        })
+      })
+      const files = media.tempFiles || []
+      if (!files.length) return
+      await this.saveSelectedHomeBanners(files)
+    } catch (error) {
+      if (error && !String(error.errMsg || '').includes('cancel')) api.showError(error)
+    }
+  },
+
+  async saveSelectedHomeBanners(files = []) {
+    const currentOrg = this.data.currentOrg || ORG_OPTIONS[0]
+    const organizationId = bannerOrganizationId(currentOrg)
+    this.setData({ bannerSaving: true })
+    wx.showLoading({ title: '上传轮播图' })
+    try {
+      const uploaded = await Promise.all(files.map((item, index) => uploadOrgFile({
+        filePath: item.tempFilePath || item.path,
+        organizationId,
+        leaderRole: '首页轮播',
+        departmentName: '',
+        eventName: `${currentOrg.orgName || '当前范围'}首页轮播`,
+        sequence: index,
+        resourceType: 'home_banner',
+        resourceId: organizationId,
+        module: 'photos'
+      })))
+      const banners = uploaded.map(item => item.fileID).filter(Boolean)
+      await api.call('saveHomeBanners', {
+        organizationId,
+        scopeName: currentOrg.orgName,
+        banners
+      })
+      await this.loadHomeBannersForScope()
+      wx.showToast({ title: '轮播已更新', icon: 'success' })
+    } catch (error) {
+      api.showError(error)
+    } finally {
+      wx.hideLoading()
+      this.setData({ bannerSaving: false })
+    }
+  },
+
+  async clearHomeBanners() {
+    const currentOrg = this.data.currentOrg || ORG_OPTIONS[0]
+    const organizationId = bannerOrganizationId(currentOrg)
+    this.setData({ bannerSaving: true })
+    try {
+      await api.call('saveHomeBanners', {
+        organizationId,
+        scopeName: currentOrg.orgName,
+        banners: []
+      })
+      await this.loadHomeBannersForScope()
+      wx.showToast({ title: '已清空轮播', icon: 'success' })
+    } catch (error) {
+      api.showError(error)
+    } finally {
+      this.setData({ bannerSaving: false })
+    }
   },
 
   openTask(event) {

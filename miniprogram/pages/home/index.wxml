@@ -7,25 +7,30 @@
     <view class="scope-action">切换 ▼</view>
   </view>
 
-  <swiper class="hero-swiper" autoplay circular indicator-dots interval="3500">
-    <swiper-item wx:for="{{heroSlides}}" wx:key="key">
-      <view wx:if="{{item.type === 'intro'}}" class="hero">
-        <view class="hero-top">
-          <view>
-            <view class="eyebrow">LIONS DISTRICT 21 · SUIHUA</view>
-            <view class="hero-title org-title"><text>{{currentOrg.orgName}}</text></view>
-            <view class="hero-subtitle">二一聚力 · 再创佳绩</view>
+  <view class="hero-wrap">
+    <swiper class="hero-swiper" autoplay circular indicator-dots interval="3500">
+      <swiper-item wx:for="{{heroSlides}}" wx:key="key">
+        <view wx:if="{{item.type === 'intro'}}" class="hero">
+          <view class="hero-top">
+            <view>
+              <view class="eyebrow">LIONS DISTRICT 21 · SUIHUA</view>
+              <view class="hero-title org-title"><text>{{currentOrg.orgName}}</text></view>
+              <view class="hero-subtitle">二一聚力 · 再创佳绩</view>
+            </view>
+            <view class="hero-seal">21</view>
           </view>
-          <view class="hero-seal">21</view>
+          <view class="term-row">
+            <view>2026—2027年度</view>
+            <view class="demo-tag">四队同心</view>
+          </view>
         </view>
-        <view class="term-row">
-          <view>2026—2027年度</view>
-          <view class="demo-tag">四队同心</view>
-        </view>
-      </view>
-      <image wx:else src="{{item.src}}" mode="aspectFill" />
-    </swiper-item>
-  </swiper>
+        <image wx:else src="{{item.src}}" mode="aspectFill" />
+      </swiper-item>
+    </swiper>
+    <view wx:if="{{canManageBanners}}" class="banner-edit" catchtap="editHomeBanners">
+      {{bannerSaving ? '保存中' : '编辑轮播'}}
+    </view>
+  </view>
 
   <view class="section-row">
     <view>

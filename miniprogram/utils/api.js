@@ -74,6 +74,55 @@ function saveLocalLedgerRecords(records) {
   wx.setStorageSync('demoLedgerRecords', records)
 }
 
+const DEFAULT_HOME_BANNERS = {
+  org_region_21_suihua: [
+    '/images/archives/word-service-001/01.jpg',
+    '/images/archives/word-service-003/01.jpg',
+    '/images/archives/word-care-001/01.jpg',
+    '/images/archives/word-social-001/01.jpg',
+    '/images/archives/word-training-001/01.jpg'
+  ],
+  org_team_linghang: ['/images/archives/word-service-001/01.jpg', '/images/archives/word-training-001/01.jpg'],
+  org_team_ailinghang: ['/images/archives/word-care-001/01.jpg', '/images/archives/word-service-003/01.jpg'],
+  org_team_yuanhang: ['/images/archives/word-social-001/01.jpg', '/images/archives/word-service-001/01.jpg'],
+  org_team_jingying: ['/images/archives/word-training-001/01.jpg', '/images/archives/word-care-001/01.jpg']
+}
+const HOME_BANNER_ALIASES = {
+  district: 'org_region_21_suihua',
+  district21: 'org_region_21_suihua',
+  linghang: 'org_team_linghang',
+  ailinghang: 'org_team_ailinghang',
+  yuanhang: 'org_team_yuanhang',
+  jingying: 'org_team_jingying'
+}
+
+function normalizeHomeBannerOrganizationId(value) {
+  const id = String(value || 'org_region_21_suihua')
+  return HOME_BANNER_ALIASES[id] || id
+}
+
+function getLocalHomeBannerStore() {
+  try {
+    return wx.getStorageSync('demoHomeBanners') || {}
+  } catch (error) {
+    return {}
+  }
+}
+
+function getLocalHomeBanners(organizationId) {
+  const id = normalizeHomeBannerOrganizationId(organizationId)
+  const saved = getLocalHomeBannerStore()
+  return saved[id] || DEFAULT_HOME_BANNERS[id] || DEFAULT_HOME_BANNERS.org_region_21_suihua
+}
+
+function saveLocalHomeBanners(organizationId, banners = []) {
+  const id = normalizeHomeBannerOrganizationId(organizationId)
+  const saved = getLocalHomeBannerStore()
+  saved[id] = banners.filter(Boolean).slice(0, 9)
+  wx.setStorageSync('demoHomeBanners', saved)
+  return saved[id]
+}
+
 function allTasks() {
   const tasks = {}
   data.tasks.concat(getLocalTasks()).forEach(item => {
@@ -472,14 +521,14 @@ function localCall(action, payload = {}) {
         notices: data.notices,
         activities: data.activities.slice(0, 3),
         teams: data.teams,
-        banners: [
-          '/images/archives/word-service-001/01.jpg',
-          '/images/archives/word-service-003/01.jpg',
-          '/images/archives/word-care-001/01.jpg',
-          '/images/archives/word-social-001/01.jpg',
-          '/images/archives/word-training-001/01.jpg'
-        ]
+        banners: getLocalHomeBanners('org_region_21_suihua')
       }
+      break
+    case 'listHomeBanners':
+      result = getLocalHomeBanners(payload.organizationId)
+      break
+    case 'saveHomeBanners':
+      result = saveLocalHomeBanners(payload.organizationId, payload.banners || [])
       break
     case 'listTasks': {
       const tasks = allTasks().map(item => ({ ...item, status: effectiveTaskStatus(item) })).filter(item => {
@@ -1008,7 +1057,8 @@ function canFallbackToLocal(action) {
     'listStructure',
     'listArchiveEntries',
     'listLedgerRecords',
-    'getArchiveEntry'
+    'getArchiveEntry',
+    'listHomeBanners'
   ].includes(action)
 }
 

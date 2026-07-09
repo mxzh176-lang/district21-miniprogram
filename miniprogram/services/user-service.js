@@ -5,6 +5,8 @@ const ACTIONS = [
   'saveMyProfile',
   'saveUserMemberCode',
   'listProfileOrganizations',
+  'listHomeBanners',
+  'saveHomeBanners',
   'bootstrapGovernance',
   'listRoleAssignments',
   'listPlatformUsers',
@@ -40,6 +42,7 @@ async function execute(action, payload, localFallback) {
   if (action === 'saveMyProfile') return cloudbase.invoke('saveMyProfile', payload)
   if (action === 'saveUserMemberCode') return cloudbase.invoke('saveUserMemberCode', payload)
   if (action === 'listProfileOrganizations') return cloudbase.invoke('listProfileOrganizations', payload)
+  if (['listHomeBanners', 'saveHomeBanners'].includes(action)) return cloudbase.invoke(action, payload)
   if ([
     'bootstrapGovernance',
     'listRoleAssignments',

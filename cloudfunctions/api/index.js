@@ -23,6 +23,7 @@ const COLLECTIONS = {
   operationLog: 'operation_log',
   ledgerRecord: 'ledger_record',
   honorRecord: 'honor_record',
+  homeBanner: 'home_banners',
   members: 'members',
   tasks: 'tasks',
   org: 'org_units',
@@ -2358,6 +2359,10 @@ async function saveFileRecord(openid, event = {}) {
       throw Object.assign(new Error('文件组织与事件组织不一致'), { code: 'FILE_ORGANIZATION_MISMATCH' })
     }
     await requireEventEditor(openid, record, 'upload')
+  } else if (resourceType === 'home_banner') {
+    if (!await canAdministerOrganization(user.id, organizationId)) {
+      throw Object.assign(new Error('仅超管、协作区管理员或当前服务队管理员可上传首页轮播'), { code: 'PERMISSION_DENIED' })
+    }
   } else {
     const portModule = module === 'history' ? 'history' : 'archive'
     const portState = await portPermissionState(user.id, portModule, 'upload', { organizationId })
@@ -2521,6 +2526,109 @@ async function applyMembership(openid, event) {
   }
   const result = await db.collection(COLLECTIONS.members).add({ data })
   return publicMember({ ...data, _id: result._id })
+}
+
+const HOME_BANNER_ALLOWED_ORGANIZATIONS = [
+  'org_region_21_suihua',
+  'org_team_linghang',
+  'org_team_ailinghang',
+  'org_team_yuanhang',
+  'org_team_jingying'
+]
+
+function normalizeHomeBannerOrganizationId(value) {
+  const organizationId = canonicalOrganizationId(value || 'org_region_21_suihua')
+  if (!HOME_BANNER_ALLOWED_ORGANIZATIONS.includes(organizationId)) {
+    throw Object.assign(new Error('请选择协作区或服务队'), { code: 'INVALID_HOME_BANNER_ORGANIZATION' })
+  }
+  return organizationId
+}
+
+async function ensureHomeBannerCollection() {
+  try {
+    await db.collection(COLLECTIONS.homeBanner).limit(1).get()
+  } catch (error) {
+    if (typeof db.createCollection !== 'function') throw error
+    try {
+      await db.createCollection(COLLECTIONS.homeBanner)
+    } catch (createError) {
+      if (!/exist|already/i.test(createError.message || '')) throw createError
+    }
+  }
+}
+
+async function listHomeBanners(openid, event = {}) {
+  await requireApproved(openid)
+  const organizationId = normalizeHomeBannerOrganizationId(event.organizationId)
+  try {
+    const result = await db.collection(COLLECTIONS.homeBanner)
+      .where({ organizationId, status: 'active' })
+      .limit(20)
+      .get()
+    const rows = result.data
+      .slice()
+      .sort((a, b) => (Number(a.sortOrder) || 0) - (Number(b.sortOrder) || 0))
+    const withUrls = await attachImageUrls(rows.map(item => ({
+      id: item.id,
+      fileId: item.fileId,
+      imageUrl: item.imageUrl,
+      sortOrder: item.sortOrder
+    })))
+    return withUrls.map(item => ({
+      id: item.id,
+      fileId: item.fileId,
+      imageUrl: item.imageUrl,
+      src: item.imageUrl || item.fileId,
+      sortOrder: item.sortOrder
+    }))
+  } catch (error) {
+    if (/collection|not exist|doesn't exist/i.test(error.message || '')) return []
+    throw error
+  }
+}
+
+async function saveHomeBanners(openid, event = {}) {
+  const user = await requirePlatformUser(openid)
+  const organizationId = normalizeHomeBannerOrganizationId(event.organizationId)
+  if (!await canAdministerOrganization(user.id, organizationId)) {
+    throw Object.assign(new Error('仅超管、协作区管理员或当前服务队管理员可编辑首页轮播'), { code: 'PERMISSION_DENIED' })
+  }
+  await ensureHomeBannerCollection()
+  const banners = (event.banners || [])
+    .map(item => typeof item === 'string' ? item : item.fileId || item.fileID || item.imageUrl || item.src)
+    .map(item => cleanText(item, 1000))
+    .filter(Boolean)
+    .slice(0, 9)
+  const existing = await db.collection(COLLECTIONS.homeBanner)
+    .where({ organizationId, status: 'active' })
+    .limit(100)
+    .get()
+  await Promise.all(existing.data.map(item => db.collection(COLLECTIONS.homeBanner).doc(item._id).update({
+    data: { status: 'deleted', deletedAt: now(), updatedAt: now(), deletedBy: user.id }
+  })))
+  await Promise.all(banners.map((value, index) => {
+    const isCloudFile = value.startsWith('cloud://')
+    return db.collection(COLLECTIONS.homeBanner).add({
+      data: {
+        id: businessId('home_banner'),
+        organizationId,
+        scopeName: cleanText(event.scopeName, 80),
+        fileId: isCloudFile ? value : '',
+        imageUrl: isCloudFile ? '' : value,
+        sortOrder: index,
+        status: 'active',
+        createdBy: user.id,
+        updatedBy: user.id,
+        createdAt: now(),
+        updatedAt: now()
+      }
+    })
+  }))
+  await writePlatformLog(user, 'update', 'home_banner', organizationId, {
+    organizationId,
+    count: banners.length
+  })
+  return listHomeBanners(openid, { organizationId })
 }
 
 async function getHome(openid) {
@@ -3359,6 +3467,8 @@ const handlers = {
   saveMember,
   deleteMember,
   listOrg,
+  listHomeBanners,
+  saveHomeBanners,
   getOrg,
   saveOrg,
   deleteOrg,
