@@ -1,5 +1,5 @@
 {
   "*": {
-    "invoke": "auth != null && auth.loginType != 'ANONYMOUS'"
+    "invoke": "auth != null"
   }
 }

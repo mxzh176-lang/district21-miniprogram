@@ -1,23 +1,22 @@
 <view class="page">
-  <view class="archive-hero">
-    <view class="hero-kicker">ARCHIVE DIRECTORY</view>
-    <view class="hero-title">让狮爱有迹可循</view>
-    <view class="hero-desc">{{currentScope.orgType === 'team' ? currentScope.orgName : '协作区与服务队'}}档案，岗位人员直接填写内容</view>
+  <view class="scope-bar" bindtap="chooseOrgScope">
+    <view>
+      <view class="scope-kicker">当前范围</view>
+      <view class="scope-name">{{currentScope.orgName}}</view>
+    </view>
+    <view class="scope-action">切换 ▼</view>
   </view>
 
   <view class="archive-error" wx:if="{{loadError}}">{{loadError}}</view>
 
-  <scroll-view scroll-x class="organization-scroll" wx:if="{{organizations.length > 1}}">
-    <view class="organization-tabs">
-      <view
-        class="organization-tab {{selectedId === item.id ? 'active' : ''}}"
-        wx:for="{{organizations}}"
-        wx:key="id"
-        data-id="{{item.id}}"
-        bindtap="selectOrganization"
-      >{{item.shortName}}</view>
+  <view class="photo-library" wx:if="{{canOpenMediaDrive}}" bindtap="uploadPhotos">
+    <view>
+      <view class="photo-kicker">TEAM CLOUD DRIVE</view>
+      <view class="photo-title">服务队云盘</view>
+      <view class="photo-desc">会议、联谊、关爱、服务照片与视频集中保存</view>
     </view>
-  </scroll-view>
+    <view class="upload-button">进入 ›</view>
+  </view>
 
   <view class="confirm-entry" wx:if="{{pendingConfirmCount}}" bindtap="openConfirmations">
     <view>
@@ -50,16 +49,18 @@
     </view>
   </view>
 
-  <view class="recent-section">
+  <view class="recent-section history-panel">
     <view class="recent-heading">
-      <view class="section-title">最新归档</view>
+      <view>
+        <view class="section-title">历史事件</view>
+        <view class="section-desc">最新归档内容在这里集中展示，超过首屏后可展开查看</view>
+      </view>
       <view class="history-link" bindtap="openHistoryList">历史事件 ›</view>
     </view>
-    <scroll-view scroll-x class="recent-scroll" wx:if="{{recentEntries.length}}">
-      <view class="recent-track">
+    <view class="history-grid" wx:if="{{visibleRecentEntries.length}}">
         <view
           class="recent-card"
-          wx:for="{{recentEntries}}"
+          wx:for="{{visibleRecentEntries}}"
           wx:key="_id"
           data-id="{{item._id}}"
           bindtap="openRecentEntry"
@@ -86,53 +87,10 @@
           <view class="recent-summary">{{item.summaryText}}</view>
           <view class="recent-meta">{{item.meta}}</view>
         </view>
-      </view>
-    </scroll-view>
-    <view wx:else class="archive-empty compact-empty" bindtap="openHistoryList">暂无最新归档，点击查看历史事件 ›</view>
-  </view>
-
-  <view class="section-row">
-    <view>
-      <view class="section-title">档案栏目</view>
-      <view class="section-desc">通讯录已独立为单独页面，不在档案中重复维护</view>
     </view>
-  </view>
-
-  <view class="category-grid">
-    <view
-      class="category-card {{item.restricted ? 'restricted' : ''}}"
-      wx:for="{{selectedOrganization.categories}}"
-      wx:key="id"
-      data-category="{{item.id}}"
-      data-restricted="{{item.restricted}}"
-      bindtap="addContent"
-    >
-      <view class="category-heading">
-        <view class="category-name">{{item.name}}</view>
-        <view class="category-person">{{item.person}}</view>
-        <view wx:if="{{item.canEditDirectory}}" class="position-edit" data-position="{{item.positionId}}" catchtap="editPosition">编辑</view>
-      </view>
-      <view wx:if="{{item.children && item.children.length}}" class="committee-list">
-        <view
-          class="committee-item compact"
-          wx:for="{{item.children}}"
-          wx:key="id"
-          data-category="{{item.id}}"
-          catchtap="openSubArchive"
-        >
-          <view>
-            <view class="committee-name">{{item.name}}</view>
-            <view class="committee-role">{{item.person}}</view>
-          </view>
-          <view class="committee-arrow">›</view>
-          <view wx:if="{{item.canEditDirectory}}" class="position-edit child-edit" data-position="{{item.positionId}}" catchtap="editPosition">编辑</view>
-        </view>
-      </view>
-      <view class="category-footer">
-        <text>{{item.count}}条</text>
-        <text>{{item.canMaintain ? '填写 ›' : '查看 ›'}}</text>
-      </view>
-      <view wx:if="{{item.id === 'treasurer'}}" class="ledger-note">账目公开透明，所有成员可查看；仅管理员和司库可维护。</view>
+    <view wx:else class="archive-empty compact-empty" bindtap="openHistoryList">暂无最新归档，点击查看历史事件 ›</view>
+    <view wx:if="{{historyHasMore}}" class="history-fold" bindtap="toggleHistoryFold">
+      {{historyExpanded ? '收起历史事件' : '展开更多历史事件'}} ›
     </view>
   </view>
 </view>

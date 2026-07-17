@@ -1,5 +1,10 @@
 const api = require('../../utils/api')
 const permission = require('../../utils/permission')
+const orgScope = require('../../utils/org-scope')
+
+function filterByTeam(items = [], teamId = 'all') {
+  return teamId === 'all' ? items : items.filter(item => item.teamId === teamId)
+}
 
 Page({
   data: {
@@ -11,6 +16,8 @@ Page({
   },
 
   async onShow() {
+    const currentScope = orgScope.getCurrentScope()
+    const teamId = currentScope.teamId || 'all'
     const [events, teams, member] = await Promise.all([
       api.call('listArchiveEntries'),
       api.call('listTeams'),
@@ -30,17 +37,17 @@ Page({
       }))
     this.setData({
       events: sorted,
-      filteredEvents: sorted.slice(0, 50),
+      filteredEvents: filterByTeam(sorted, teamId).slice(0, 50),
       teams,
+      teamId,
       canEdit: permission.canPerform(member, 'history', 'update') || permission.canPerform(member, 'history', 'delete')
     })
   },
 
   selectTeam(event) {
     const teamId = event.currentTarget.dataset.id
-    const filteredEvents = teamId === 'all'
-      ? this.data.events
-      : this.data.events.filter(item => item.teamId === teamId)
+    orgScope.setCurrentScopeByTeamId(teamId)
+    const filteredEvents = filterByTeam(this.data.events, teamId)
     this.setData({ teamId, filteredEvents: filteredEvents.slice(0, 50) })
   },
 

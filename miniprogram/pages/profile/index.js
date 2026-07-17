@@ -3,7 +3,7 @@ const permission = require('../../utils/permission')
 const orgScope = require('../../utils/org-scope')
 
 Page({
-  data: { member: {}, currentScope: orgScope.ORG_OPTIONS[0], canManage: false, canViewPermissions: false, needsProfile: false },
+  data: { member: {}, currentScope: orgScope.ORG_OPTIONS[0], canManage: false, canManageAssignments: false, canViewPermissions: false, needsProfile: false },
 
   async onShow() {
     const currentScope = orgScope.getCurrentScope()
@@ -16,6 +16,7 @@ Page({
         displayCode: member.memberCode || member.accountSuffix || String(member.id || member._id || '').slice(-6)
       },
       canManage: permission.canManage(member),
+      canManageAssignments: permission.canManageAssignments(member),
       canViewPermissions: permission.isSuperAdmin(member) ||
         permission.hasPortPermission(member, 'permission', 'read') ||
         !permission.activePortPermissions(member).length,
@@ -29,6 +30,10 @@ Page({
 
   goUserPermissions() {
     wx.navigateTo({ url: '/pages/admin/user-roles/index' })
+  },
+
+  goPermissionGrants() {
+    wx.navigateTo({ url: '/pages/admin/permission-grants/index' })
   },
 
   editProfile() {

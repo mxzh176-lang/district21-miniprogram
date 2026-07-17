@@ -145,6 +145,42 @@
       }
     },
     {
+      "name": "admin_accounts",
+      "description": "独立管理后台账号，绑定现有内部用户并启用密码与 TOTP 二次验证。",
+      "indexes": [["username", "status"], ["userId", "status"]],
+      "fields": {
+        "id": "string",
+        "username": "string",
+        "userId": "string",
+        "passwordHash": "string",
+        "totpSecret": "string",
+        "recoveryCodeHash": "string",
+        "failedAttempts": "number",
+        "lockedUntil": "Date | null",
+        "status": "active | disabled",
+        "lastLoginAt": "Date | null",
+        "createdAt": "Date",
+        "updatedAt": "Date"
+      }
+    },
+    {
+      "name": "admin_sessions",
+      "description": "管理后台短期访问会话与轮换刷新令牌。",
+      "indexes": [["accessTokenHash", "status"], ["refreshTokenHash", "status"], ["accountId", "status"]],
+      "fields": {
+        "id": "string",
+        "accountId": "string",
+        "userId": "string",
+        "accessTokenHash": "string",
+        "refreshTokenHash": "string",
+        "accessExpiresAt": "Date",
+        "refreshExpiresAt": "Date",
+        "status": "active | rotated | revoked",
+        "createdAt": "Date",
+        "updatedAt": "Date"
+      }
+    },
+    {
       "name": "event_record",
       "description": "纪事主表，正文与元信息；图片必须放到 event_image。",
       "indexes": [
@@ -210,29 +246,146 @@
       }
     },
     {
-      "name": "todo",
-      "description": "协作区与服务队待办，本月完成后保留，archiveMonth 到达后进入历史事件。",
+      "name": "media_album",
+      "description": "服务队独立云盘相册；所有成员可查看，目标服务队管理员负责维护。",
       "indexes": [
-        ["organizationId", "month", "status"],
-        ["positionId", "status", "date"],
-        ["archiveMonth", "status"]
+        ["organizationId", "status", "eventDate"],
+        ["organizationId", "category", "status", "eventDate"],
+        ["organizationId", "parentId", "status", "eventDate"],
+        ["creatorId", "createdAt"]
       ],
       "fields": {
         "id": "string",
-        "areaId": "string",
-        "teamId": "string | null",
         "organizationId": "string",
-        "positionId": "string",
         "title": "string",
-        "type": "string",
-        "date": "string",
-        "month": "string",
-        "status": "pending | completed | overdue",
+        "parentId": "string | empty",
+        "depth": "number",
+        "category": "meeting | fellowship | care | service | uncategorized",
+        "eventDate": "YYYY-MM-DD",
+        "coverFileID": "string",
+        "mediaCount": "number",
+        "imageCount": "number",
+        "videoCount": "number",
+        "creatorId": "string",
+        "creatorName": "string",
+        "status": "active | deleted",
+        "createdAt": "Date",
+        "updatedAt": "Date",
+        "deletedAt": "Date | null"
+      }
+    },
+    {
+      "name": "media_share",
+      "description": "服务队云盘内部限时分享，仅登录成员可通过分享口令访问。",
+      "indexes": [
+        ["token", "status"],
+        ["organizationId", "status", "createdAt"],
+        ["creatorId", "status", "createdAt"]
+      ],
+      "fields": {
+        "id": "string",
+        "token": "string",
+        "organizationId": "string",
+        "resourceType": "media_album",
+        "resourceId": "string",
+        "title": "string",
+        "creatorId": "string",
+        "creatorName": "string",
+        "expiresAt": "Date",
+        "status": "active | revoked | expired",
+        "visitCount": "number",
+        "createdAt": "Date",
+        "updatedAt": "Date"
+      }
+    },
+    {
+      "name": "media_export",
+      "description": "服务队云盘导出任务及24小时临时下载包。",
+      "indexes": [
+        ["organizationId", "status", "createdAt"],
+        ["albumId", "status", "createdAt"],
+        ["creatorId", "createdAt"]
+      ],
+      "fields": {
+        "id": "string",
+        "organizationId": "string",
+        "albumId": "string",
+        "format": "zip | csv",
+        "fileName": "string",
+        "fileID": "string",
+        "objectKey": "string",
+        "fileCount": "number",
+        "size": "number",
+        "creatorId": "string",
+        "creatorName": "string",
+        "status": "ready | expired | deleted",
+        "expiresAt": "Date",
+        "createdAt": "Date",
+        "updatedAt": "Date"
+      }
+    },
+    {
+      "name": "file_records",
+      "description": "统一文件登记表，记录档案、首页轮播和服务队云盘媒体，兼容未来 OSS 迁移。",
+      "indexes": [
+        ["resourceType", "resourceId", "status", "sortOrder"],
+        ["resourceType", "resourceId", "status", "mediaType", "sortOrder"],
+        ["organizationId", "module", "status"],
+        ["albumId", "sortOrder"]
+      ],
+      "fields": {
+        "id": "string",
+        "organizationId": "string",
+        "serviceTeamName": "string",
+        "leaderRole": "string",
+        "departmentName": "string",
+        "eventName": "string",
+        "cloudPath": "string",
+        "objectKey": "string",
+        "fileID": "string",
+        "fileType": "string",
+        "originalFileName": "string",
+        "resourceType": "event_record | home_banner | media_album | media_export",
+        "resourceId": "string",
+        "module": "string",
+        "albumId": "string",
+        "category": "string",
+        "mediaType": "image | video",
+        "size": "number",
+        "duration": "number",
+        "width": "number",
+        "height": "number",
+        "sortOrder": "number",
+        "provider": "cloudbase | aliyun_oss",
+        "status": "active | deleted",
+        "uploaderOpenid": "string",
+        "uploaderName": "string",
+        "createdAt": "Date",
+        "updatedAt": "Date",
+        "deletedAt": "Date | null"
+      }
+    },
+    {
+      "name": "todo",
+      "description": "远航服务队内部共享提醒，与档案、荣誉事件独立存储。",
+      "indexes": [
+        ["organizationId", "date", "status"],
+        ["managerId", "date"],
+        ["creatorId", "createdAt"]
+      ],
+      "fields": {
+        "id": "string",
+        "title": "string",
         "description": "string",
-        "completedAt": "Date | null",
-        "completedBy": "string | null",
-        "archiveMonth": "string",
-        "createdBy": "string",
+        "category": "生日关怀 | 婚丧嫁娶 | 公益服务 | 联谊活动 | 会议培训 | 其他",
+        "date": "YYYY-MM-DD",
+        "time": "HH:mm | empty",
+        "location": "string",
+        "managerId": "string | empty",
+        "creatorId": "string",
+        "organizationId": "org_team_yuanhang",
+        "status": "pending | completed | deleted",
+        "visible": "boolean",
         "createdAt": "Date",
         "updatedAt": "Date"
       }

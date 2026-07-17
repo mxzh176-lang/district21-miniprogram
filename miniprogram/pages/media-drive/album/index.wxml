@@ -1,0 +1,69 @@
+<view class="page">
+  <view class="album-head" wx:if="{{album.id}}">
+    <scroll-view wx:if="{{breadcrumbs.length > 1}}" scroll-x class="breadcrumbs"><view class="breadcrumb-row"><text wx:for="{{breadcrumbs}}" wx:key="id">{{index ? ' / ' : ''}}{{item.title}}</text></view></scroll-view>
+    <view class="album-category">{{album.categoryName}}</view>
+    <view class="album-title">{{album.title}}</view>
+    <view class="album-meta">{{album.eventDate}} · {{album.mediaCount || files.length}} 个文件</view>
+    <view class="live-status"><text class="live-dot {{liveSyncing ? 'syncing' : ''}}"></text>{{liveSyncing ? '正在同步' : '实时同步中'}}<text wx:if="{{lastSyncedAt}}"> · {{lastSyncedAt}}</text></view>
+    <view class="head-actions">
+      <view wx:if="{{permissions.canUpload}}" class="head-button primary" bindtap="openUploadQueue">＋ 上传</view>
+      <view wx:if="{{permissions.canManage}}" class="head-button" bindtap="createSubfolder">新建子文件夹</view>
+      <view wx:if="{{permissions.canManage}}" class="head-button" bindtap="renameFolder">重命名</view>
+      <view wx:if="{{permissions.canManage}}" class="head-button" bindtap="editAlbum">调整分类</view>
+      <view wx:if="{{permissions.canShare}}" class="head-button" bindtap="prepareShare">分享</view>
+      <view wx:if="{{permissions.canExport}}" class="head-button" bindtap="exportFolder">{{exporting ? '导出中' : '导出'}}</view>
+    </view>
+    <view class="upload-progress" wx:if="{{uploadProgress}}">{{uploadProgress}}</view>
+  </view>
+
+  <view class="error-card" wx:if="{{loadError}}">{{loadError}}</view>
+  <view wx:if="{{childFolders.length}}" class="folder-section">
+    <view class="section-title">子文件夹</view>
+    <view class="folder-grid">
+      <view class="folder-card" wx:for="{{childFolders}}" wx:key="id" data-id="{{item.id}}" bindtap="openChildFolder">
+        <view class="folder-icon">▰</view>
+        <view class="folder-info"><view class="folder-name">{{item.title}}</view><view class="folder-meta">{{item.mediaCount || 0}} 个文件</view></view>
+        <view class="folder-arrow">›</view>
+      </view>
+    </view>
+  </view>
+  <view wx:if="{{files.length}}" class="section-title media-section-title">照片和视频</view>
+  <view class="media-grid" wx:if="{{files.length}}">
+    <view class="media-card" wx:for="{{files}}" wx:key="id">
+      <video wx:if="{{item.mediaType === 'video'}}" class="media-preview" src="{{item.url}}" controls object-fit="cover"></video>
+      <image wx:else class="media-preview" src="{{item.url}}" mode="aspectFill" data-url="{{item.url}}" bindtap="previewImage" />
+      <view class="media-footer">
+        <view class="media-name">{{item.originalFileName || (item.mediaType === 'video' ? '视频' : '照片')}}</view>
+        <view wx:if="{{permissions.canDelete}}" class="delete-file" data-id="{{item.id}}" bindtap="deleteFile">删除</view>
+      </view>
+    </view>
+  </view>
+  <view class="empty" wx:elif="{{!loading && !loadError && !childFolders.length}}">文件夹里还没有内容</view>
+  <view class="loading" wx:if="{{loading}}">正在加载相册…</view>
+  <view wx:if="{{permissions.canDelete && album.id}}" class="delete-album" bindtap="deleteAlbum">删除整个文件夹</view>
+
+  <view class="mask" wx:if="{{showUploadQueue}}" bindtap="closeUploadQueue"></view>
+  <view class="upload-sheet" wx:if="{{showUploadQueue}}">
+    <view class="sheet-title">上传到“{{album.title}}”</view>
+    <view class="queue-head"><view>{{pendingFiles.length}} 个文件<text wx:if="{{pendingSizeText}}"> · {{pendingSizeText}}</text></view><view class="queue-add" bindtap="chooseMoreFiles">＋ 继续添加</view></view>
+    <scroll-view wx:if="{{pendingFiles.length}}" scroll-y class="queue-list">
+      <view class="queue-item" wx:for="{{pendingFiles}}" wx:key="tempFilePath">
+        <image class="queue-thumb" src="{{item.thumbTempFilePath || item.tempFilePath}}" mode="aspectFill" />
+        <view class="queue-name">{{item.fileType === 'video' ? '视频' : '照片'}} {{index + 1}}</view>
+        <view class="queue-remove" data-index="{{index}}" bindtap="removePendingFile">移除</view>
+      </view>
+    </scroll-view>
+    <view wx:else class="queue-empty" bindtap="chooseMoreFiles">点击选择照片或视频，可重复添加</view>
+    <view class="upload-progress" wx:if="{{uploadProgress}}">{{uploadProgress}}</view>
+    <button class="primary-button" disabled="{{!pendingFiles.length || uploading}}" loading="{{uploading}}" bindtap="startUploadQueue">开始上传</button>
+    <button class="cancel-button" disabled="{{uploading}}" bindtap="closeUploadQueue">取消</button>
+  </view>
+
+  <view class="mask" wx:if="{{shareReady}}" bindtap="closeShareReady"></view>
+  <view class="share-sheet" wx:if="{{shareReady}}">
+    <view class="sheet-title">内部分享已准备</view>
+    <view class="share-desc">仅已登录的内部成员可以打开，分享有效期为7天。</view>
+    <button class="primary-button" open-type="share">转发给内部成员</button>
+    <button class="cancel-button" bindtap="closeShareReady">完成</button>
+  </view>
+</view>

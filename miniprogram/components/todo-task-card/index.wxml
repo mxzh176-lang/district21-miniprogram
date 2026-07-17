@@ -1,22 +1,19 @@
 <view class="task-card {{compact ? 'compact-card' : ''}} {{task.completed ? 'done' : ''}} tone-{{task.tone}}" bindtap="handleOpen">
   <view class="category-rail">
-    <view class="category-icon">
-      <text wx:if="{{task.completed}}">✓</text>
-      <text wx:elif="{{task.tone === 'service'}}">益</text>
-      <text wx:elif="{{task.tone === 'meeting'}}">会</text>
-      <text wx:elif="{{task.tone === 'birthday'}}">生</text>
-      <text wx:elif="{{task.tone === 'social'}}">联</text>
-      <text wx:elif="{{task.tone === 'visit'}}">访</text>
-      <text wx:elif="{{task.tone === 'training'}}">训</text>
-      <text wx:else>待</text>
+    <view class="category-icon icon-{{task.tone}}">
+      <text wx:if="{{task.completed}}" class="completed-icon">✓</text>
+      <block wx:else>
+        <text class="category-glyph">{{task.categoryIcon || '📌'}}</text>
+        <text wx:if="{{task.tone === 'birthday'}}" class="cake-spark cake-spark-left">✦</text>
+        <text wx:if="{{task.tone === 'birthday'}}" class="cake-spark cake-spark-right">✦</text>
+      </block>
     </view>
     <view class="category-name">{{task.categoryLabel}}</view>
   </view>
   <view class="task-body">
     <view class="title">{{task.title}}</view>
-    <view class="info-row"><text class="info-icon">◷</text><text>{{task.dateLabel}} · {{task.timeLabel}}</text></view>
-    <view class="info-row"><text class="info-icon location-icon">⌖</text><text class="ellipsis">{{task.locationLabel}}</text></view>
-    <view class="team-label"><text class="team-label-dot"></text>{{task.teamLabel}}</view>
+    <view class="info-row date-row"><text class="info-key">日期</text><text class="date-text">{{task.dateLabel}}</text></view>
+    <view class="team-label"><text class="team-label-dot"></text>{{task.categoryLabel}}</view>
   </view>
   <view class="task-side">
     <view wx:if="{{!task.completed}}" class="countdown {{task.countdownCompact ? 'compact' : ''}}">
@@ -25,7 +22,7 @@
       <text class="countdown-unit">{{task.countdownUnit}}</text>
     </view>
     <view class="check-wrap" catchtap="handleComplete">
-      <view class="check-box {{task.completed ? 'checked' : ''}} {{task.canComplete && !readonly ? '' : 'disabled'}}">
+      <view class="check-box {{task.completed ? 'checked' : ''}} {{task.canComplete && (!readonly || task.completed) ? '' : 'disabled'}}">
         <text wx:if="{{task.completed}}">✓</text>
       </view>
     </view>

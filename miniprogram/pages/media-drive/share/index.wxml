@@ -1,0 +1,12 @@
+<view class="page">
+  <view class="share-card" wx:if="{{share}}">
+    <view class="share-icon">云</view>
+    <view class="share-kicker">内部云盘分享</view>
+    <view class="share-title">{{share.title}}</view>
+    <view class="share-meta">{{share.organizationName}}</view>
+    <view class="share-meta">由 {{share.creatorName}} 分享 · 仅内部成员可查看</view>
+    <button class="open-button" bindtap="openFolder">打开文件夹</button>
+  </view>
+  <view class="state-card" wx:if="{{loading}}">正在验证内部分享…</view>
+  <view class="state-card error" wx:if="{{loadError}}">{{loadError}}</view>
+</view>

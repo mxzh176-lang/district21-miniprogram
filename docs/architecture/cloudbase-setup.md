@@ -32,6 +32,8 @@ user
 user_role
 event_record
 event_image
+media_album
+file_records
 operation_log
 ```
 
@@ -110,7 +112,7 @@ cloudfunctions/api
 ```json
 {
   "*": {
-    "invoke": "auth != null && auth.loginType != 'ANONYMOUS'"
+    "invoke": "auth != null"
   }
 }
 ```
@@ -121,7 +123,7 @@ cloudfunctions/api
 cloudbase/function-invoke-policy.json
 ```
 
-这条规则的含义是：只有已登录微信用户，且不是匿名登录，才能调用云函数。
+这条规则允许已建立 CloudBase 会话的客户端调用云函数。云函数会再次校验：匿名会话只能访问管理后台登录及已登录后的后台接口，其他小程序接口会返回 `ANONYMOUS_ACTION_DENIED`。
 
 注意：这不是业务管理员权限。它只解决“能不能调用云函数”。真正的组织权限仍然要在云函数内部通过：
 
@@ -150,7 +152,7 @@ organization
 
 ## 7. 未来迁移准备
 
-`event_image` 已预留：
+`event_image` 与 `file_records` 已预留：
 
 ```text
 provider

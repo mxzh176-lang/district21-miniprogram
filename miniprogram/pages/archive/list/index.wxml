@@ -26,7 +26,15 @@
   <view class="filter-card">
     <view class="filter-title-row">
       <view class="filter-title">查找历史事件</view>
-      <text class="filter-reset" wx:if="{{eventMonth}}" bindtap="resetFilters">重置时间</text>
+      <text class="filter-reset" wx:if="{{eventMonth || eventCategory}}" bindtap="resetFilters">重置筛选</text>
+    </view>
+    <view class="filter-row event-category-filter">
+      <picker class="filter-picker" range="{{eventCategoryOptions}}" value="{{eventCategoryIndex}}" bindchange="changeEventCategory">
+        <view class="filter-value">
+          <text class="filter-label">事件分类</text>
+          <text class="filter-selection">{{eventCategoryOptions[eventCategoryIndex]}}⌄</text>
+        </view>
+      </picker>
     </view>
     <view class="filter-row">
       <picker class="filter-picker" range="{{categoryOptions}}" range-key="name" value="{{categoryIndex}}" bindchange="changeCategory">
@@ -56,7 +64,7 @@
       <view class="event-copy">
         <view class="event-heading">
           <view class="event-title">{{item.title}}</view>
-          <view class="status published">岗位事件</view>
+          <view class="status published">{{item.eventCategory}}</view>
         </view>
         <view class="event-summary">{{item.summary}}</view>
         <view class="event-meta">

@@ -20,7 +20,7 @@ function formatRecentDate(value) {
 }
 
 function archiveSortTime(item = {}) {
-  return String(item.updatedAt || item.createdAt || item.date || '')
+  return String(item.createdAt || item.updatedAt || item.date || '')
 }
 
 Page({
@@ -35,14 +35,18 @@ Page({
     honorStats: { counts: { oneStar: 0, twoStar: 0, threeStar: 0, fourStar: 0, fiveStar: 0 }, total: 0 },
     honorLevels: [],
     recentEntries: [],
+    visibleRecentEntries: [],
+    historyExpanded: false,
+    historyHasMore: false,
     pendingConfirmCount: 0,
     pendingVerifyCount: 0,
+    canOpenMediaDrive: false,
     session: null
   },
 
   async onShow() {
     try {
-      const currentScope = orgScope.ORG_OPTIONS.find(item => item.dataId === this.data.selectedId || item.orgId === this.data.selectedId || item.teamId === this.data.selectedId) || orgScope.ORG_OPTIONS[0]
+      const currentScope = orgScope.getCurrentScope()
       const [organizations, session] = await Promise.all([
         api.call('listArchives'),
         api.call('getSession')
@@ -50,11 +54,14 @@ Page({
       this.setData({
         organizations,
         session,
+        canOpenMediaDrive: session && session.status === 'approved',
         currentScope,
         canManage: permission.canManage(session),
         loadError: ''
       })
-      const scopedId = this.data.selectedId || 'district'
+      const scopedId = currentScope.orgType === 'team'
+        ? currentScope.orgId
+        : (organizations[0] && organizations[0].id) || 'district'
       await this.selectOrganizationById(scopedId)
     } catch (error) {
       this.setData({ loading: false, loadError: '档案加载失败，请点击微信开发者工具“编译”后重试。' })
@@ -83,6 +90,7 @@ Page({
 
   async selectOrganizationById(id) {
     let selectedOrganization = this.data.organizations.find(item => item.id === id) || this.data.organizations[0] || {}
+    const selectedId = selectedOrganization.id || id
     const supportIds = ['secretary', 'tamer', 'treasurer', 'admin']
     const sourceCategories = selectedOrganization.categories || []
     const captainCategory = sourceCategories.find(item => item.id === 'captain') || {}
@@ -131,7 +139,7 @@ Page({
       }))
     }
     this.setData({
-      selectedId: id,
+      selectedId,
       selectedOrganization,
       loading: false,
       loadError: ''
@@ -157,16 +165,8 @@ Page({
       const latestEntries = (entries || [])
         .slice()
         .sort((a, b) => archiveSortTime(b).localeCompare(archiveSortTime(a)))
-        .slice(0, 5)
-      const detailedEntries = await Promise.all(latestEntries.map(async item => {
-        try {
-          const detail = await api.call('getArchiveEntry', { id: item._id })
-          return { ...item, ...detail }
-        } catch (error) {
-          return item
-        }
-      }))
-      const recentEntries = detailedEntries
+        .slice(0, 30)
+      const recentEntries = latestEntries
         .map(item => ({
           ...item,
           dateLabel: formatRecentDate(item.date),
@@ -176,10 +176,24 @@ Page({
           summaryText: item.summary || item.content || item.location || '点击查看历史事件详情',
           meta: `${categoryMap[item.categoryId] || item.uploaderRole || '档案'} · ${item.uploadedBy || item.ownerName || '已归档'}`
         }))
-      this.setData({ recentEntries })
+      this.setHistoryEntries(recentEntries, this.data.historyExpanded)
     } catch (error) {
-      this.setData({ recentEntries: [] })
+      this.setHistoryEntries([], false)
     }
+  },
+
+  setHistoryEntries(entries = [], expanded = false) {
+    const visibleLimit = 10
+    this.setData({
+      recentEntries: entries,
+      visibleRecentEntries: expanded ? entries : entries.slice(0, visibleLimit),
+      historyExpanded: expanded,
+      historyHasMore: entries.length > visibleLimit
+    })
+  },
+
+  toggleHistoryFold() {
+    this.setHistoryEntries(this.data.recentEntries, !this.data.historyExpanded)
   },
 
   async loadHonorOverview() {
@@ -282,6 +296,10 @@ Page({
   },
 
   uploadPhotos() {
-    wx.showToast({ title: '正式版将打开云照片上传', icon: 'none' })
+    const selectedId = String(this.data.selectedId || '')
+    const organizationId = selectedId.startsWith('org_team_')
+      ? selectedId
+      : ['linghang', 'ailinghang', 'yuanhang', 'jingying'].includes(selectedId) ? `org_team_${selectedId}` : ''
+    wx.navigateTo({ url: `/pages/media-drive/index${organizationId ? `?organizationId=${organizationId}` : ''}` })
   }
 })

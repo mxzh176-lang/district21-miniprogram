@@ -49,9 +49,8 @@
         <view class="contact-copy">
           <view class="name-line">
             <view class="identity">
-              <text class="name">{{member.name}}</text>
+              <text class="name">{{member.displayName}}</text>
             </view>
-            <view class="team-name">{{member.teamShortName || member.team}}</view>
           </view>
           <view class="position">{{member.position}}</view>
           <view class="member-info">
@@ -60,11 +59,12 @@
             <text wx:if="{{member.resource}}">资源 {{member.resource}}</text>
           </view>
         </view>
-        <view wx:if="{{canManage}}" class="edit-chip" data-id="{{member._id}}" catchtap="editMember">编辑</view>
+        <view wx:if="{{member.canManageMember}}" class="edit-chip" data-id="{{member._id}}" catchtap="editMember">编辑</view>
         <view class="contact-arrow">›</view>
       </view>
     </view>
     <view wx:if="{{!groups.length}}" class="empty">未找到符合条件的狮友</view>
+    <view class="contacts-bottom-space"></view>
   </scroll-view>
 
   <view class="alphabet-rail">

@@ -77,11 +77,18 @@ function buildOrgCloudPath(params) {
   const eventName = safePathSegment(params.eventName, '', 80)
   if (!params.eventName || !String(params.eventName).trim()) throw new Error('请先填写事件名称')
   const teamName = serviceTeamName(params.organizationId, params.serviceTeamName)
+  const suffix = fileExtension(params.filePath, params.originalFileName)
+  if (params.resourceType === 'media_album') {
+    const categoryName = safePathSegment(params.categoryName, '未分类', 30)
+    const year = /^\d{4}/.test(String(params.eventDate || '')) ? String(params.eventDate).slice(0, 4) : String(new Date().getFullYear())
+    const unique = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    const name = `${eventName}_${unique}.${suffix}`
+    return `${FIXED_ORGANIZATION_PATH.concat([teamName, '服务队云盘', categoryName, year, eventName, name]).join('/')}`
+  }
   const leaderRole = safePathSegment(params.leaderRole, '服务队公共活动', 30)
   const departmentName = params.departmentName
     ? safePathSegment(params.departmentName, '', 40)
     : ''
-  const suffix = fileExtension(params.filePath, params.originalFileName)
   const name = `${eventName}_${Number(params.sequence || 0) + 1}.${suffix}`
   const folders = FIXED_ORGANIZATION_PATH.concat([teamName, leaderRole])
   if (departmentName) folders.push(departmentName)
@@ -92,6 +99,7 @@ function buildOrgCloudPath(params) {
 function inferFileType(fileName) {
   const suffix = fileExtension(fileName, fileName)
   if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic'].includes(suffix)) return `image/${suffix === 'jpg' ? 'jpeg' : suffix}`
+  if (['mp4', 'mov', 'm4v', 'avi', 'webm'].includes(suffix)) return `video/${suffix === 'mov' ? 'quicktime' : suffix}`
   if (suffix === 'pdf') return 'application/pdf'
   return `application/${suffix}`
 }
@@ -118,7 +126,14 @@ async function uploadOrgFile(params = {}) {
         originalFileName: sourceName,
         resourceType: params.resourceType || 'event_record',
         resourceId: params.resourceId || '',
-        module: params.module || 'archives'
+        module: params.module || 'archives',
+        category: params.category || '',
+        mediaType: params.mediaType || '',
+        size: Number(params.size) || 0,
+        duration: Number(params.duration) || 0,
+        width: Number(params.width) || 0,
+        height: Number(params.height) || 0,
+        sortOrder: Number(params.sortOrder) || 0
       }
     })
     return { ...uploaded, cloudPath, objectKey: cloudPath, fileRecord: record }

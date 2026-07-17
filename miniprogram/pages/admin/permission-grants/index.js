@@ -7,7 +7,7 @@ const MODULE_OPTIONS = [
   { value: 'tasks', label: '待办事项' },
   { value: 'history', label: '历史事件' },
   { value: 'notices', label: '通知公告' },
-  { value: 'photos', label: '照片' },
+  { value: 'photos', label: '服务队云盘' },
   { value: 'honors', label: '荣誉表彰' },
   { value: 'all', label: '全部内容' }
 ]
@@ -24,11 +24,12 @@ const ACTION_OPTIONS = [
   { value: 'read', label: '查看', checked: true },
   { value: 'create', label: '新增', checked: true },
   { value: 'update', label: '修改', checked: true },
-  { value: 'delete', label: '删除', checked: false }
+  { value: 'upload', label: '上传照片视频', checked: true },
+  { value: 'delete', label: '删除', checked: true }
 ]
 
 const ROLE_PRESETS = [
-  { label: '栏目负责人：维护单个档案类目', module: 'archives', scopeType: 'position', actions: ['read', 'create', 'update'] },
+  { label: '单个岗位管理员（秘书、司库、委员会等）', module: 'archives', scopeType: 'position', actions: ['read', 'create', 'update', 'upload', 'delete'] },
   { label: '分管负责人：维护岗位及子类目', module: 'archives', scopeType: 'position_tree', actions: ['read', 'create', 'update'] },
   { label: '栏目负责人：维护职务与负责人资料', module: 'archives', scopeType: 'position', actions: ['read', 'update'] },
   { label: '服务队档案统筹员：维护本队档案', module: 'archives', scopeType: 'organization', actions: ['read', 'create', 'update'] },
@@ -36,6 +37,7 @@ const ROLE_PRESETS = [
   { label: '服务队待办协调员', module: 'tasks', scopeType: 'organization', actions: ['read', 'create', 'update'] },
   { label: '服务队历史维护员', module: 'history', scopeType: 'organization', actions: ['read', 'create', 'update'] },
   { label: '服务队荣誉记录员', module: 'honors', scopeType: 'organization', actions: ['read', 'create', 'update'] },
+  { label: '服务队云盘管理员', module: 'photos', scopeType: 'organization', actions: ['read', 'upload', 'update', 'delete'] },
   { label: '岗位荣誉记录员', module: 'honors', scopeType: 'position', actions: ['read', 'create', 'update'] },
   { label: '服务队全内容管理员', module: 'all', scopeType: 'organization', actions: ['read', 'create', 'update', 'delete'] },
   { label: '协作区全内容管理员', module: 'all', scopeType: 'organization_tree', actions: ['read', 'create', 'update', 'delete'] }
@@ -51,6 +53,7 @@ Page({
     organizations: [],
     organizationIndex: 0,
     positions: [],
+    allPositions: [],
     positionIndex: 0,
     moduleOptions: MODULE_OPTIONS,
     moduleIndex: 0,
@@ -59,7 +62,7 @@ Page({
     actionOptions: ACTION_OPTIONS,
     rolePresets: ROLE_PRESETS,
     rolePresetIndex: 0,
-    actions: ['read', 'create', 'update'],
+    actions: ['read', 'create', 'update', 'upload', 'delete'],
     startDate: '2026-07-01',
     endDate: '2027-06-30',
     grants: [],
@@ -100,6 +103,7 @@ Page({
           organizationName: organizationMap[item.organizationId] || item.organizationId,
           moduleLabel: this.optionLabel(MODULE_OPTIONS, item.module),
           scopeLabel: this.optionLabel(SCOPE_OPTIONS, item.scopeType),
+          positionName: item.scopeId || '',
           actionLabel: (item.actions || []).map(action => this.optionLabel(ACTION_OPTIONS, action)).join('、')
         })),
         loading: false,
@@ -129,16 +133,64 @@ Page({
     const organization = this.currentOrganization()
     if (!organization.id) return this.setData({ positions: [] })
     try {
-      const positions = await api.call('listPositions', {
-        organizationId: organization.cloudId || organization.id
+      const organizationId = organization.cloudId || organization.id
+      const [sourcePositions, directory] = await Promise.all([
+        api.call('listPositions', { organizationId }),
+        api.call('listPositionDirectory', { organizationId })
+      ])
+      const positionMap = {}
+      sourcePositions.forEach(item => { positionMap[item.id] = item })
+      const directoryMap = {}
+      ;(directory || []).forEach(item => { directoryMap[item.id] = item })
+      const positions = sourcePositions.map(item => ({
+        ...item,
+        roleName: item.type === 'committee' && !String(item.name || '').endsWith('主席') ? `${item.name}主席` : item.name,
+        person: directoryMap[item.id] ? directoryMap[item.id].person : '待授权',
+        userId: directoryMap[item.id] ? directoryMap[item.id].userId : '',
+        displayName: this.positionDisplayName(item, positionMap, directoryMap)
+      }))
+      const sortedPositions = this.prioritizePositions(positions)
+      this.setData({
+        positions: sortedPositions,
+        allPositions: positions,
+        positionIndex: 0,
+        grants: this.data.grants.map(item => ({
+          ...item,
+          positionName: item.organizationId === (organization.cloudId || organization.id) && positionMap[item.scopeId]
+            ? positions.find(position => position.id === item.scopeId).displayName
+            : item.positionName
+        }))
       })
-      this.setData({ positions, positionIndex: 0 })
     } catch (error) {
       this.setData({ positions: [] })
     }
   },
 
-  onUserChange(event) { this.setData({ userIndex: Number(event.detail.value) }) },
+  positionDisplayName(position, positionMap, directoryMap) {
+    const parent = positionMap[position.parentPositionId]
+    const roleName = position.type === 'committee' && !String(position.name || '').endsWith('主席')
+      ? `${position.name}主席`
+      : position.name
+    const hierarchy = parent ? `${parent.name} / ${roleName}` : roleName
+    const person = directoryMap[position.id] && directoryMap[position.id].person || '待授权'
+    return `${hierarchy} · ${person} · 单独管理本岗位档案`
+  },
+
+  prioritizePositions(positions = this.data.allPositions) {
+    const user = this.data.users[this.data.userIndex] || {}
+    return positions.slice().sort((a, b) => {
+      const aAssigned = a.userId === user.id || a.person && a.person === user.name ? 1 : 0
+      const bAssigned = b.userId === user.id || b.person && b.person === user.name ? 1 : 0
+      return bAssigned - aAssigned || Number(a.sortOrder || 0) - Number(b.sortOrder || 0)
+    })
+  },
+
+  onUserChange(event) {
+    const userIndex = Number(event.detail.value)
+    this.setData({ userIndex }, () => {
+      this.setData({ positions: this.prioritizePositions(), positionIndex: 0 })
+    })
+  },
   onRolePresetChange(event) {
     const rolePresetIndex = Number(event.detail.value)
     const preset = this.data.rolePresets[rolePresetIndex]

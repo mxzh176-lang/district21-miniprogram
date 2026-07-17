@@ -18,7 +18,7 @@
         <text class="progress-number">{{doneCount}}</text>
         <text class="progress-divider">/</text>
         <text>{{totalCount}}</text>
-        <view class="progress-label">本月完成</view>
+        <view class="progress-label">已完成</view>
       </view>
       <button wx:if="{{canCreate}}" class="create-button" bindtap="createTask"><text class="plus">＋</text>新增</button>
     </view>
@@ -49,8 +49,8 @@
 
     <scroll-view scroll-x class="date-scroll" wx:if="{{taskDates.length}}" enable-flex>
       <view class="date-list">
-        <view class="date-chip {{selectedDay === 'all' ? 'active' : ''}}" data-day="all" bindtap="selectDay">本月全部</view>
-        <view class="date-chip {{selectedDay === item.day ? 'active' : ''}}" wx:for="{{taskDates}}" wx:key="day" data-day="{{item.day}}" bindtap="selectDay">{{item.day}}日 <text>{{item.count}}</text></view>
+        <view class="date-chip {{selectedDay === 'all' ? 'active' : ''}}" data-day="all" bindtap="selectDay">全部日期</view>
+        <view class="date-chip {{selectedDay === item.date ? 'active' : ''}}" wx:for="{{taskDates}}" wx:key="date" data-day="{{item.date}}" bindtap="selectDay">{{item.label}} <text>{{item.count}}</text></view>
       </view>
     </scroll-view>
   </view>
@@ -69,13 +69,14 @@
       <view class="fold-icon {{completedExpanded ? 'expanded' : ''}}">⌄</view>
     </view>
     <view wx:if="{{completedExpanded}}">
-      <todo-task-card
-        wx:for="{{completedTasks}}"
-        wx:key="_id"
-        task="{{item}}"
-        readonly="{{true}}"
-        bind:open="openTask"
-      />
+      <view class="completed-task-item" wx:for="{{completedTasks}}" wx:key="_id">
+        <todo-task-card
+          task="{{item}}"
+          readonly="{{true}}"
+          bind:open="openTask"
+          bind:reopen="reopenTask"
+        />
+      </view>
     </view>
   </view>
 

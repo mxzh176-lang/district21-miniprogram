@@ -53,6 +53,22 @@ function roleDefaults(preset) {
   return { dataScope: 'position', permissions }
 }
 
+function grantSortTime(item = {}) {
+  return String(item.updatedAt || item.createdAt || item.grantedAt || '')
+}
+
+function uniqueGrantsByUser(grants = []) {
+  const map = {}
+  grants
+    .slice()
+    .sort((a, b) => grantSortTime(b).localeCompare(grantSortTime(a)))
+    .forEach(item => {
+      if (!item.userId || map[item.userId]) return
+      map[item.userId] = item
+    })
+  return Object.values(map)
+}
+
 Page({
   data: {
     canEdit: false,
@@ -85,11 +101,16 @@ Page({
       const eligibleUsers = users.filter(item =>
         item.profileCompleted && item.defaultOrganizationId && item.name && !item.name.startsWith('待认证用户')
       )
+      const displayGrants = uniqueGrantsByUser(grants).map(item => ({
+        ...item,
+        teamName: teamMap[item.teamId] || item.teamId,
+        scopeName: (DATA_SCOPES.find(scope => scope.value === item.dataScope) || {}).label || item.dataScope
+      }))
       this.setData({
         users: eligibleUsers.map(item => ({ ...item, displayName: `${item.name} · ${teamMap[item.defaultOrganizationId] || '协作区'} · ${item.memberCode || item.accountSuffix}` })),
         incompleteUserCount: users.length - eligibleUsers.length,
         teams,
-        grants: grants.map(item => ({ ...item, teamName: teamMap[item.teamId] || item.teamId, scopeName: (DATA_SCOPES.find(scope => scope.value === item.dataScope) || {}).label || item.dataScope })),
+        grants: displayGrants,
         loading: false,
         setupRequired: false
       })
@@ -170,9 +191,10 @@ Page({
     const scope = this.data.dataScopes[this.data.scopeIndex]
     if (!user || !team || !role || !scope) return wx.showToast({ title: '请完整选择授权信息', icon: 'none' })
     if (scope.value === 'position' && !role.positionId) return wx.showToast({ title: '岗位范围必须选择具体岗位角色', icon: 'none' })
+    const existingGrant = this.data.grants.find(item => item.userId === user.id)
     try {
       await api.call('saveUserPermissions', { userPermissions: {
-        id: this.data.editingId || undefined,
+        id: this.data.editingId || (existingGrant && existingGrant.id) || undefined,
         userId: user.id, userName: user.name,
         teamId: team.cloudId || team.id,
         roleCode: role.code, roleName: role.name,

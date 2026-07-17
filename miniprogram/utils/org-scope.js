@@ -5,7 +5,7 @@ const ORG_OPTIONS = [
   { orgType: 'team', orgId: 'linghang', orgName: '领航服务队', teamId: 'linghang', dataId: 'linghang', shortName: '领航', members: 31 },
   { orgType: 'team', orgId: 'ailinghang', orgName: '爱领航服务队', teamId: 'ailinghang', dataId: 'ailinghang', shortName: '爱领航', members: 29 },
   { orgType: 'team', orgId: 'yuanhang', orgName: '远航服务队', teamId: 'yuanhang', dataId: 'yuanhang', shortName: '远航', members: 32 },
-  { orgType: 'team', orgId: 'jingying', orgName: '精英服务队', teamId: 'jingying', dataId: 'jingying', shortName: '精英', members: 28 }
+  { orgType: 'team', orgId: 'jingying', orgName: '精英服务队', teamId: 'jingying', dataId: 'jingying', shortName: '精英', members: 25 }
 ]
 
 function normalizeTeamId(value) {

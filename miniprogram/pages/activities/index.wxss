@@ -139,6 +139,7 @@
   font-size: 20rpx;
 }
 
+
 .event-title {
   margin-top: 8rpx;
   font-size: 32rpx;

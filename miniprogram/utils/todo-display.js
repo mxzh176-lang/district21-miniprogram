@@ -11,11 +11,21 @@ const TEAMS = [
 const CATEGORY_TONES = [
   { tone: 'service', keywords: ['公益服务', '服务'] },
   { tone: 'meeting', keywords: ['工作会议', '会议纪要', '会议'] },
-  { tone: 'birthday', keywords: ['狮友生日', '生日'] },
+  { tone: 'birthday', keywords: ['生日关爱', '生日关怀', '狮友生日', '生日'] },
   { tone: 'social', keywords: ['联谊活动', '联谊聚餐', '聚会联谊', '联谊', '聚餐'] },
-  { tone: 'visit', keywords: ['走访慰问', '狮友关爱', '慰问', '走访', '关爱'] },
+  { tone: 'visit', keywords: ['婚丧嫁娶', '走访慰问', '狮友关爱', '慰问', '走访', '关爱'] },
   { tone: 'training', keywords: ['培训活动', '会议培训', '培训'] }
 ]
+
+const CATEGORY_ICONS = {
+  service: '🌱',
+  meeting: '📣',
+  birthday: '🎂',
+  social: '🤝',
+  visit: '💝',
+  training: '🎓',
+  default: '📌'
+}
 
 function pad(value) {
   return String(value).padStart(2, '0')
@@ -38,6 +48,7 @@ function taskTeamIds(task) {
 }
 
 function matchesTeam(task, teamId) {
+  if (task.visibleToAll) return true
   if (!teamId || teamId === 'all') return true
   const ids = taskTeamIds(task)
   if (ids.includes(teamId)) return true
@@ -61,10 +72,21 @@ function categoryLabel(category) {
     visit: '走访慰问',
     training: '培训活动'
   }
-  return labels[tone] || category || '其他事项'
+  if (category === '生日关怀') return '生日关爱'
+  return category || labels[tone] || '其他事项'
+}
+
+function categoryIcon(category) {
+  return CATEGORY_ICONS[categoryTone(category)] || CATEGORY_ICONS.default
 }
 
 function parseTaskDate(task) {
+  const dateText = String(task.date || '')
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateText)) {
+    const [year, monthNumber, day] = dateText.split('-').map(Number)
+    const date = new Date(year, monthNumber - 1, day)
+    if (date.getFullYear() === year && date.getMonth() === monthNumber - 1 && date.getDate() === day) return date
+  }
   const month = /^\d{4}-\d{2}$/.test(String(task.month || '')) ? task.month : ''
   const day = Number(task.day)
   if (!month || !day || day < 1 || day > 31) return null
@@ -122,7 +144,8 @@ function decorateTask(item, session) {
     canComplete: permission.canCompleteTodo(session, item),
     tone: categoryTone(item.category),
     categoryLabel: categoryLabel(item.category),
-    dateLabel: date ? `${date.getMonth() + 1}月${date.getDate()}日 ${weekday}` : `${item.month || '本月'} 日期待定`,
+    categoryIcon: categoryIcon(item.category),
+    dateLabel: date ? `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 ${weekday}` : `${item.month || '本月'} 日期待定`,
     timeLabel: time || '时间待定',
     locationLabel: item.location || '地点待定',
     teamLabel: teamNames.length ? teamNames.join(' ｜ ') : '服务队待定',

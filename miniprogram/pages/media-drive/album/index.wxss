@@ -1,0 +1,53 @@
+.page{min-height:100vh;padding:24rpx 24rpx 150rpx;box-sizing:border-box;background:#f7f8fa;color:#1f2329}
+.album-head{padding:32rpx;border:1rpx solid #eef0f5;border-radius:28rpx;background:#fff;box-shadow:0 12rpx 34rpx rgba(31,35,41,.06)}
+.album-category{color:#1456f0;font-size:20rpx;font-weight:800}
+.album-title{margin-top:10rpx;font-size:40rpx;font-weight:900}
+.album-meta{margin-top:9rpx;color:#8f959e;font-size:21rpx}
+.live-status{display:flex;align-items:center;margin-top:14rpx;color:#646a73;font-size:18rpx}
+.live-dot{width:13rpx;height:13rpx;margin-right:9rpx;border-radius:50%;background:#31b56a;box-shadow:0 0 0 6rpx rgba(49,181,106,.12)}
+.live-dot.syncing{background:#1456f0;animation:live-pulse 1s infinite}
+.head-actions{display:flex;gap:14rpx;margin-top:24rpx}
+.head-button{padding:14rpx 20rpx;border-radius:999rpx;color:#1456f0;background:#eff4ff;font-size:21rpx;font-weight:800}
+.head-button.primary{color:#fff;background:#1456f0}
+.upload-progress{margin-top:18rpx;color:#1456f0;font-size:21rpx}
+.media-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18rpx;margin-top:22rpx}
+.media-card{overflow:hidden;border:1rpx solid #eef0f5;border-radius:20rpx;background:#fff;box-shadow:0 8rpx 24rpx rgba(31,35,41,.05)}
+.media-preview{display:block;width:100%;height:250rpx;background:#e8eaf0}
+.media-footer{display:flex;align-items:center;justify-content:space-between;gap:10rpx;padding:15rpx}
+.media-name{flex:1;overflow:hidden;color:#646a73;font-size:18rpx;text-overflow:ellipsis;white-space:nowrap}
+.delete-file{color:#d94f65;font-size:19rpx;font-weight:800}
+.empty,.loading,.error-card{margin-top:22rpx;padding:54rpx 24rpx;border-radius:22rpx;text-align:center;background:#fff;color:#8f959e}
+.error-card{color:#b74242;background:#fff0ee}
+.delete-album{margin-top:40rpx;padding:22rpx;border:1rpx solid #ffd7d7;border-radius:20rpx;color:#d94f65;background:#fff;text-align:center;font-size:23rpx;font-weight:800}
+.breadcrumbs{margin-bottom:14rpx;white-space:nowrap}
+.breadcrumb-row{display:inline-block;color:#8f959e;font-size:19rpx}
+.head-actions{flex-wrap:wrap}
+.folder-section{margin-top:24rpx}
+.section-title{font-size:28rpx;font-weight:900}
+.media-section-title{margin-top:28rpx}
+.folder-grid{display:grid;gap:14rpx;margin-top:14rpx}
+.folder-card{display:flex;align-items:center;gap:18rpx;padding:22rpx;border:1rpx solid #e8eaf0;border-radius:20rpx;background:#fff}
+.folder-icon{display:flex;align-items:center;justify-content:center;width:68rpx;height:58rpx;border-radius:14rpx;color:#1456f0;background:#eff4ff;font-size:29rpx}
+.folder-info{flex:1;min-width:0}
+.folder-name{overflow:hidden;font-size:25rpx;font-weight:800;text-overflow:ellipsis;white-space:nowrap}
+.folder-meta{margin-top:5rpx;color:#8f959e;font-size:18rpx}
+.folder-arrow{color:#8f959e;font-size:34rpx}
+.mask{position:fixed;z-index:20;inset:0;background:rgba(0,0,0,.42)}
+.upload-sheet,.share-sheet{position:fixed;z-index:21;right:0;bottom:0;left:0;padding:32rpx 28rpx calc(34rpx + env(safe-area-inset-bottom));border-radius:32rpx 32rpx 0 0;background:#fff}
+.sheet-title{font-size:32rpx;font-weight:900}
+.queue-head{display:flex;align-items:center;justify-content:space-between;margin-top:24rpx;color:#646a73;font-size:21rpx}
+.queue-add{padding:12rpx 18rpx;border-radius:999rpx;color:#1456f0;background:#eff4ff;font-weight:800}
+.queue-list{max-height:360rpx;margin-top:14rpx;border:1rpx solid #eef0f5;border-radius:18rpx}
+.queue-item{display:flex;align-items:center;gap:14rpx;padding:12rpx;border-bottom:1rpx solid #f0f1f4}
+.queue-item:last-child{border-bottom:0}
+.queue-thumb{width:66rpx;height:66rpx;border-radius:12rpx;background:#eef0f5}
+.queue-name{flex:1;color:#646a73;font-size:21rpx}
+.queue-remove{color:#d94f65;font-size:20rpx}
+.queue-empty{margin-top:20rpx;padding:38rpx;border:2rpx dashed #cbd8ff;border-radius:18rpx;color:#1456f0;background:#f6f8ff;text-align:center;font-size:22rpx}
+.primary-button,.cancel-button{margin-top:22rpx;border-radius:20rpx;font-size:26rpx;font-weight:800}
+.primary-button{color:#fff;background:#1456f0}
+.cancel-button{color:#646a73;background:#f2f3f5}
+.share-desc{margin-top:16rpx;color:#646a73;font-size:22rpx;line-height:1.7}
+@keyframes live-pulse{0%,100%{opacity:.45}
+50%{opacity:1}
+}

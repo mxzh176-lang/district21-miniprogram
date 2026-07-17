@@ -1,0 +1,66 @@
+<view class="page">
+  <view class="drive-hero">
+    <view class="hero-kicker">TEAM CLOUD DRIVE</view>
+    <view class="hero-title">{{organizationName || '服务队云盘'}}</view>
+    <view class="hero-desc">四个服务队可以互相查看；只有本队云盘管理员可以上传和整理</view>
+    <view class="live-status"><text class="live-dot {{liveSyncing ? 'syncing' : ''}}"></text>{{liveSyncing ? '正在同步' : '实时同步中'}}<text wx:if="{{lastSyncedAt}}"> · {{lastSyncedAt}}</text></view>
+  </view>
+
+  <picker wx:if="{{teams.length > 1}}" range="{{teams}}" range-key="name" value="{{teamIndex}}" bindchange="onTeamChange">
+    <view class="team-picker">当前云盘：{{teams[teamIndex].name}} <text>切换 ›</text></view>
+  </picker>
+
+  <scroll-view scroll-x class="category-scroll">
+    <view class="category-row">
+      <view wx:for="{{categories}}" wx:key="id" class="category-chip {{category === item.id ? 'active' : ''}}" data-id="{{item.id}}" bindtap="selectCategory">{{item.name}}</view>
+    </view>
+  </scroll-view>
+
+  <view class="error-card" wx:if="{{loadError}}">{{loadError}}</view>
+
+  <view class="section-head">
+    <view><view class="section-title">云盘文件夹</view><view class="section-desc">支持建立文件夹和连续添加照片视频</view></view>
+    <view wx:if="{{permissions.canUpload}}" class="upload-action" bindtap="openUploadForm">＋ 新建</view>
+  </view>
+
+  <view class="album-grid" wx:if="{{albums.length}}">
+    <view class="album-card" wx:for="{{albums}}" wx:key="id" data-id="{{item.id}}" bindtap="openAlbum">
+      <image wx:if="{{item.coverUrl && item.imageCount}}" class="album-cover" src="{{item.coverUrl}}" mode="aspectFill" />
+      <view wx:else class="album-placeholder"><text>{{item.videoCount && !item.imageCount ? '▶' : '云'}}</text></view>
+      <view class="album-body">
+        <view class="album-category">{{item.categoryName}}</view>
+        <view class="album-title">{{item.title}}</view>
+        <view class="album-meta">{{item.eventDate}} · {{item.mediaCount || 0}} 个文件</view>
+      </view>
+    </view>
+  </view>
+  <view class="empty" wx:elif="{{!loading && !loadError}}">当前分类暂无相册</view>
+  <view class="loading" wx:if="{{loading}}">正在加载云盘…</view>
+
+  <view class="mask" wx:if="{{showUploadForm}}" bindtap="closeUploadForm"></view>
+  <view class="upload-sheet" wx:if="{{showUploadForm}}">
+    <view class="sheet-title">新建文件夹</view>
+    <view class="field-label">文件夹名称</view>
+    <input class="field-input" value="{{uploadForm.title}}" placeholder="未填写则建立未分类相册" placeholder-class="field-placeholder" cursor-color="#1456f0" bindinput="onTitleInput" />
+    <view class="field-label">活动日期</view>
+    <picker mode="date" value="{{uploadForm.eventDate}}" bindchange="onDateChange"><view class="field-input">{{uploadForm.eventDate}}</view></picker>
+    <view class="field-label">照片分类</view>
+    <picker range="{{uploadCategories}}" range-key="name" value="{{uploadCategoryIndex}}" bindchange="onUploadCategoryChange"><view class="field-input">{{uploadCategories[uploadCategoryIndex].name}}</view></picker>
+    <view class="queue-head">
+      <view><view class="field-label queue-label">待上传文件</view><view class="queue-summary">{{pendingFiles.length}} 个<text wx:if="{{pendingSizeText}}"> · {{pendingSizeText}}</text></view></view>
+      <view class="queue-add" bindtap="chooseUploadFiles">＋ 继续添加</view>
+    </view>
+    <scroll-view wx:if="{{pendingFiles.length}}" scroll-y class="queue-list">
+      <view class="queue-item" wx:for="{{pendingFiles}}" wx:key="tempFilePath">
+        <image class="queue-thumb" src="{{item.thumbTempFilePath || item.tempFilePath}}" mode="aspectFill" />
+        <view class="queue-name">{{item.fileType === 'video' ? '视频' : '照片'}} {{index + 1}}</view>
+        <view class="queue-remove" data-index="{{index}}" bindtap="removePendingFile">移除</view>
+      </view>
+    </scroll-view>
+    <view wx:else class="queue-empty" bindtap="chooseUploadFiles">点击选择照片或视频，可重复添加</view>
+    <view class="upload-progress" wx:if="{{uploadProgress}}">{{uploadProgress}}</view>
+    <button wx:if="{{pendingFiles.length}}" class="primary-button" loading="{{uploading}}" disabled="{{uploading}}" bindtap="startUploadQueue">开始上传 {{pendingFiles.length}} 个文件</button>
+    <button wx:else class="primary-button" loading="{{uploading}}" disabled="{{uploading}}" bindtap="saveFolderOnly">仅创建文件夹</button>
+    <button class="cancel-button" disabled="{{uploading}}" bindtap="closeUploadForm">取消</button>
+  </view>
+</view>

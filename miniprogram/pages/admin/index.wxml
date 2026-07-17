@@ -37,55 +37,28 @@
   </view>
 
   <view class="section-title">页面内容管理</view>
+  <view class="position-grant-entry" bindtap="goPermissionGrants">
+    <view class="position-grant-head"><view class="manage-icon blue">岗</view><view><view class="position-grant-title">岗位与委员会管理员</view><view class="position-grant-desc">秘书、纠察、司库、总务及各委员会分别授权</view></view><view class="arrow">›</view></view>
+    <view class="position-grant-chips"><text>查看</text><text>新增</text><text>修改</text><text>上传</text><text>删除</text></view>
+  </view>
   <view class="manage-grid">
-    <view class="manage-item" bindtap="goUserRoles"><view class="manage-icon blue">权</view><view>用户与权限</view><text>角色、组织与期限</text></view>
-    <view class="manage-item" bindtap="goPermissionGrants"><view class="manage-icon blue">授</view><view>人员精细授权</view><text>模块、范围和任期</text></view>
+    <view class="manage-item" bindtap="goUserRoles"><view class="manage-icon blue">权</view><view>组织角色与总权限</view><text>角色、组织与期限</text></view>
     <view class="manage-item" bindtap="goTasks"><view class="manage-icon green">待</view><view>待办与服务</view><text>修改事项</text></view>
     <view class="manage-item" bindtap="goArchives"><view class="manage-icon red">档</view><view>档案与照片</view><text>编辑排序</text></view>
     <view class="manage-item" bindtap="goContacts"><view class="manage-icon gold">员</view><view>人员与企业</view><text>头像资料</text></view>
     <view class="manage-item" bindtap="goNotices"><view class="manage-icon blue">文</view><view>通知内容</view><text>文字编辑</text></view>
   </view>
 
-  <view class="section-title">管理员设置</view>
-  <view class="add-admin-card" wx:if="{{canAddAdmin}}">
-    <view class="add-admin-title">直接添加管理员</view>
-    <view class="add-admin-desc">从狮友通讯录选择成员并设置管理身份。</view>
-    <view class="admin-picker-row">
-      <picker class="admin-picker" range="{{adminCandidates}}" range-key="name"
-        value="{{candidateIndex}}" bindchange="selectCandidate">
-        <view class="picker-value">
-          {{adminCandidates.length ? adminCandidates[candidateIndex].name + ' · ' + adminCandidates[candidateIndex].team : '暂无可添加成员'}}
-        </view>
-      </picker>
-      <picker class="role-picker" range="{{roleOptions}}" range-key="label"
-        value="{{roleIndex}}" bindchange="selectRole">
-        <view class="picker-value">{{roleOptions[roleIndex].label}}</view>
-      </picker>
-    </view>
-    <button class="add-admin-button" bindtap="addAdmin" disabled="{{!adminCandidates.length}}">添加管理员</button>
+  <view class="section-title">统一权限管理</view>
+  <view class="position-grant-entry" bindtap="goUserRoles">
+    <view class="position-grant-head"><view class="manage-icon blue">权</view><view><view class="position-grant-title">组织角色与用户权限</view><view class="position-grant-desc">与 Web 管理后台共用同一份云端权限，修改后立即同步</view></view><view class="arrow">›</view></view>
+    <view class="position-grant-chips"><text>人员</text><text>服务队</text><text>岗位</text><text>模块</text><text>任期</text></view>
   </view>
-
-  <view class="section-title">管理员板块权限</view>
-  <view class="permission-card" wx:for="{{adminMembers}}" wx:key="_id">
-    <view class="permission-person">
-      <view class="permission-avatar">{{item.initial}}</view>
-      <view class="permission-copy"><view class="permission-name">{{item.name}}</view><view class="permission-team">{{item.team}} · {{item.roleLabel}}</view></view>
-      <view wx:if="{{canAddAdmin}}" class="remove-admin" data-id="{{item._id}}" data-name="{{item.name}}" catchtap="removeAdmin">取消</view>
-    </view>
-    <checkbox-group class="permission-options" data-id="{{item._id}}" bindchange="changePermissions">
-      <label><checkbox value="tasks" checked="{{item.canTasks}}" color="#a15be8" /><text>待办</text></label>
-      <label><checkbox value="archives" checked="{{item.canArchives}}" color="#a15be8" /><text>档案</text></label>
-      <label><checkbox value="contacts" checked="{{item.canContacts}}" color="#a15be8" /><text>通讯录</text></label>
-      <label><checkbox value="photos" checked="{{item.canPhotos}}" color="#a15be8" /><text>照片</text></label>
-      <label><checkbox value="notices" checked="{{item.canNotices}}" color="#a15be8" /><text>通知</text></label>
-    </checkbox-group>
-  </view>
-  <view class="empty-admin" wx:if="{{!adminMembers.length}}">暂未添加管理员。</view>
 
   <view class="log-entry" bindtap="goLogs">
     <view><view class="log-title">管理员操作记录</view><view class="log-desc">查看新增、上传、权限变更与删除记录</view></view>
     <view class="arrow">›</view>
   </view>
 
-  <view class="demo-footer">权限勾选后立即保存。超级管理员可随时调整每位管理员能够维护的板块。</view>
+  <view class="demo-footer">Web 后台与小程序统一读取 user_permissions、user_role 和岗位任期数据，不再使用旧管理员权限入口。</view>
 </view>

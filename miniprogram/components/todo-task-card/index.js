@@ -22,7 +22,12 @@ Component({
 
     handleComplete() {
       const task = this.data.task || {}
-      if (this.data.readonly || task.completed) return
+      if (task.completed) {
+        if (!task.canComplete) return
+        this.triggerEvent('reopen', { id: task._id || task.id, task })
+        return
+      }
+      if (this.data.readonly) return
       this.triggerEvent('complete', { id: task._id || task.id, task })
     }
   }

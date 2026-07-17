@@ -13,4 +13,11 @@ App({
       api.initialize({ env: this.globalData.cloudEnvId, traceUser: true })
     } catch (error) {}
   }
+  ,
+  async onShow() {
+    try {
+      this.globalData.member = await api.call('getSession', {}, { forceRefresh: true })
+      wx.setStorageSync('district21-permission-refreshed-at', Date.now())
+    } catch (error) {}
+  }
 })

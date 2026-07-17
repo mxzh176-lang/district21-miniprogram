@@ -1,0 +1,25 @@
+<view class="page agreement-page">
+  <view class="agreement-card">
+    <view class="agreement-title">21纪事本用户服务协议</view>
+    <view class="agreement-date">更新日期：2026年7月15日</view>
+
+    <view class="section-title">一、服务范围</view>
+    <view class="paragraph">21纪事本用于二十一协作区及所属服务队内部的成员识别、岗位授权、活动纪事、待办提醒和资料归档，不提供面向公众的社交发布服务。</view>
+
+    <view class="section-title">二、内部身份资料</view>
+    <view class="paragraph">为核对内部成员身份，系统会保存你主动提交的姓名、所属组织、账号标识及可选的本人照片。姓名、所属组织和照片会展示在仅供内部成员访问的成员名册中，账号标识用于登录识别和权限校验。</view>
+
+    <view class="section-title">三、照片使用</view>
+    <view class="paragraph">成员照片为可选资料。上传人应确保照片为本人照片或已取得合法使用授权，不得上传违法违规、侵犯他人权益或与本人无关的内容。照片仅用于内部成员辨认，不用于人脸识别、广告画像或对外公开。</view>
+
+    <view class="section-title">四、资料维护与保护</view>
+    <view class="paragraph">系统按照组织和岗位权限限制资料访问与修改。你可以重新上传照片进行替换；需要更正、删除资料或停止使用时，可联系所属服务队管理员处理。</view>
+
+    <view class="section-title">五、使用规则</view>
+    <view class="paragraph">使用者应提交真实、必要的信息，妥善使用内部资料，不得擅自复制、传播其他成员资料，也不得利用本工具从事违法违规活动。</view>
+
+    <view class="section-title">六、隐私说明</view>
+    <view class="paragraph">关于个人信息处理方式、保存范围和用户权利，以小程序平台展示的《隐私保护指引》为准。</view>
+    <button class="privacy-button" bindtap="openPrivacyPolicy">查看隐私保护指引</button>
+  </view>
+</view>

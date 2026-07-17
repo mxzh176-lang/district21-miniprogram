@@ -11,6 +11,15 @@
   </view>
 
   <view class="form-card">
+    <view class="avatar-editor" bindtap="chooseAvatar">
+      <view class="avatar-preview">
+        <image wx:if="{{avatarUrl}}" src="{{avatarUrl}}" mode="aspectFill" />
+        <text wx:else>上传照片</text>
+      </view>
+      <view class="avatar-action">点击选择本人照片（可选）</view>
+      <view class="avatar-help">照片仅用于内部成员名册辨认，可随时重新上传替换。</view>
+    </view>
+
     <view class="field-group">
       <view class="field-label">姓名</view>
       <input
@@ -45,8 +54,18 @@
     </view>
 
     <view class="account-row"><text>账号尾号</text><text>{{accountSuffix}}</text></view>
-    <button class="save-button" loading="{{saving}}" disabled="{{saving || !organizations.length}}" bindtap="save">提交内部资料</button>
+    <checkbox-group class="consent-row" bindchange="onConsentChange">
+      <label>
+        <checkbox value="accepted" checked="{{consentAccepted}}" color="#2563eb" />
+        <text>我已阅读并同意</text>
+      </label>
+      <text class="policy-link" catchtap="openUserAgreement">《用户服务协议》</text>
+      <text>和</text>
+      <text class="policy-link" catchtap="openPrivacyPolicy">《隐私保护指引》</text>
+    </checkbox-group>
+    <view class="consent-help">系统将收集姓名、所属组织及你主动上传的照片，用于内部身份核对、成员名册展示和权限分配。</view>
+    <button class="save-button" loading="{{saving}}" disabled="{{saving || !organizations.length || !consentAccepted}}" bindtap="save">保存内部资料</button>
   </view>
 
-  <view class="privacy-note">不要求上传身份证、证件照片或人脸信息。请勿在姓名栏填写手机号、身份证号等敏感信息。</view>
+  <view class="privacy-note">不要求上传身份证、证件照或进行人脸识别。请勿在姓名栏填写手机号、身份证号等敏感信息。</view>
 </view>

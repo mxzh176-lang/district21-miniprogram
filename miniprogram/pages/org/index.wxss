@@ -125,6 +125,10 @@
   height: calc(100vh - 390rpx);
 }
 
+.contacts-bottom-space {
+  height: calc(140rpx + env(safe-area-inset-bottom));
+}
+
 .group-letter {
   padding: 12rpx 4rpx 7rpx;
   color: #c982ff;

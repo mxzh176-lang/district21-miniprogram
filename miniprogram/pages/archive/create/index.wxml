@@ -1,0 +1,70 @@
+<view class="page">
+  <view class="create-hero">
+    <view class="hero-kicker">CREATE RECORD</view>
+    <view class="hero-title">新建内容</view>
+    <view class="hero-desc">根据你的成员身份和岗位权限，选择可以创建的内容。</view>
+  </view>
+
+  <view class="archive-error" wx:if="{{loadError}}">{{loadError}}</view>
+
+  <view wx:if="{{canCreateTodo}}" class="quick-create-card" bindtap="openTodo">
+    <view class="quick-create-icon">待</view>
+    <view class="quick-create-copy">
+      <view class="quick-create-title">新建待办事项</view>
+      <view class="quick-create-desc">发布远航服务队内部共享提醒</view>
+    </view>
+    <view class="quick-create-arrow">›</view>
+  </view>
+
+  <view wx:if="{{hasArchiveAccess}}" class="scope-bar" bindtap="chooseOrgScope">
+    <view>
+      <view class="scope-kicker">当前范围</view>
+      <view class="scope-name">{{currentScope.orgName || selectedOrganization.name || '请选择范围'}}</view>
+    </view>
+    <view class="scope-action">切换 ▼</view>
+  </view>
+
+  <view wx:if="{{hasArchiveAccess}}" class="section-row">
+    <view>
+      <view class="section-title">职位与下级录入</view>
+      <view class="section-desc">点击职位或下级栏目进入新事件录入；负责人编辑仅超级管理员可见。</view>
+    </view>
+  </view>
+
+  <view wx:if="{{hasArchiveAccess}}" class="category-grid">
+    <view
+      class="category-card {{item.restricted ? 'restricted' : ''}}"
+      wx:for="{{categoryDirectory}}"
+      wx:key="id"
+      data-category="{{item.id}}"
+      bindtap="openCategory"
+    >
+      <view class="category-heading">
+        <view class="category-name">{{item.displayName || item.name}}</view>
+        <view class="category-person">{{item.person}}</view>
+        <view wx:if="{{item.canEditDirectory}}" class="position-edit" data-position="{{item.positionId}}" catchtap="editPosition">编辑</view>
+      </view>
+      <view wx:if="{{item.children && item.children.length}}" class="committee-list">
+        <view
+          class="committee-item compact"
+          wx:for="{{item.children}}"
+          wx:key="id"
+          data-category="{{item.id}}"
+          catchtap="openCategory"
+        >
+          <view>
+            <view class="committee-name">{{item.displayName || item.name}}</view>
+            <view class="committee-role">{{item.person}}</view>
+          </view>
+          <view class="committee-arrow">›</view>
+          <view wx:if="{{item.canEditDirectory}}" class="position-edit child-edit" data-position="{{item.positionId}}" catchtap="editPosition">编辑</view>
+        </view>
+      </view>
+      <view class="category-footer">
+        <text>{{item.count}}条</text>
+        <text>{{item.canMaintain ? (item.id === 'treasurer' ? '账目 ›' : '录入 ›') : '选择下级 ›'}}</text>
+      </view>
+      <view wx:if="{{item.id === 'treasurer'}}" class="ledger-note">账目公开透明，所有成员可查看；仅管理员和司库可维护。</view>
+    </view>
+  </view>
+</view>

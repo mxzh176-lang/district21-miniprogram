@@ -8,7 +8,10 @@
   </view>
 
   <view class="profile-hero">
-    <view class="avatar">21</view>
+    <view class="avatar">
+      <image wx:if="{{member.avatarUrl}}" class="avatar-image" src="{{member.avatarUrl}}" mode="aspectFill" />
+      <text wx:else>21</text>
+    </view>
     <view class="name">{{member.nickname}}</view>
     <view class="role">{{member.displayRole}} · {{member.term}}</view>
     <view class="organization">{{member.team}}</view>
@@ -43,6 +46,11 @@
   <view wx:if="{{!needsProfile && member.status === 'approved' && canViewPermissions}}" class="menu-card" bindtap="goUserPermissions">
     <view class="menu-icon blue">管</view>
     <view class="menu-copy"><view class="menu-title">用户与权限</view><view class="menu-desc">查看角色、岗位、模块和授权期限</view></view>
+    <view class="arrow">›</view>
+  </view>
+  <view wx:if="{{canManageAssignments}}" class="menu-card permission-highlight" bindtap="goPermissionGrants">
+    <view class="menu-icon blue">岗</view>
+    <view class="menu-copy"><view class="menu-title">岗位与委员会管理员</view><view class="menu-desc">为秘书、纠察、司库、总务和各委员会分别授权</view></view>
     <view class="arrow">›</view>
   </view>
   <view wx:if="{{canManage}}" class="menu-card" bindtap="goAdmin">

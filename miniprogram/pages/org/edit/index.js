@@ -10,16 +10,27 @@ const SURNAME_LETTERS = {
   许: 'X', 谢: 'X', 杨: 'Y', 姚: 'Y', 张: 'Z', 赵: 'Z', 周: 'Z'
 }
 
+const PROFESSION_OPTIONS = [
+  { value: '', label: '未设置' },
+  { value: 'teacher', label: '教师' },
+  { value: 'nurse', label: '护士' },
+  { value: 'doctor', label: '医生' }
+]
+
 Page({
   data: {
     id: '',
     teams: [],
     teamIndex: 0,
+    professionOptions: PROFESSION_OPTIONS,
+    professionIndex: 0,
     canManage: false,
+    canDelete: false,
     form: {
       name: '',
       position: '',
       birthday: '',
+      profession: '',
       company: '',
       industry: '',
       resource: '',
@@ -37,7 +48,14 @@ Page({
       api.call('listTeams')
     ])
     this.session = session
-    const serviceTeams = teams.slice(1)
+    const serviceTeams = teams.slice(1).filter(item => {
+      const organizationId = item.cloudId || item.id
+      return permission.canPerform(session, 'contacts', options.id ? 'update' : 'create', {
+        organizationId,
+        cloudOrganizationId: organizationId,
+        teamId: item.id
+      })
+    })
     const defaultOrganizationId = serviceTeams[0] && (serviceTeams[0].cloudId || serviceTeams[0].id)
     this.setData({
       id: options.id || '',
@@ -61,6 +79,8 @@ Page({
       this.setData({
         form: result.member,
         teamIndex,
+        professionIndex: Math.max(0, PROFESSION_OPTIONS.findIndex(item => item.value === result.member.profession)),
+        canDelete: Boolean(result.canDelete),
         canManage: Boolean(result.canManage) || permission.canPerform(session, 'contacts', 'update', {
           organizationId: memberOrganizationId,
           cloudOrganizationId: memberOrganizationId,
@@ -76,6 +96,14 @@ Page({
 
   onTeamChange(event) {
     this.setData({ teamIndex: Number(event.detail.value) })
+  },
+
+  onProfessionChange(event) {
+    const professionIndex = Number(event.detail.value) || 0
+    this.setData({
+      professionIndex,
+      'form.profession': PROFESSION_OPTIONS[professionIndex].value
+    })
   },
 
   chooseAvatar() {
@@ -128,5 +156,25 @@ Page({
     })
     wx.showToast({ title: '资料已保存', icon: 'success' })
     setTimeout(() => wx.navigateBack(), 700)
+  },
+
+  deleteMember() {
+    const { id, form } = this.data
+    if (!id) return
+    wx.showModal({
+      title: '删除成员',
+      content: `确认从成员名册中删除“${form.name || '该成员'}”吗？新增事件的狮友名单也会同步移除。`,
+      confirmColor: '#d83931',
+      success: async result => {
+        if (!result.confirm) return
+        try {
+          await api.call('deleteMember', { id })
+          wx.showToast({ title: '成员已删除', icon: 'success' })
+          setTimeout(() => wx.switchTab({ url: '/pages/org/index' }), 500)
+        } catch (error) {
+          api.showError(error)
+        }
+      }
+    })
   }
 })

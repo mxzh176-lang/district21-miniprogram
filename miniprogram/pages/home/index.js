@@ -3,6 +3,7 @@ const permission = require('../../utils/permission')
 const orgScope = require('../../utils/org-scope')
 const todoDisplay = require('../../utils/todo-display')
 const { uploadOrgFile } = require('../../services/file-upload-service')
+const TODO_SYNC_INTERVAL = 5000
 
 const ORG_OPTIONS = orgScope.ORG_OPTIONS
 const BANNER_ORGANIZATION_IDS = {
@@ -84,9 +85,18 @@ Page({
   async onShow() {
     try {
       await this.loadHome()
+      this.startTodoSync()
     } catch (error) {
       api.showError(error)
     }
+  },
+
+  onHide() {
+    this.stopTodoSync()
+  },
+
+  onUnload() {
+    this.stopTodoSync()
   },
 
   async onPullDownRefresh() {
@@ -113,7 +123,9 @@ Page({
   },
 
   refreshBannerPermission(session = this.data.session, currentOrg = this.data.currentOrg) {
-    const canManageBanners = permission.canAccessOrganization(session, bannerOrganizationContext(currentOrg))
+    const context = bannerOrganizationContext(currentOrg)
+    const canManageBanners = permission.canAccessOrganization(session, context) ||
+      ['create', 'update', 'delete', 'upload'].some(action => permission.hasPortPermission(session, 'home', action, context))
     this.setData({ canManageBanners })
   },
 
@@ -121,11 +133,18 @@ Page({
     const currentOrg = this.data.currentOrg || ORG_OPTIONS[0]
     const organizationId = bannerOrganizationId(currentOrg)
     try {
-      const banners = await api.call('listHomeBanners', { organizationId })
+      const response = await api.call('listHomeBanners', { organizationId })
+      const configured = Array.isArray(response)
+        ? response.length > 0
+        : Boolean(response && response.configured)
+      const banners = Array.isArray(response)
+        ? response
+        : response && (response.banners || response.items) || []
       const sources = this.bannerSources(banners)
+      const visibleSources = configured ? sources : (sources.length ? sources : this.data.baseBanners)
       this.setData({
         banners: sources,
-        heroSlides: this.buildHeroSlides(sources.length ? sources : this.data.baseBanners)
+        heroSlides: this.buildHeroSlides(visibleSources)
       })
     } catch (error) {
       const fallback = this.data.baseBanners || []
@@ -141,7 +160,7 @@ Page({
     const [data, session, monthData] = await Promise.all([
       api.call('getHome'),
       api.call('getSession'),
-      api.call('listTasks', { month: selectedMonth })
+      api.call('listTasks', { month: 'all' })
     ])
     const allTasks = todoDisplay.sortTasks((monthData.tasks || []).map(item => todoDisplay.decorateTask(item, session)))
     this.setData({
@@ -155,14 +174,40 @@ Page({
       baseCareOverview: data.careOverview || {},
       baseBanners: data.banners || [],
       session,
-      canCreateTask: permission.canPerform(session, 'todo', 'create')
+      canCreateTask: permission.canCreateTodo(session)
     })
     this.refreshBannerPermission(session)
     this.applyOrgScope()
     await this.loadHomeBannersForScope()
   },
 
-  applyOrgScope() {
+  startTodoSync() {
+    this.stopTodoSync()
+    this.todoSyncTimer = setInterval(() => this.refreshTodoTasks(), TODO_SYNC_INTERVAL)
+  },
+
+  stopTodoSync() {
+    if (!this.todoSyncTimer) return
+    clearInterval(this.todoSyncTimer)
+    this.todoSyncTimer = null
+  },
+
+  async refreshTodoTasks() {
+    if (this.todoSyncing || !this.data.session) return
+    this.todoSyncing = true
+    try {
+      const monthData = await api.call('listTasks', { month: 'all' }, { forceRefresh: true })
+      const allTasks = todoDisplay.sortTasks((monthData.tasks || []).map(item =>
+        todoDisplay.decorateTask(item, this.data.session)))
+      this.setData({ allTasks })
+      this.applyOrgScope({ refreshArchive: false })
+    } catch (error) {
+    } finally {
+      this.todoSyncing = false
+    }
+  },
+
+  applyOrgScope(options = {}) {
     const currentOrg = this.data.currentOrg || ORG_OPTIONS[0]
     const isDistrict = currentOrg.orgType === 'district'
     const teams = (this.data.teams && this.data.teams.length ? this.data.teams : ORG_OPTIONS)
@@ -174,7 +219,7 @@ Page({
         members: Number(item.members) || 0
       }))
       .filter(item => item.id !== 'district' && item.orgId !== 'district21')
-    const tasks = this.data.allTasks.filter(item => orgScope.matchesScope(item, currentOrg))
+    const tasks = this.data.allTasks.filter(item => item.visibleToAll || orgScope.matchesScope(item, currentOrg))
     const homeTaskGroups = todoDisplay.buildHomeGroups(tasks)
     const homeVisibleCount = homeTaskGroups.reduce((sum, group) => sum + group.tasks.length, 0)
     const homePendingCount = tasks.filter(item => !item.completed).length
@@ -208,7 +253,7 @@ Page({
       careOverview: this.data.baseCareOverview || {},
       historyTitle: '最新归档'
     })
-    this.loadArchiveEventsForHome()
+    if (options.refreshArchive !== false) this.loadArchiveEventsForHome()
   },
 
   async loadArchiveEventsForHome() {
@@ -220,15 +265,7 @@ Page({
         .slice()
         .sort((a, b) => archiveSortTime(b).localeCompare(archiveSortTime(a)))
         .slice(0, 5)
-      const detailedEntries = await Promise.all(latestEntries.map(async item => {
-        try {
-          const detail = await api.call('getArchiveEntry', { id: item._id })
-          return { ...item, ...detail }
-        } catch (error) {
-          return item
-        }
-      }))
-      const activities = detailedEntries.map(item => ({
+      const activities = latestEntries.map(item => ({
         ...item,
         mark: '档',
         dateLabel: formatArchiveDate(item.date),
@@ -359,12 +396,12 @@ Page({
     const id = event.detail && event.detail.id ? event.detail.id : event.currentTarget.dataset.id
     const task = this.data.allTasks.find(item => item._id === id)
     if (!task || !task.canComplete) {
-      wx.showToast({ title: '仅创建人、岗位负责人或管理员可完成', icon: 'none' })
+      wx.showToast({ title: '仅管理员可完成待办', icon: 'none' })
       return
     }
     try {
       await api.call('completeTask', { id })
-      wx.showToast({ title: '已完成并归档', icon: 'success' })
+      wx.showToast({ title: '已标记完成', icon: 'success' })
       await this.loadHome()
     } catch (error) {
       api.showError(error)
@@ -389,10 +426,6 @@ Page({
 
   openActivity(event) {
     wx.navigateTo({ url: `/pages/archive/detail/index?id=${event.currentTarget.dataset.id}` })
-  },
-
-  goNotices() {
-    wx.navigateTo({ url: '/pages/notices/index' })
   },
 
   goAdmin() {

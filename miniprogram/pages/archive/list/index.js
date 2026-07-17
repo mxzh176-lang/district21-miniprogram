@@ -1,5 +1,6 @@
 const api = require('../../../utils/api')
 const permission = require('../../../utils/permission')
+const { EVENT_CATEGORIES, normalizeEventCategory } = require('../../../utils/event-category')
 
 const CATEGORY_NAMES = {
   main: '记事本总目录',
@@ -55,6 +56,13 @@ function flattenCategories(organization) {
   return [{ id: 'all', name: '全部历史事件' }].concat(categories)
 }
 
+function archiveCreatedTimestamp(item = {}) {
+  const value = item.createdAt || item.updatedAt || item.date || ''
+  if (value instanceof Date) return value.getTime()
+  const timestamp = Date.parse(value)
+  return Number.isFinite(timestamp) ? timestamp : 0
+}
+
 Page({
   data: {
     organizationId: '',
@@ -68,6 +76,9 @@ Page({
     categoryIndex: 0,
     eventMonth: '',
     eventMonthLabel: '全部时间',
+    eventCategory: '',
+    eventCategoryOptions: ['全部事件分类'].concat(EVENT_CATEGORIES),
+    eventCategoryIndex: 0,
     loading: false,
     canCreate: false,
     canEdit: false,
@@ -117,12 +128,13 @@ Page({
       const query = {
         organizationId: this.data.organizationId,
         categoryId: categoryId === 'all' ? '' : categoryId,
+        eventCategory: this.data.eventCategory,
         eventMonth: this.data.eventMonth
       }
       let [entries, allEntries] = await Promise.all([
         api.call('listArchiveEntries', query),
         this.data.eventMonth
-          ? api.call('listArchiveEntries', { organizationId: this.data.organizationId, categoryId: categoryId === 'all' ? '' : categoryId })
+          ? api.call('listArchiveEntries', { organizationId: this.data.organizationId, categoryId: categoryId === 'all' ? '' : categoryId, eventCategory: this.data.eventCategory })
           : Promise.resolve(null)
       ])
       if (!entries.length) {
@@ -132,6 +144,7 @@ Page({
         allEntries = await api.call('listArchiveEntries', {
           organizationId: this.data.organizationId,
           categoryId: categoryId === 'all' ? '' : categoryId,
+          eventCategory: this.data.eventCategory,
           status: 'archived'
         })
       }
@@ -141,9 +154,10 @@ Page({
         : position ? position.name : (CATEGORY_NAMES[categoryId] || '档案事件')
       const sortedEntries = entries
         .slice()
-        .sort((a, b) => (a.order || 0) - (b.order || 0) || b.date.localeCompare(a.date))
+        .sort((a, b) => archiveCreatedTimestamp(b) - archiveCreatedTimestamp(a) || String(b.date || '').localeCompare(String(a.date || '')))
         .map((item) => ({
           ...item,
+          eventCategory: normalizeEventCategory(item.eventCategory, item.categoryId, item.uploaderRole),
           dateDay: item.date.slice(8, 10),
           dateMonth: `${Number(item.date.slice(5, 7))}月`,
           coverImage: item.photos && item.photos.length ? item.photos[0] : ''
@@ -186,8 +200,22 @@ Page({
     await this.loadEntries()
   },
 
+  async changeEventCategory(event) {
+    const eventCategoryIndex = Number(event.detail.value) || 0
+    this.setData({
+      eventCategoryIndex,
+      eventCategory: EVENT_CATEGORIES[eventCategoryIndex - 1] || ''
+    })
+    await this.loadEntries()
+  },
+
   async resetFilters() {
-    this.setData({ eventMonth: '', eventMonthLabel: '全部时间' })
+    this.setData({
+      eventMonth: '',
+      eventMonthLabel: '全部时间',
+      eventCategory: '',
+      eventCategoryIndex: 0
+    })
     await this.loadEntries()
   },
 

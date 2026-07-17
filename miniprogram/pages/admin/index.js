@@ -20,7 +20,7 @@ Page({
       { value: 'tasks', label: '待办' },
       { value: 'archives', label: '档案' },
       { value: 'contacts', label: '通讯录' },
-      { value: 'photos', label: '照片' },
+      { value: 'photos', label: '服务队云盘' },
       { value: 'notices', label: '通知' }
     ]
   },
@@ -28,18 +28,16 @@ Page({
   async onShow() {
     const approved = await auth.requireApproved({ admin: true })
     if (!approved) return
-    const [stats, appointments, adminMembers, adminCandidates, session] = await Promise.all([
+    const [stats, appointments, session] = await Promise.all([
       api.call('getAdminStats'),
       api.call('listAppointments'),
-      api.call('listAdminMembers'),
-      api.call('listAdminCandidates'),
       api.call('getSession')
     ])
     this.setData({
       stats,
       appointments,
-      adminMembers: adminMembers.map(item => this.withPermissionFlags(item)),
-      adminCandidates,
+      adminMembers: [],
+      adminCandidates: [],
       candidateIndex: 0,
       canAddAdmin: permission.isSuperAdmin(session)
     })

@@ -35,7 +35,7 @@
   <view class="section-row">
     <view>
       <view class="section-kicker">JUNE PLAN</view>
-      <view class="section-title compact">{{monthLabel}}重点待办</view>
+      <view class="section-title compact">近期重点待办</view>
     </view>
     <view class="task-heading-actions">
       <view wx:if="{{canCreateTask}}" class="quick-add" bindtap="createTask">＋</view>
@@ -54,79 +54,6 @@
     />
     <view wx:if="{{homeHasMore}}" class="task-view-all" bindtap="goTasks">还有 {{homePendingCount - homeVisibleCount}} 项待办，查看全部 ›</view>
     <view wx:if="{{!homeTaskGroups.length}}" class="home-task-empty" bindtap="goTasks">本月暂无待办，点击进入重点待办</view>
-  </view>
-
-  <view class="care-row">
-    <view class="care-card birthday" bindtap="goBirthdays">
-      <view class="care-icon">生</view>
-      <view>
-        <view class="care-label">本月生日</view>
-        <view class="care-value">{{careOverview.birthdayCount}}位狮友</view>
-      </view>
-      <view class="care-arrow">›</view>
-    </view>
-    <view class="care-card concern" bindtap="goMonthlyService">
-      <view class="care-icon">爱</view>
-      <view>
-        <view class="care-label">本月服务</view>
-        <view class="care-value">查看服务事件</view>
-      </view>
-      <view class="care-arrow">›</view>
-    </view>
-  </view>
-
-  <view class="stats">
-    <view class="stat" bindtap="goContacts">
-      <view class="stat-number">{{summary.memberCount}}</view>
-      <view class="stat-label">{{currentOrg.orgType === 'district' ? '协作区总人数' : '服务队人数'}}</view>
-    </view>
-    <view class="stat">
-      <view class="stat-number">{{currentOrg.orgType === 'district' ? 4 : 1}}</view>
-      <view class="stat-label">{{currentOrg.orgType === 'district' ? '服务队统计' : '当前服务队'}}</view>
-    </view>
-    <view class="stat">
-      <view class="stat-number">{{summary.photoCount}}</view>
-      <view class="stat-label">年度照片</view>
-    </view>
-  </view>
-
-  <view class="section-row">
-    <view class="section-title compact">{{historyTitle}}</view>
-    <view class="more" bindtap="goActivities">查看历史 ›</view>
-  </view>
-  <scroll-view scroll-x class="event-scroll">
-    <view class="event-row">
-      <view class="event-card tone-{{item.tone}}" wx:for="{{activities}}" wx:key="_id" data-id="{{item._id}}" bindtap="openActivity">
-        <swiper
-          wx:if="{{item.carouselPhotos.length}}"
-          class="event-swiper"
-          circular
-          autoplay
-          interval="3600"
-          duration="450"
-          indicator-dots="{{item.carouselPhotos.length > 1}}"
-          indicator-color="rgba(255,255,255,.35)"
-          indicator-active-color="#ffffff"
-        >
-          <swiper-item wx:for="{{item.carouselPhotos}}" wx:for-item="photo" wx:key="*this">
-            <image class="event-photo" src="{{photo}}" mode="aspectFill" />
-          </swiper-item>
-        </swiper>
-        <view wx:else class="event-mark">{{item.mark}}</view>
-        <view class="event-date">{{item.dateLabel}}</view>
-        <view class="event-title">{{item.title}}</view>
-        <view class="event-team">{{item.team}} · {{item.photoCount}}张照片</view>
-      </view>
-    </view>
-  </scroll-view>
-
-  <view class="notice-bar" wx:if="{{notices.length}}" bindtap="goNotices">
-    <view class="notice-icon">告</view>
-    <view class="notice-copy">
-      <view class="notice-title">{{notices[0].title}}</view>
-      <view class="notice-content">{{notices[0].content}}</view>
-    </view>
-    <view class="arrow">›</view>
   </view>
 
 </view>

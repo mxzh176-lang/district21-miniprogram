@@ -1,8 +1,8 @@
 <view class="page" wx:if="{{allowed}}">
   <view class="grant-hero">
     <view class="hero-kicker">GRANULAR ACCESS</view>
-    <view class="hero-title">人员精细授权</view>
-    <view class="hero-desc">类目专人优先授权为“栏目负责人”，只维护自己负责的类目；不要直接升为管理员。</view>
+    <view class="hero-title">岗位与委员会管理员</view>
+    <view class="hero-desc">一个岗位指定一位管理员，只管理对应岗位的档案入口和操作权限。</view>
   </view>
   <view class="readonly-note" wx:if="{{!canEdit}}">当前为只读模式，只有协作区管理员可分配或取消模块权限。</view>
 
@@ -12,11 +12,16 @@
   </view>
 
   <view class="form-card" wx:if="{{!loading && canEdit}}">
+    <view class="position-guide">
+      <view class="guide-title">可独立指定管理员</view>
+      <view class="guide-chips"><text>秘书</text><text>纠察</text><text>司库</text><text>总务</text><text>各委员会</text></view>
+      <view class="guide-desc">操作顺序：选人员 → 选服务队 → 选岗位 → 勾选查看、新增、修改、上传、删除。</view>
+    </view>
     <view class="field-label">常用权限角色</view>
     <picker range="{{rolePresets}}" range-key="label" value="{{rolePresetIndex}}" bindchange="onRolePresetChange">
       <view class="picker-value">{{rolePresets[rolePresetIndex].label}}</view>
     </picker>
-    <view class="identity-tip">建议：每个类目事件专人选择“栏目负责人”或“分管负责人”，默认只有查看、新增和修改权限；删除和全组织权限只给真正管理员。</view>
+    <view class="identity-tip">每次只保存一个岗位。为其他岗位指定管理员时，再选择对应岗位保存一条授权。</view>
     <view class="field-label">授权给谁</view>
     <picker range="{{users}}" range-key="displayName" value="{{userIndex}}" bindchange="onUserChange">
       <view class="picker-value">{{users.length ? users[userIndex].displayName : '暂无资料完整的成员'}}</view>
@@ -39,10 +44,16 @@
     </picker>
 
     <view wx:if="{{scopeOptions[scopeIndex].value === 'position' || scopeOptions[scopeIndex].value === 'position_tree'}}">
-      <view class="field-label">选择岗位</view>
-      <picker range="{{positions}}" range-key="name" value="{{positionIndex}}" bindchange="onPositionChange">
-        <view class="picker-value">{{positions.length ? positions[positionIndex].name : '当前组织暂无岗位'}}</view>
+      <view class="field-label">单独管理哪个档案</view>
+      <picker range="{{positions}}" range-key="displayName" value="{{positionIndex}}" bindchange="onPositionChange">
+        <view class="picker-value">{{positions.length ? positions[positionIndex].displayName : '当前组织暂无岗位'}}</view>
       </picker>
+      <view class="selected-position" wx:if="{{positions.length}}">
+        <view class="selected-position-title">当前授权档案</view>
+        <view>{{positions[positionIndex].roleName}} · {{positions[positionIndex].person}}</view>
+        <view class="selected-position-desc">此人只能管理该岗位对应的档案，不会获得其他岗位权限。</view>
+      </view>
+      <view class="identity-tip">选择用户后，其当前负责岗位会优先排列；也可以下拉指定其他单独档案。</view>
     </view>
 
     <view class="field-label">允许的操作</view>
@@ -63,7 +74,7 @@
   <view class="section-title">当前精细授权</view>
   <view class="grant-card" wx:for="{{grants}}" wx:key="id">
     <view class="grant-head"><view><view class="grant-user">{{item.userName}}</view><view class="grant-org">{{item.organizationName}}</view></view><view class="revoke" wx:if="{{canEdit}}" data-id="{{item.id}}" bindtap="revokeGrant">取消</view></view>
-    <view class="grant-summary">{{item.moduleLabel}} · {{item.scopeLabel}}</view>
+    <view class="grant-summary">{{item.moduleLabel}} · {{item.positionName || item.scopeLabel}}</view>
     <view class="grant-actions">{{item.actionLabel}}</view>
     <view class="grant-term">{{item.startDate}} 至 {{item.endDate}}</view>
   </view>

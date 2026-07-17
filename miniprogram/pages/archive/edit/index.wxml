@@ -3,13 +3,6 @@
     <view class="scope-badge">{{id ? '编辑' : '新建'}}</view>
     <text class="scope-title">{{organizationName}}</text>
     <text class="scope-subtitle">{{categoryName}} · 单条内部记录</text>
-    <view class="scope-progress">
-      <view class="progress-item active"><text>1</text><view>填写</view></view>
-      <view class="progress-line"></view>
-      <view class="progress-item"><text>2</text><view>内容</view></view>
-      <view class="progress-line"></view>
-      <view class="progress-item"><text>3</text><view>保存</view></view>
-    </view>
   </view>
 
   <view class="permission-tip" wx:if="{{canEdit}}">
@@ -30,21 +23,35 @@
         <view class="section-number">01</view>
         <view>
           <view class="section-title">基本信息</view>
-          <view class="section-desc">先填写时间和记录名称</view>
+          <view class="section-desc">先选择范围和栏目，再填写事件信息</view>
         </view>
       </view>
 
-      <view class="field">
-        <view class="field-head">
-          <text class="label">记录日期</text>
-          <text class="required">必填</text>
-        </view>
-        <picker mode="date" value="{{form.date}}" bindchange="onDateChange">
-          <view class="picker">
-            <text>{{form.date}}</text>
-            <text class="picker-arrow">›</text>
+      <view class="inline-field-row">
+        <view class="field inline-field">
+          <view class="field-head">
+            <text class="label">记录日期</text>
+            <text class="required">必填</text>
           </view>
-        </picker>
+          <picker mode="date" value="{{form.date}}" bindchange="onDateChange">
+            <view class="picker compact-picker">
+              <text>{{form.date}}</text>
+              <text class="picker-arrow">›</text>
+            </view>
+          </picker>
+        </view>
+        <view class="field inline-field">
+          <view class="field-head">
+            <text class="label">事件分类</text>
+            <text class="required">必选</text>
+          </view>
+          <picker range="{{eventCategoryOptions}}" value="{{eventCategoryIndex}}" bindchange="onEventCategoryChange">
+            <view class="picker compact-picker">
+              <text>{{form.eventCategory}}</text>
+              <text class="picker-arrow">›</text>
+            </view>
+          </picker>
+        </view>
       </view>
 
       <view class="field">
@@ -55,8 +62,7 @@
         <input class="input wide-input" style="color:#000000;-webkit-text-fill-color:#000000;font-weight:700;opacity:1;"
           cursor-color="#7447c8" value="{{form.title}}" data-field="title" bindinput="onInput"
           placeholder-class="form-placeholder" placeholder-style="color:#626d82;font-weight:500;"
-          placeholder="{{formCopy.titlePlaceholder}}" />
-        <view class="field-help">标题建议控制在 10 至 30 个字，方便历史事件列表展示。</view>
+          placeholder="请输入事件名称" />
       </view>
 
       <view class="field">
@@ -68,112 +74,58 @@
       </view>
 
       <view class="field">
+        <text class="label">事件说明（选填）</text>
+        <textarea class="textarea short" style="color:#000000;-webkit-text-fill-color:#000000;font-weight:700;opacity:1;"
+          cursor-color="#7447c8" value="{{form.summary}}" data-field="summary" bindinput="onInput"
+          placeholder-class="form-placeholder" placeholder-style="color:#626d82;font-weight:500;"
+          placeholder="简单写几句话即可" />
+      </view>
+
+      <view class="field">
         <view class="field-head"><text class="label">参与狮友</text><text class="required">必选</text></view>
         <view class="participant-summary">
           <view>
             <view class="participant-total">{{form.participantCount || 0}} 人</view>
-            <view class="participant-help">点击服务队展开，从成员名单中勾选参与狮友</view>
+            <view class="participant-help">点击选择，再按服务队勾选参与狮友</view>
+          </view>
+          <view class="participant-select-button" bindtap="toggleParticipantPicker">
+            {{participantPickerExpanded ? '收起' : '选择'}}
           </view>
         </view>
         <view wx:if="{{legacyParticipantNote}}" class="legacy-participant-note">{{legacyParticipantNote}}</view>
-        <view class="participant-team participant-team-{{item.tone}}" wx:for="{{participantTeams}}" wx:key="id">
-          <view class="participant-team-head" data-team-id="{{item.id}}" bindtap="toggleParticipantTeam">
-            <view>
-              <view class="participant-team-name">{{item.name}}</view>
-              <view class="participant-team-count">已选 {{item.selectedCount}} / {{item.members.length}}</view>
+        <block wx:if="{{participantPickerExpanded}}">
+          <view class="participant-team participant-team-{{item.tone}}" wx:for="{{participantTeams}}" wx:key="id">
+            <view class="participant-team-head" data-team-id="{{item.id}}" bindtap="toggleParticipantTeam">
+              <view>
+                <view class="participant-team-name">{{item.name}}</view>
+                <view class="participant-team-count">已选 {{item.selectedCount}} / {{item.members.length}}</view>
+              </view>
+              <view class="participant-team-arrow">{{item.expanded ? '收起' : '展开'}} ›</view>
             </view>
-            <view class="participant-team-arrow">{{item.expanded ? '收起' : '展开'}} ›</view>
-          </view>
-          <view class="participant-member-grid" wx:if="{{item.expanded}}">
-            <view
-              class="participant-member {{member.checked ? 'checked' : ''}}"
-              wx:for="{{item.members}}"
-              wx:for-item="member"
-              wx:key="id"
-              data-id="{{member.id}}"
-              bindtap="toggleParticipant"
-            >
-              <view class="participant-checkbox">{{member.checked ? '✓' : ''}}</view>
-              <text>{{member.name}}</text>
+            <view class="participant-member-grid" wx:if="{{item.expanded}}">
+              <view
+                class="participant-member {{member.checked ? 'checked' : ''}}"
+                wx:for="{{item.members}}"
+                wx:for-item="member"
+                wx:key="id"
+                data-id="{{member.id}}"
+                bindtap="toggleParticipant"
+              >
+                <view class="participant-checkbox">{{member.checked ? '✓' : ''}}</view>
+                <text>{{member.name}}</text>
+              </view>
             </view>
           </view>
-        </view>
+        </block>
       </view>
     </view>
 
-    <view class="form-section template-section">
-      <view class="section-heading">
-        <view class="section-number template-number">模</view>
-        <view>
-          <view class="section-title">分类记录模板</view>
-          <view class="section-desc">根据档案类别填充固定格式，内容仍由负责人核对</view>
-        </view>
-      </view>
-
-      <view class="field">
-        <text class="label">{{formCopy.keywordLabel}}</text>
-        <input class="input wide-input" style="color:#000000;-webkit-text-fill-color:#000000;font-weight:700;opacity:1;"
-          cursor-color="#7447c8" value="{{form.keywords}}" data-field="keywords" bindinput="onInput"
-          placeholder-class="form-placeholder" placeholder-style="color:#626d82;font-weight:500;"
-          placeholder="{{formCopy.keywordPlaceholder}}" />
-        <view class="keyword-examples">
-          <text>示例：</text>
-          <text class="keyword-chip" wx:for="{{formCopy.keywordExamples}}" wx:key="*this">{{item}}</text>
-        </view>
-      </view>
-
-      <button class="template-button" bindtap="applyTemplate">
-        <text class="template-button-icon">模</text>
-        <text>套用分类记录模板</text>
-      </button>
-      <view class="template-note success" wx:if="{{templateApplied}}">
-        模板已填充，请继续检查和修改下方内容。
-      </view>
-    </view>
-
-    <view class="form-section">
-      <view class="section-heading">
-        <view class="section-number">02</view>
-        <view>
-          <view class="section-title">内容记录</view>
-          <view class="section-desc">摘要用于列表，详情用于完整档案</view>
-        </view>
-      </view>
-
-      <view class="field">
-        <text class="label">内容摘要</text>
-        <textarea class="textarea short" style="color:#000000;-webkit-text-fill-color:#000000;font-weight:700;opacity:1;"
-          cursor-color="#7447c8" value="{{form.summary}}" data-field="summary" bindinput="onInput"
-          placeholder-class="form-placeholder" placeholder-style="color:#626d82;font-weight:500;"
-          placeholder="请输入简短摘要，用于历史事件列表展示" />
-      </view>
-
-      <view class="field">
-        <view class="field-head">
-          <text class="label">详细记录</text>
-          <text class="required">必填</text>
-        </view>
-        <textarea class="textarea" style="color:#000000;-webkit-text-fill-color:#000000;font-weight:700;opacity:1;"
-          cursor-color="#7447c8" value="{{form.content}}" data-field="content" bindinput="onInput"
-          placeholder-class="form-placeholder" placeholder-style="color:#626d82;font-weight:500;"
-          placeholder="{{formCopy.detailPlaceholder}}" />
-      </view>
-    </view>
-
-    <view class="form-section">
-      <view class="section-heading">
-        <view class="section-number">03</view>
-        <view>
-          <view class="section-title">图片与关联信息</view>
-          <view class="section-desc">最多上传 9 张与本条内部档案相关的图片</view>
-        </view>
-      </view>
-
+    <view class="form-section photo-section" id="photo-section">
       <view class="photo-upload" wx:if="{{canUpload}}" bindtap="choosePhotos">
         <view class="upload-icon">＋</view>
         <view class="upload-copy">
-          <view class="upload-title">{{form.photoCount ? '继续添加附件' : formCopy.photoTitle}}</view>
-          <view class="upload-desc">{{form.photoCount ? '已选择 ' + form.photoCount + ' 张' : formCopy.photoDescription}}</view>
+          <view class="upload-title">{{form.photoCount ? '继续添加照片' : '添加照片'}}</view>
+          <view class="upload-desc">{{form.photoCount ? '已选择 ' + form.photoCount + ' 张' : '从相册或相机选择'}}</view>
         </view>
         <view class="upload-arrow">›</view>
       </view>
@@ -186,14 +138,6 @@
         </view>
       </view>
 
-      <view class="uploader-row">
-        <view>
-          <view class="uploader-label">录入人</view>
-          <view class="uploader-desc">自动记录当前操作账号</view>
-        </view>
-        <input class="uploader-name" style="color:#5b6476;-webkit-text-fill-color:#5b6476;font-weight:700;opacity:1;"
-          value="{{form.uploadedBy}}" disabled />
-      </view>
     </view>
 
     <view class="form-section honor-section" wx:if="{{honorEligible}}">
@@ -228,6 +172,6 @@
   </block>
 
   <view class="footer-actions" wx:if="{{canEdit}}">
-    <button class="publish-button" bindtap="saveEvent">保存事件</button>
+    <button class="publish-button {{saving ? 'saving' : ''}}" disabled="{{saving}}" loading="{{saving}}" bindtap="saveEvent">{{saving ? '正在保存，请勿重复点击' : '保存事件'}}</button>
   </view>
 </view>

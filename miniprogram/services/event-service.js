@@ -1,5 +1,6 @@
 const cloudbase = require('./providers/cloudbase-adapter')
 const { uploadOrgFile, archivePort } = require('./file-upload-service')
+const { normalizeEventCategory } = require('../utils/event-category')
 
 const ORGANIZATION_IDS = {
   district: 'org_region_21_suihua',
@@ -52,6 +53,7 @@ function recordToArchiveEntry(record) {
     cloudDocumentId: record._id,
     organizationId: toLocalOrganizationId(record.organizationId),
     categoryId: record.categoryId || record.category,
+    eventCategory: normalizeEventCategory(record.eventType, record.categoryId, record.category),
     positionId: record.positionId || record.categoryId || '',
     date: record.eventDate || '',
     dateLabel: record.eventDate || '',
@@ -90,6 +92,8 @@ function recordToArchiveEntry(record) {
     keywords: record.keywords || [],
     summary: record.summary || '',
     content: record.content || '',
+    createdAt: record.createdAt || '',
+    updatedAt: record.updatedAt || '',
     source: 'cloud'
   }
 }
@@ -114,13 +118,13 @@ function archiveEntryToRecord(entry) {
     ],
     category: entry.uploaderRole || entry.categoryId || '纪事',
     categoryId: entry.categoryId || '',
+    eventType: normalizeEventCategory(entry.eventCategory, entry.categoryId, entry.uploaderRole),
     positionId,
     archiveId: `archive_${organizationId}_${positionId || 'main'}`,
     eventDate: entry.date,
     location: entry.location || '',
     participantCount: Number(entry.participantCount) || 0,
     participants: Array.isArray(entry.participants) ? entry.participants : [],
-    ownerName: entry.uploadedBy || '',
     status: entry.status || 'draft',
     eventStatus: entry.eventStatus || (entry.honorRequestedLevel && entry.honorRequestedLevel !== 'none' ? 'pending_leader_confirm' : 'archived'),
     honorRequestedLevel: entry.honorRequestedLevel || 'none',
@@ -176,6 +180,7 @@ async function execute(action, payload, localFallback) {
     const records = await cloudbase.invoke('listEventRecords', {
       organizationId: toCloudOrganizationId(payload.organizationId),
       categoryId: payload.categoryId,
+      eventType: payload.eventCategory,
       eventMonth: payload.eventMonth,
       status: payload.status || 'published',
       limit: 100

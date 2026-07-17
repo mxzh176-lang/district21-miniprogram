@@ -3,6 +3,7 @@ const permission = require('../../utils/permission')
 const orgScope = require('../../utils/org-scope')
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
+const MEMBER_SYNC_INTERVAL = 5000
 const TEAM_COLORS = {
   linghang: { tone: 'green', color: '#24d18f', name: '领航' },
   ailinghang: { tone: 'red', color: '#ff5e7a', name: '爱领航' },
@@ -48,32 +49,82 @@ Page({
       api.call('listTeams'),
       api.call('getSession')
     ])
+    this.session = session
+    const serviceTeams = teams.slice(1)
     this.setData({
       members: this.decorateMembers(members),
-      teams: teams.slice(1).map(item => {
+      teams: serviceTeams.map(item => {
         const meta = TEAM_COLORS[normalizeTeamId(item.id)] || TEAM_COLORS.district
         return { ...item, tone: meta.tone, color: item.color || meta.color }
       }),
       currentScope,
       teamId: currentScope.teamId || 'all',
-      canManage: permission.canPerform(session, 'contacts', 'update') || permission.canPerform(session, 'contacts', 'create')
+      canManage: serviceTeams.some(item => {
+        const organizationId = item.cloudId || item.id
+        return permission.canPerform(session, 'contacts', 'create', {
+          organizationId,
+          cloudOrganizationId: organizationId,
+          teamId: item.id
+        })
+      })
     })
     this.applyFilter()
+    this.startMemberSync()
+  },
+
+  onHide() {
+    this.stopMemberSync()
+  },
+
+  onUnload() {
+    this.stopMemberSync()
+  },
+
+  startMemberSync() {
+    this.stopMemberSync()
+    this._memberSyncTimer = setInterval(() => {
+      this.refreshMembers().catch(() => {})
+    }, MEMBER_SYNC_INTERVAL)
+  },
+
+  stopMemberSync() {
+    if (!this._memberSyncTimer) return
+    clearInterval(this._memberSyncTimer)
+    this._memberSyncTimer = null
+  },
+
+  async refreshMembers() {
+    if (this._memberSyncing) return
+    this._memberSyncing = true
+    try {
+      const members = await api.call('listOrg', {}, { forceRefresh: true })
+      this.setData({ members: this.decorateMembers(members) })
+      this.applyFilter()
+    } finally {
+      this._memberSyncing = false
+    }
   },
 
   decorateMembers(members = []) {
     return members.map(item => {
       const teamId = normalizeTeamId(item.teamId || item.organizationId || item.defaultOrganizationId)
       const meta = TEAM_COLORS[teamId] || TEAM_COLORS.district
+      const teamShortName = item.teamShortName || meta.name
       return {
         ...item,
         teamId,
         teamTone: meta.tone,
         teamColor: item.teamColor || meta.color,
-        teamShortName: item.teamShortName || meta.name,
+        teamShortName,
+        displayName: `${teamShortName}-${item.name}`,
         birthdayLabel: birthdayLabel(item.birthday),
         memberCodeLabel: item.memberCode || item.accountSuffix || '',
-        position: item.position || '成员'
+        position: item.position || '成员',
+        canManageMember: permission.canPerform(this.session, 'contacts', 'update', {
+          organizationId: item.organizationId || item.defaultOrganizationId,
+          cloudOrganizationId: item.organizationId || item.defaultOrganizationId,
+          teamId
+        })
       }
     })
   },

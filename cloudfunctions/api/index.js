@@ -1,4 +1,7 @@
 const cloud = require('wx-server-sdk')
+const crypto = require('crypto')
+const JSZip = require('jszip')
+const { authenticator } = require('otplib')
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
@@ -19,19 +22,24 @@ const COLLECTIONS = {
   roleAssignment: 'role_assignment',
   eventRecord: 'event_record',
   eventImage: 'event_image',
+  mediaAlbum: 'media_album',
+  mediaShare: 'media_share',
+  mediaExport: 'media_export',
   fileRecord: 'file_records',
   operationLog: 'operation_log',
   ledgerRecord: 'ledger_record',
   honorRecord: 'honor_record',
   homeBanner: 'home_banners',
   members: 'members',
-  tasks: 'tasks',
+  tasks: 'todo',
   org: 'org_units',
   activities: 'activities',
   photos: 'photos',
   notices: 'notices',
   history: 'history',
   auditLogs: 'audit_logs'
+  ,adminAccount: 'admin_accounts'
+  ,adminSession: 'admin_sessions'
 }
 
 const success = (data = null) => ({ ok: true, data })
@@ -39,6 +47,56 @@ const fail = (code, message) => ({ ok: false, code, message })
 const cleanText = (value, maxLength = 200) => String(value || '').trim().slice(0, maxLength)
 const activeItems = items => items.filter(item => !item.deletedAt)
 const now = () => new Date()
+
+const MEDIA_CATEGORIES = [
+  { id: 'meeting', name: '会议照片' },
+  { id: 'fellowship', name: '联谊照片' },
+  { id: 'care', name: '关爱记录' },
+  { id: 'service', name: '服务记录' },
+  { id: 'uncategorized', name: '未分类' }
+]
+const MEDIA_CATEGORY_NAMES = MEDIA_CATEGORIES.reduce((result, item) => {
+  result[item.id] = item.name
+  return result
+}, {})
+const MEDIA_TEAM_NAMES = {
+  org_team_linghang: '领航服务队',
+  org_team_ailinghang: '爱领航服务队',
+  org_team_yuanhang: '远航服务队',
+  org_team_jingying: '精英服务队'
+}
+const MEDIA_EXPORT_MAX_FILES = 80
+const MEDIA_EXPORT_MAX_BYTES = 100 * 1024 * 1024
+
+const ADMIN_ACCESS_TTL = 30 * 60 * 1000
+const ADMIN_REFRESH_TTL = 7 * 24 * 60 * 60 * 1000
+const ADMIN_MAX_FAILURES = 5
+const WEB_ADMIN_ACTIONS = new Set([
+  'adminLogin', 'adminRefresh', 'adminLogout', 'adminChangePassword', 'adminGraph',
+  'adminGrantPreflight', 'adminGrantCommit', 'adminGrantRevoke',
+  'adminSaveUserPermissions', 'adminRevokeUserPermissions', 'adminDeleteUser'
+])
+
+function randomToken(bytes = 32) {
+  return crypto.randomBytes(bytes).toString('base64url')
+}
+
+function tokenHash(value) {
+  return crypto.createHash('sha256').update(String(value || '')).digest('hex')
+}
+
+function passwordHash(password, salt = crypto.randomBytes(16).toString('hex')) {
+  const hash = crypto.scryptSync(String(password), salt, 64).toString('hex')
+  return `${salt}:${hash}`
+}
+
+function passwordMatches(password, stored) {
+  const [salt, expected] = String(stored || '').split(':')
+  if (!salt || !expected) return false
+  const actual = crypto.scryptSync(String(password), salt, 64)
+  const expectedBuffer = Buffer.from(expected, 'hex')
+  return actual.length === expectedBuffer.length && crypto.timingSafeEqual(actual, expectedBuffer)
+}
 
 function businessId(prefix) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
@@ -437,6 +495,7 @@ async function activePermissionGrants(userId) {
 }
 
 const PORT_PERMISSION_ACTIONS = {
+  home: ['read', 'create', 'update', 'delete', 'upload'],
   history: ['read', 'create', 'update', 'delete', 'upload'],
   archive: ['read', 'update', 'upload', 'delete'],
   contacts: ['read', 'create', 'update', 'delete'],
@@ -522,6 +581,23 @@ async function requireLegacyPortEditor(openid, module, action, context = {}) {
     if (portState.configured) {
       throw Object.assign(new Error('无权限操作'), { code: 'PERMISSION_DENIED' })
     }
+  }
+  return requireEditor(openid)
+}
+
+async function requireDirectoryMemberEditor(openid, action, organizationId) {
+  const platformUser = await findPlatformUser(openid)
+  organizationId = canonicalOrganizationId(organizationId)
+  if (platformUser && platformUser.status === 'active') {
+    const context = { organizationId }
+    if (await canAdministerOrganization(platformUser.id, organizationId)) return platformUser
+    const portState = await portPermissionState(platformUser.id, 'contacts', action, context)
+    if (portState.allowed) return platformUser
+    if (portState.configured) {
+      throw Object.assign(new Error('无权限维护该服务队成员'), { code: 'PERMISSION_DENIED' })
+    }
+    if (await hasPlatformGrant(platformUser.id, 'contacts', action, context)) return platformUser
+    throw Object.assign(new Error('无权限维护该服务队成员'), { code: 'PERMISSION_DENIED' })
   }
   return requireEditor(openid)
 }
@@ -790,6 +866,13 @@ async function getPlatformSession(openid) {
   if (user.status === 'disabled') {
     throw Object.assign(new Error('当前账号已停用'), { code: 'USER_DISABLED' })
   }
+  if (user.status === 'pending' && hasCompleteAuthorizationProfile(user)) {
+    const timestamp = now()
+    await db.collection(COLLECTIONS.user).doc(user._id).update({
+      data: { status: 'active', updatedAt: timestamp, lastLoginAt: timestamp }
+    })
+    user = { ...user, status: 'active', updatedAt: timestamp, lastLoginAt: timestamp }
+  }
   const [baseRoles, assignments, grants, portPermissions] = await Promise.all([
     platformRoles(user.id),
     activeRoleAssignments(user.id),
@@ -858,6 +941,11 @@ async function saveMyProfile(openid, event = {}) {
   const profile = event.profile || {}
   const name = cleanText(profile.name, 30)
   const organizationId = canonicalOrganizationId(profile.organizationId)
+  const avatarFileID = cleanText(profile.avatarFileID, 1000)
+  const avatarRecordId = cleanText(profile.avatarRecordId, 100)
+  if (profile.consentAccepted !== true) {
+    throw Object.assign(new Error('请先阅读并同意用户服务协议和隐私保护指引'), { code: 'PROFILE_CONSENT_REQUIRED' })
+  }
   if (!name || name.length < 2) {
     throw Object.assign(new Error('请填写至少两个字的真实姓名'), { code: 'INVALID_PROFILE_NAME' })
   }
@@ -873,19 +961,39 @@ async function saveMyProfile(openid, event = {}) {
     name,
     defaultOrganizationId: organizationId,
     profileCompleted: true,
+    status: 'active',
     updatedAt: now(),
     lastLoginAt: now()
+  }
+  if (avatarFileID || avatarRecordId) {
+    if (!avatarFileID || !avatarRecordId) {
+      throw Object.assign(new Error('头像文件信息不完整，请重新选择照片'), { code: 'INVALID_PROFILE_AVATAR' })
+    }
+    await ensureFileRecordCollection()
+    const avatarResult = await db.collection(COLLECTIONS.fileRecord)
+      .where({ id: avatarRecordId, status: 'active' })
+      .limit(1)
+      .get()
+    const avatarRecord = avatarResult.data[0]
+    if (!avatarRecord || avatarRecord.resourceType !== 'user_avatar' ||
+        avatarRecord.resourceId !== user.id || avatarRecord.organizationId !== organizationId ||
+        avatarRecord.fileID !== avatarFileID || avatarRecord.uploaderOpenid !== openid) {
+      throw Object.assign(new Error('只能将本人上传的照片设为成员头像'), { code: 'PROFILE_AVATAR_PERMISSION_DENIED' })
+    }
+    data.avatar = avatarFileID
   }
   await db.collection(COLLECTIONS.user).doc(user._id).update({ data })
   await writePlatformLog({ ...user, name }, 'update_profile', 'user', user.id, {
     name,
-    organizationId
+    organizationId,
+    avatarUpdated: Boolean(data.avatar)
   })
   return {
     id: user.id,
     name,
     organizationId,
-    status: user.status
+    avatarUrl: data.avatar || user.avatar || '',
+    status: data.status
   }
 }
 
@@ -909,9 +1017,22 @@ async function listProfileOrganizations(openid) {
     .map(item => ({ id: item.id, name: item.name, shortName: item.shortName, type: item.type }))
 }
 
-const PERMISSION_MODULES = ['all', 'archives', 'contacts', 'tasks', 'history', 'notices', 'photos', 'honors']
-const PERMISSION_ACTIONS = ['read', 'create', 'update', 'delete']
+const PERMISSION_MODULES = [
+  'all', 'home', 'tasks', 'archives', 'history', 'photos', 'honors', 'ledger',
+  'contacts', 'contact_private', 'positions', 'role_assignments', 'notices',
+  'files', 'permissions', 'logs'
+]
+const PERMISSION_ACTIONS = ['read', 'create', 'update', 'delete', 'upload', 'approve', 'complete', 'export']
+const PERMISSION_MODULE_ACTIONS = {
+  all: PERMISSION_ACTIONS,
+  home: ['read', 'create', 'update', 'delete', 'upload'], tasks: ['read', 'create', 'update', 'delete', 'complete'], archives: ['read', 'create', 'update', 'delete', 'export'],
+  history: ['read', 'create', 'update', 'delete', 'export'], photos: ['read', 'upload', 'update', 'delete'], honors: ['read', 'create', 'update', 'approve'],
+  ledger: ['read', 'create', 'update', 'delete', 'export'], contacts: ['read', 'create', 'update', 'delete', 'export'], contact_private: ['read', 'update'],
+  positions: ['read', 'create', 'update', 'delete'], role_assignments: ['read', 'create', 'update', 'delete'], notices: ['read', 'create', 'update', 'delete'],
+  files: ['read', 'upload', 'delete'], permissions: ['read', 'create', 'update', 'delete'], logs: ['read', 'export']
+}
 const PERMISSION_SCOPES = ['global', 'organization', 'organization_tree', 'position', 'position_tree']
+const TEAM_SCOPED_ADMIN_ROLE_CODES = ['team_admin', 'first-vp', 'second-vp', 'third-vp', 'secretary', 'treasurer']
 
 async function listUserPermissions(openid) {
   const user = await requirePlatformUser(openid)
@@ -936,13 +1057,14 @@ function sanitizePortPermissions(input = {}) {
   return result
 }
 
-async function saveUserPermissions(openid, event = {}) {
-  const operator = await requireSuperAdmin(openid)
+async function saveUserPermissions(openid, event = {}, authorizedOperator = null) {
+  const operator = authorizedOperator || await requireSuperAdmin(openid)
   const input = event.userPermissions || {}
   const userId = cleanText(input.userId, 100)
   const teamId = canonicalOrganizationId(input.teamId)
   const roleCode = cleanText(input.roleCode, 100)
   const roleName = cleanText(input.roleName, 100)
+  const groupName = cleanText(input.groupName, 100)
   const dataScope = cleanText(input.dataScope, 20)
   const positionId = cleanText(input.positionId, 140)
   const startDate = cleanText(input.startDate, 10)
@@ -958,6 +1080,9 @@ async function saveUserPermissions(openid, event = {}) {
   if (!['region', 'team'].includes(team.type)) {
     throw Object.assign(new Error('请选择协作区或服务队'), { code: 'INVALID_PERMISSION_TEAM' })
   }
+  if (TEAM_SCOPED_ADMIN_ROLE_CODES.includes(roleCode) && (team.type !== 'team' || dataScope !== 'team')) {
+    throw Object.assign(new Error('服务队管理员岗位只能使用所属服务队范围'), { code: 'INVALID_TEAM_SCOPED_ADMIN_ROLE' })
+  }
   if (dataScope === 'position') {
     const positionResult = await db.collection(COLLECTIONS.position)
       .where({ id: positionId, organizationId: teamId, status: 'active' })
@@ -967,8 +1092,26 @@ async function saveUserPermissions(openid, event = {}) {
       throw Object.assign(new Error('所选岗位不属于当前服务队'), { code: 'INVALID_PERMISSION_POSITION' })
     }
   }
-  const id = cleanText(input.id, 100) || businessId('user_permission')
-  const existing = await db.collection(COLLECTIONS.userPermissions).where({ id }).limit(1).get()
+  const inputId = cleanText(input.id, 100)
+  const existingById = inputId
+    ? await db.collection(COLLECTIONS.userPermissions).where({ id: inputId }).limit(1).get()
+    : { data: [] }
+  const existingByUser = existingById.data[0]
+    ? { data: [] }
+    : await db.collection(COLLECTIONS.userPermissions).where({ userId, status: 'active' }).limit(20).get()
+  const sameRolePermissions = existingByUser.data.filter(item =>
+    canonicalOrganizationId(item.teamId) === teamId && item.roleCode === roleCode)
+  const primaryExisting = existingById.data[0] || sameRolePermissions[0]
+  const id = primaryExisting ? primaryExisting.id : inputId || businessId('user_permission')
+  const normalizedPermissions = sanitizePortPermissions(input.permissions)
+  normalizedPermissions.finance = roleCode === 'super_admin'
+    ? normalizedPermissions.finance
+    : ['read']
+  if (TEAM_SCOPED_ADMIN_ROLE_CODES.includes(roleCode)) {
+    Object.keys(normalizedPermissions).forEach(module => {
+      normalizedPermissions[module] = normalizedPermissions[module].filter(action => action !== 'delete')
+    })
+  }
   const data = {
     id,
     userId,
@@ -976,17 +1119,23 @@ async function saveUserPermissions(openid, event = {}) {
     teamId,
     roleCode,
     roleName,
+    groupName: groupName || roleName,
     dataScope,
     positionId: dataScope === 'position' ? positionId : '',
-    permissions: sanitizePortPermissions(input.permissions),
+    permissions: normalizedPermissions,
     startDate,
     endDate,
     status: 'active',
     grantedBy: operator.id,
     updatedAt: now()
   }
-  if (existing.data[0]) {
-    await db.collection(COLLECTIONS.userPermissions).doc(existing.data[0]._id).update({ data })
+  const duplicatedActive = (existingById.data.concat(sameRolePermissions))
+    .filter(item => item && item._id && item._id !== (primaryExisting && primaryExisting._id))
+  await Promise.all(duplicatedActive.map(item => db.collection(COLLECTIONS.userPermissions).doc(item._id).update({
+    data: { status: 'deleted', mergedInto: id, updatedAt: now() }
+  })))
+  if (primaryExisting) {
+    await db.collection(COLLECTIONS.userPermissions).doc(primaryExisting._id).update({ data })
   } else {
     data.createdAt = now()
     await db.collection(COLLECTIONS.userPermissions).add({ data })
@@ -1029,12 +1178,12 @@ async function saveUserPermissions(openid, event = {}) {
   await db.collection(COLLECTIONS.user).where({ id: userId }).update({
     data: { status: 'active', updatedAt: now() }
   })
-  await writePlatformLog(operator, existing.data[0] ? 'update_permission' : 'grant_permission', 'user_permissions', id, data)
+  await writePlatformLog(operator, primaryExisting ? 'update_permission' : 'grant_permission', 'user_permissions', id, data)
   return data
 }
 
-async function revokeUserPermissions(openid, event = {}) {
-  const operator = await requireSuperAdmin(openid)
+async function revokeUserPermissions(openid, event = {}, authorizedOperator = null) {
+  const operator = authorizedOperator || await requireSuperAdmin(openid)
   const id = cleanText(event.id, 100)
   const result = await db.collection(COLLECTIONS.userPermissions).where({ id }).limit(1).get()
   const grant = result.data[0]
@@ -1817,13 +1966,29 @@ async function listOrganizations(openid, event = {}) {
   return result.data
 }
 
+const EVENT_TYPES = ['例会事件', '联谊事件', '关爱事件', '纠察事件', '培训事件', '会员发展']
+
+function inferEventType(categoryId = '', category = '') {
+  const value = `${categoryId} ${category}`.toLowerCase()
+  if (/fellowship|social|联谊/.test(value)) return '联谊事件'
+  if (/care|关爱/.test(value)) return '关爱事件'
+  if (/tamer|纠察/.test(value)) return '纠察事件'
+  if (/training|培训|领导力/.test(value)) return '培训事件'
+  if (/member-retention|\bmember\b|会员/.test(value)) return '会员发展'
+  return '例会事件'
+}
+
+function normalizeEventType(value, categoryId = '', category = '') {
+  return EVENT_TYPES.includes(value) ? value : inferEventType(categoryId, category)
+}
+
 async function listEventRecords(openid, event = {}) {
-  const user = await requirePlatformUser(openid)
-  const portGrants = await enforcingPortPermissions(user.id)
+  await requirePlatformUser(openid)
   const status = cleanText(event.status, 30) || 'published'
   const organizationId = cleanText(event.organizationId, 80)
   const category = cleanText(event.category, 40)
   const categoryId = cleanText(event.categoryId, 80)
+  const eventType = cleanText(event.eventType, 40)
   const eventMonth = cleanText(event.eventMonth, 7)
   const limit = Math.min(Number(event.limit) || 50, 100)
   const result = await db.collection(COLLECTIONS.eventRecord).limit(200).get()
@@ -1833,9 +1998,14 @@ async function listEventRecords(openid, event = {}) {
     .filter(item => !organizationId || item.organizationId === organizationId)
     .filter(item => !category || item.category === category)
     .filter(item => !categoryId || item.categoryId === categoryId)
+    .map(item => ({ ...item, eventType: normalizeEventType(item.eventType, item.categoryId, item.category) }))
+    .filter(item => !eventType || item.eventType === eventType)
     .filter(item => !eventMonth || item.eventMonth === eventMonth)
-    .filter(item => !portGrants.length || portPermissionAllowed(portGrants, user.id, 'history', 'read', item))
-    .sort((a, b) => String(b.eventDate || '').localeCompare(String(a.eventDate || '')))
+    .sort((a, b) => {
+      const createdDifference = new Date(b.createdAt || b.updatedAt || b.eventDate || 0).getTime() -
+        new Date(a.createdAt || a.updatedAt || a.eventDate || 0).getTime()
+      return createdDifference || String(b.eventDate || '').localeCompare(String(a.eventDate || ''))
+    })
     .slice(0, limit)
   try {
     const imageResult = await db.collection(COLLECTIONS.eventImage).limit(1000).get()
@@ -1887,6 +2057,7 @@ async function saveEventRecord(openid, event = {}) {
       : [],
     category: cleanText(record.category, 40) || '纪事',
     categoryId: cleanText(record.categoryId, 80),
+    eventType: normalizeEventType(cleanText(record.eventType, 40), record.categoryId, record.category),
     positionId: cleanText(record.positionId || record.categoryId, 140),
     archiveId: cleanText(record.archiveId, 180),
     keywords: Array.isArray(record.keywords)
@@ -1934,7 +2105,7 @@ async function saveEventRecord(openid, event = {}) {
 }
 
 async function getEventRecord(openid, event = {}) {
-  const user = await requirePlatformUser(openid)
+  await requirePlatformUser(openid)
   const id = cleanText(event.id, 100)
   if (!id) throw Object.assign(new Error('缺少纪事 ID'), { code: 'EVENT_ID_REQUIRED' })
   const result = await db.collection(COLLECTIONS.eventRecord).where({ id }).limit(1).get()
@@ -1942,16 +2113,16 @@ async function getEventRecord(openid, event = {}) {
   if (!record || record.deletedAt) {
     throw Object.assign(new Error('纪事不存在或已归档'), { code: 'NOT_FOUND' })
   }
-  const portState = await portPermissionState(user.id, 'history', 'read', record)
-  if (portState.configured && !portState.allowed) {
-    throw Object.assign(new Error('无权限操作'), { code: 'PERMISSION_DENIED' })
-  }
   const images = await db.collection(COLLECTIONS.eventImage)
     .where({ eventId: record.id, status: 'active' })
     .orderBy('sortOrder', 'asc')
     .limit(200)
     .get()
-  return { ...record, images: await attachImageUrls(images.data) }
+  return {
+    ...record,
+    eventType: normalizeEventType(record.eventType, record.categoryId, record.category),
+    images: await attachImageUrls(images.data)
+  }
 }
 
 async function archiveEventRecord(openid, event = {}) {
@@ -2328,27 +2499,587 @@ async function saveEventImages(openid, event = {}) {
   return { eventId, imageCount: images.length, removedFileCount: removedFileIds.length }
 }
 
-async function ensureFileRecordCollection() {
+async function ensureCollection(collectionName) {
   try {
-    await db.collection(COLLECTIONS.fileRecord).limit(1).get()
+    await db.collection(collectionName).limit(1).get()
   } catch (error) {
     if (typeof db.createCollection !== 'function') throw error
     try {
-      await db.createCollection(COLLECTIONS.fileRecord)
+      await db.createCollection(collectionName)
     } catch (createError) {
       if (!/exist|already/i.test(createError.message || '')) throw createError
     }
   }
 }
 
-async function saveFileRecord(openid, event = {}) {
+async function ensureFileRecordCollection() {
+  return ensureCollection(COLLECTIONS.fileRecord)
+}
+
+function normalizeMediaCategory(value) {
+  const category = cleanText(value, 30)
+  return MEDIA_CATEGORY_NAMES[category] ? category : 'uncategorized'
+}
+
+function mediaOrganizationId(value) {
+  const organizationId = canonicalOrganizationId(value)
+  if (!MEDIA_TEAM_NAMES[organizationId]) {
+    throw Object.assign(new Error('请选择有效的服务队云盘'), { code: 'INVALID_MEDIA_ORGANIZATION' })
+  }
+  return organizationId
+}
+
+async function mediaPermission(openid, organizationId, action = 'read') {
   const user = await requirePlatformUser(openid)
+  organizationId = mediaOrganizationId(organizationId)
+  if (action === 'read') return { user, organizationId }
+  if (await canAdministerOrganization(user.id, organizationId)) return { user, organizationId }
+  const normalizedAction = action === 'create' ? 'upload' : (action === 'export' ? 'update' : action)
+  const portState = await portPermissionState(user.id, 'photos', normalizedAction, { organizationId })
+  if (portState.allowed || await hasPlatformGrant(user.id, 'photos', normalizedAction, { organizationId })) {
+    return { user, organizationId }
+  }
+  throw Object.assign(new Error(action === 'read' ? '无权查看该服务队云盘' : '无权管理该服务队云盘'), {
+    code: 'MEDIA_PERMISSION_DENIED'
+  })
+}
+
+async function mediaPermissionSummary(user, organizationId) {
+  const administrator = await canAdministerOrganization(user.id, organizationId)
+  const permissionFor = async action => {
+    if (administrator) return true
+    const portState = await portPermissionState(user.id, 'photos', action, { organizationId })
+    return portState.allowed || await hasPlatformGrant(user.id, 'photos', action, { organizationId })
+  }
+  const canRead = true
+  const canUpload = administrator || await permissionFor('upload')
+  const canManage = administrator || await permissionFor('update')
+  const canDelete = administrator || await permissionFor('delete')
+  return { canRead, canUpload, canManage, canDelete, canExport: canManage, canShare: canRead, canSwitchTeam: true }
+}
+
+async function mediaAvailableTeams(openid) {
+  await requirePlatformUser(openid)
+  return Object.keys(MEDIA_TEAM_NAMES).map(id => ({ id, name: MEDIA_TEAM_NAMES[id] }))
+}
+
+async function mediaAlbumsForOrganization(organizationId) {
+  const result = await db.collection(COLLECTIONS.mediaAlbum)
+    .where({ organizationId, status: 'active' })
+    .limit(500)
+    .get()
+  return result.data.filter(item => !item.deletedAt)
+}
+
+function mediaAlbumBreadcrumbs(album, albums = []) {
+  const byId = new Map(albums.map(item => [item.id, item]))
+  const result = []
+  let current = album
+  const visited = new Set()
+  while (current && !visited.has(current.id) && result.length < 12) {
+    visited.add(current.id)
+    result.unshift({ id: current.id, title: current.title })
+    current = current.parentId ? byId.get(current.parentId) : null
+  }
+  return result
+}
+
+async function mediaAlbumCoverMap(albums = []) {
+  const coverIds = albums.map(item => cleanText(item.coverFileID, 1000)).filter(Boolean)
+  const coverMap = {}
+  if (coverIds.length && typeof cloud.getTempFileURL === 'function') {
+    try {
+      const response = await cloud.getTempFileURL({ fileList: Array.from(new Set(coverIds)).slice(0, 50) })
+      ;(response.fileList || []).forEach(item => {
+        if (item.fileID && item.tempFileURL) coverMap[item.fileID] = item.tempFileURL
+      })
+    } catch (error) {
+      console.warn('获取云盘封面失败', error.message)
+    }
+  }
+  return coverMap
+}
+
+function mediaAlbumView(item, coverMap = {}) {
+  return {
+    ...item,
+    parentId: item.parentId || '',
+    categoryName: MEDIA_CATEGORY_NAMES[item.category] || MEDIA_CATEGORY_NAMES.uncategorized,
+    coverUrl: coverMap[item.coverFileID] || ''
+  }
+}
+
+async function listMediaAlbums(openid, event = {}) {
+  const organizationId = mediaOrganizationId(event.organizationId)
+  const { user } = await mediaPermission(openid, organizationId, 'read')
+  await ensureCollection(COLLECTIONS.mediaAlbum)
+  await ensureFileRecordCollection()
+  const category = cleanText(event.category, 30)
+  const parentId = cleanText(event.parentId, 100)
+  const page = Math.max(1, Number(event.page) || 1)
+  const pageSize = Math.min(30, Math.max(1, Number(event.pageSize) || 20))
+  const start = (page - 1) * pageSize
+  const allAlbums = await mediaAlbumsForOrganization(organizationId)
+  const filtered = allAlbums
+    .filter(item => (item.parentId || '') === parentId)
+    .filter(item => !category || category === 'all' || item.category === normalizeMediaCategory(category))
+    .sort((a, b) => String(b.eventDate || '').localeCompare(String(a.eventDate || '')) || new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+  const albums = filtered.slice(start, start + pageSize)
+  const coverMap = await mediaAlbumCoverMap(albums)
+  const currentFolder = parentId ? allAlbums.find(item => item.id === parentId) : null
+  if (parentId && !currentFolder) throw Object.assign(new Error('文件夹不存在或已删除'), { code: 'MEDIA_ALBUM_NOT_FOUND' })
+  return {
+    organizationId,
+    organizationName: MEDIA_TEAM_NAMES[organizationId],
+    categories: MEDIA_CATEGORIES,
+    permissions: await mediaPermissionSummary(user, organizationId),
+    availableTeams: await mediaAvailableTeams(openid),
+    parentId,
+    currentFolder: currentFolder ? mediaAlbumView(currentFolder, coverMap) : null,
+    breadcrumbs: currentFolder ? mediaAlbumBreadcrumbs(currentFolder, allAlbums) : [],
+    albums: albums.map(item => mediaAlbumView(item, coverMap)),
+    page,
+    pageSize,
+    total: filtered.length,
+    hasMore: start + albums.length < filtered.length
+  }
+}
+
+async function findMediaAlbum(id) {
+  const albumId = cleanText(id, 100)
+  if (!albumId) return null
+  const result = await db.collection(COLLECTIONS.mediaAlbum).where({ id: albumId }).limit(1).get()
+  return result.data[0] || null
+}
+
+async function getMediaAlbum(openid, event = {}) {
+  await ensureCollection(COLLECTIONS.mediaAlbum)
+  await ensureFileRecordCollection()
+  const album = await findMediaAlbum(event.id)
+  if (!album || album.status !== 'active' || album.deletedAt) {
+    throw Object.assign(new Error('相册不存在或已删除'), { code: 'MEDIA_ALBUM_NOT_FOUND' })
+  }
+  const { user } = await mediaPermission(openid, album.organizationId, 'read')
+  const page = Math.max(1, Number(event.page) || 1)
+  const pageSize = Math.min(50, Math.max(1, Number(event.pageSize) || 30))
+  const start = (page - 1) * pageSize
+  const condition = { resourceType: 'media_album', resourceId: album.id, status: 'active' }
+  const [countResult, result, allAlbums] = await Promise.all([
+    db.collection(COLLECTIONS.fileRecord).where(condition).count(),
+    db.collection(COLLECTIONS.fileRecord).where(condition)
+      .orderBy('sortOrder', 'asc')
+      .skip(start)
+      .limit(pageSize)
+      .get(),
+    mediaAlbumsForOrganization(album.organizationId)
+  ])
+  const files = result.data
+  const childFolders = allAlbums.filter(item => (item.parentId || '') === album.id)
+  const childCoverMap = await mediaAlbumCoverMap(childFolders)
+  const fileIds = Array.from(new Set(files.map(item => cleanText(item.fileID, 1000)).filter(Boolean)))
+  const urlMap = {}
+  for (let index = 0; index < fileIds.length; index += 50) {
+    try {
+      const response = await cloud.getTempFileURL({ fileList: fileIds.slice(index, index + 50) })
+      ;(response.fileList || []).forEach(item => {
+        if (item.fileID && item.tempFileURL) urlMap[item.fileID] = item.tempFileURL
+      })
+    } catch (error) {
+      console.warn('获取云盘文件链接失败', error.message)
+    }
+  }
+  return {
+    album: mediaAlbumView(album),
+    breadcrumbs: mediaAlbumBreadcrumbs(album, allAlbums),
+    childFolders: childFolders.map(item => mediaAlbumView(item, childCoverMap)),
+    files: files.map(item => ({ ...item, url: urlMap[item.fileID] || item.fileID })),
+    permissions: await mediaPermissionSummary(user, album.organizationId),
+    page,
+    pageSize,
+    total: countResult.total,
+    hasMore: start + files.length < countResult.total
+  }
+}
+
+async function saveMediaAlbum(openid, event = {}) {
+  await ensureCollection(COLLECTIONS.mediaAlbum)
+  await ensureFileRecordCollection()
+  const input = event.album || {}
+  const existing = input.id ? await findMediaAlbum(input.id) : null
+  const organizationId = mediaOrganizationId(existing ? existing.organizationId : input.organizationId)
+  const action = existing ? 'update' : 'create'
+  const { user } = await mediaPermission(openid, organizationId, action)
+  if (existing && canonicalOrganizationId(input.organizationId || organizationId) !== organizationId) {
+    throw Object.assign(new Error('不能把相册移动到其他服务队'), { code: 'MEDIA_TEAM_MISMATCH' })
+  }
+  const category = normalizeMediaCategory(input.category || (existing && existing.category))
+  const eventDate = validDateText(input.eventDate || (existing && existing.eventDate)) || new Date().toISOString().slice(0, 10)
+  const title = cleanText(input.title || (existing && existing.title), 80) || '未分类相册'
+  const parentId = cleanText(input.parentId !== undefined ? input.parentId : (existing && existing.parentId), 100)
+  let parent = null
+  if (parentId) {
+    parent = await findMediaAlbum(parentId)
+    if (!parent || parent.status !== 'active' || parent.deletedAt) {
+      throw Object.assign(new Error('上级文件夹不存在'), { code: 'MEDIA_PARENT_NOT_FOUND' })
+    }
+    if (parent.organizationId !== organizationId) {
+      throw Object.assign(new Error('不能跨服务队建立文件夹'), { code: 'MEDIA_TEAM_MISMATCH' })
+    }
+    if (existing && parent.id === existing.id) {
+      throw Object.assign(new Error('不能把文件夹放入自身'), { code: 'MEDIA_FOLDER_CYCLE' })
+    }
+    if (existing) {
+      const albums = await mediaAlbumsForOrganization(organizationId)
+      if (mediaDescendantAlbumIds(existing.id, albums).includes(parent.id)) {
+        throw Object.assign(new Error('不能把文件夹移入自己的下级目录'), { code: 'MEDIA_FOLDER_CYCLE' })
+      }
+    }
+  }
+  const data = {
+    id: existing ? existing.id : businessId('album'),
+    organizationId,
+    title,
+    parentId,
+    depth: parent ? Number(parent.depth || 0) + 1 : 0,
+    category,
+    eventDate,
+    coverFileID: existing ? existing.coverFileID || '' : '',
+    mediaCount: existing ? Number(existing.mediaCount) || 0 : 0,
+    imageCount: existing ? Number(existing.imageCount) || 0 : 0,
+    videoCount: existing ? Number(existing.videoCount) || 0 : 0,
+    creatorId: existing ? existing.creatorId : user.id,
+    creatorName: existing ? existing.creatorName : user.name,
+    status: 'active',
+    updatedAt: now()
+  }
+  if (existing) {
+    await db.collection(COLLECTIONS.mediaAlbum).doc(existing._id).update({ data })
+    if (existing.category !== category || existing.title !== title) {
+      await db.collection(COLLECTIONS.fileRecord)
+        .where({ resourceType: 'media_album', resourceId: existing.id, status: 'active' })
+        .update({ data: { category, eventName: title, updatedAt: now() } })
+    }
+  } else {
+    data.createdAt = now()
+    await db.collection(COLLECTIONS.mediaAlbum).add({ data })
+  }
+  await writePlatformLog(user, existing ? 'update' : 'create', 'media_album', data.id, { organizationId, category })
+  return { ...data, categoryName: MEDIA_CATEGORY_NAMES[category] }
+}
+
+async function deleteMediaFile(openid, event = {}) {
+  await ensureFileRecordCollection()
+  const id = cleanText(event.id, 100)
+  const result = await db.collection(COLLECTIONS.fileRecord).where({ id }).limit(1).get()
+  const file = result.data[0]
+  if (!file || file.resourceType !== 'media_album' || file.status !== 'active') {
+    throw Object.assign(new Error('文件不存在或已删除'), { code: 'MEDIA_FILE_NOT_FOUND' })
+  }
+  const { user } = await mediaPermission(openid, file.organizationId, 'delete')
+  await db.collection(COLLECTIONS.fileRecord).doc(file._id).update({
+    data: { status: 'deleted', deletedAt: now(), deletedBy: user.id, updatedAt: now() }
+  })
+  if (file.fileID) {
+    try { await cloud.deleteFile({ fileList: [file.fileID] }) } catch (error) { console.warn('删除云盘文件失败', error.message) }
+  }
+  const album = await findMediaAlbum(file.resourceId)
+  if (album) await refreshMediaAlbumStats(album)
+  await writePlatformLog(user, 'delete', 'media_file', id, { organizationId: file.organizationId, albumId: file.resourceId })
+  return true
+}
+
+async function refreshMediaAlbumStats(albumOrId) {
+  const album = typeof albumOrId === 'string' ? await findMediaAlbum(albumOrId) : albumOrId
+  if (!album) return
+  const baseCondition = { resourceType: 'media_album', resourceId: album.id, status: 'active' }
+  const [mediaCount, imageCount, videoCount, nextImages] = await Promise.all([
+    db.collection(COLLECTIONS.fileRecord).where(baseCondition).count(),
+    db.collection(COLLECTIONS.fileRecord).where({ ...baseCondition, mediaType: 'image' }).count(),
+    db.collection(COLLECTIONS.fileRecord).where({ ...baseCondition, mediaType: 'video' }).count(),
+    db.collection(COLLECTIONS.fileRecord).where({ ...baseCondition, mediaType: 'image' }).orderBy('sortOrder', 'asc').limit(1).get()
+  ])
+  await db.collection(COLLECTIONS.mediaAlbum).doc(album._id).update({ data: {
+    mediaCount: mediaCount.total,
+    imageCount: imageCount.total,
+    videoCount: videoCount.total,
+    coverFileID: nextImages.data[0] ? nextImages.data[0].fileID : '',
+    updatedAt: now()
+  } })
+}
+
+function mediaDescendantAlbumIds(rootId, albums = []) {
+  const result = []
+  const queue = [rootId]
+  const visited = new Set()
+  while (queue.length) {
+    const id = queue.shift()
+    if (!id || visited.has(id)) continue
+    visited.add(id)
+    result.push(id)
+    albums.filter(item => (item.parentId || '') === id).forEach(item => queue.push(item.id))
+  }
+  return result
+}
+
+async function deleteMediaAlbum(openid, event = {}) {
+  await ensureCollection(COLLECTIONS.mediaAlbum)
+  await ensureFileRecordCollection()
+  const album = await findMediaAlbum(event.id)
+  if (!album || album.status !== 'active') throw Object.assign(new Error('相册不存在或已删除'), { code: 'MEDIA_ALBUM_NOT_FOUND' })
+  const { user } = await mediaPermission(openid, album.organizationId, 'delete')
+  const allAlbums = await mediaAlbumsForOrganization(album.organizationId)
+  const targetAlbumIds = mediaDescendantAlbumIds(album.id, allAlbums)
+  const targetAlbums = allAlbums.filter(item => targetAlbumIds.includes(item.id))
+  const fileIds = []
+  let fileCount = 0
+  for (const albumId of targetAlbumIds) {
+    while (true) {
+      const files = await db.collection(COLLECTIONS.fileRecord)
+        .where({ resourceType: 'media_album', resourceId: albumId, status: 'active' }).limit(100).get()
+      if (!files.data.length) break
+      fileCount += files.data.length
+      fileIds.push(...files.data.map(item => item.fileID).filter(Boolean))
+      await Promise.all(files.data.map(item => db.collection(COLLECTIONS.fileRecord).doc(item._id).update({
+        data: { status: 'deleted', deletedAt: now(), deletedBy: user.id, updatedAt: now() }
+      })))
+    }
+  }
+  for (let index = 0; index < fileIds.length; index += 50) {
+    try { await cloud.deleteFile({ fileList: fileIds.slice(index, index + 50) }) } catch (error) { console.warn('批量删除云盘文件失败', error.message) }
+  }
+  await Promise.all(targetAlbums.map(item => db.collection(COLLECTIONS.mediaAlbum).doc(item._id).update({
+    data: { status: 'deleted', deletedAt: now(), deletedBy: user.id, updatedAt: now() }
+  })))
+  await writePlatformLog(user, 'delete', 'media_album', album.id, {
+    organizationId: album.organizationId,
+    fileCount,
+    folderCount: targetAlbums.length
+  })
+  return true
+}
+
+async function createMediaShare(openid, event = {}) {
+  await ensureCollection(COLLECTIONS.mediaShare)
+  const album = await findMediaAlbum(event.albumId)
+  if (!album || album.status !== 'active' || album.deletedAt) {
+    throw Object.assign(new Error('文件夹不存在或已删除'), { code: 'MEDIA_ALBUM_NOT_FOUND' })
+  }
+  const { user } = await mediaPermission(openid, album.organizationId, 'read')
+  const expiresDays = Math.min(30, Math.max(1, Number(event.expiresDays) || 7))
+  const createdAt = now()
+  const expiresAt = new Date(createdAt.getTime() + expiresDays * 24 * 60 * 60 * 1000)
+  const data = {
+    id: businessId('share'),
+    token: randomToken(9),
+    organizationId: album.organizationId,
+    resourceType: 'media_album',
+    resourceId: album.id,
+    title: album.title,
+    creatorId: user.id,
+    creatorName: user.name,
+    expiresAt,
+    status: 'active',
+    visitCount: 0,
+    createdAt,
+    updatedAt: createdAt
+  }
+  await db.collection(COLLECTIONS.mediaShare).add({ data })
+  await writePlatformLog(user, 'share', 'media_album', album.id, { organizationId: album.organizationId, shareId: data.id })
+  return { ...data, sharePath: `/pages/media-drive/share/index?token=${encodeURIComponent(data.token)}` }
+}
+
+async function getMediaShare(openid, event = {}) {
+  await ensureCollection(COLLECTIONS.mediaShare)
+  const token = cleanText(event.token, 100)
+  const result = await db.collection(COLLECTIONS.mediaShare).where({ token, status: 'active' }).limit(1).get()
+  const share = result.data[0]
+  if (!share || new Date(share.expiresAt).getTime() <= Date.now()) {
+    throw Object.assign(new Error('分享已失效'), { code: 'MEDIA_SHARE_EXPIRED' })
+  }
+  const album = await findMediaAlbum(share.resourceId)
+  if (!album || album.status !== 'active' || album.deletedAt) {
+    throw Object.assign(new Error('分享的文件夹不存在'), { code: 'MEDIA_ALBUM_NOT_FOUND' })
+  }
+  await mediaPermission(openid, album.organizationId, 'read')
+  await db.collection(COLLECTIONS.mediaShare).doc(share._id).update({
+    data: { visitCount: Number(share.visitCount || 0) + 1, updatedAt: now() }
+  })
+  return {
+    id: share.id,
+    title: share.title,
+    creatorName: share.creatorName,
+    expiresAt: share.expiresAt,
+    organizationName: MEDIA_TEAM_NAMES[album.organizationId],
+    album: mediaAlbumView(album)
+  }
+}
+
+async function mediaFilesForAlbumIds(albumIds = [], limit = 500) {
+  const files = []
+  for (const albumId of albumIds) {
+    if (files.length >= limit) break
+    const result = await db.collection(COLLECTIONS.fileRecord)
+      .where({ resourceType: 'media_album', resourceId: albumId, status: 'active' })
+      .orderBy('sortOrder', 'asc')
+      .limit(Math.min(100, limit - files.length))
+      .get()
+    files.push(...result.data)
+  }
+  return files
+}
+
+function csvCell(value) {
+  return `"${String(value === undefined || value === null ? '' : value).replace(/"/g, '""')}"`
+}
+
+function safeExportName(value, fallback) {
+  return cleanText(value, 80).replace(/[\\/:*?"<>|\x00-\x1f]/g, '-') || fallback
+}
+
+async function createMediaExport(openid, event = {}) {
+  await ensureCollection(COLLECTIONS.mediaExport)
+  await ensureFileRecordCollection()
+  const album = await findMediaAlbum(event.albumId)
+  if (!album || album.status !== 'active' || album.deletedAt) {
+    throw Object.assign(new Error('文件夹不存在或已删除'), { code: 'MEDIA_ALBUM_NOT_FOUND' })
+  }
+  const { user } = await mediaPermission(openid, album.organizationId, 'export')
+  const allAlbums = await mediaAlbumsForOrganization(album.organizationId)
+  const albumIds = mediaDescendantAlbumIds(album.id, allAlbums)
+  const albumMap = new Map(allAlbums.map(item => [item.id, item]))
+  const format = cleanText(event.format, 20) === 'csv' ? 'csv' : 'zip'
+  const limit = format === 'zip' ? MEDIA_EXPORT_MAX_FILES + 1 : 500
+  const files = await mediaFilesForAlbumIds(albumIds, limit)
+  if (!files.length) throw Object.assign(new Error('文件夹中没有可导出的文件'), { code: 'MEDIA_EXPORT_EMPTY' })
+  if (format === 'zip' && files.length > MEDIA_EXPORT_MAX_FILES) {
+    throw Object.assign(new Error(`单次最多打包 ${MEDIA_EXPORT_MAX_FILES} 个文件，请分文件夹导出`), { code: 'MEDIA_EXPORT_TOO_LARGE' })
+  }
+  const exportId = businessId('export')
+  const baseName = safeExportName(album.title, '服务队云盘')
+  let content
+  let fileName
+  let fileType
+  if (format === 'csv') {
+    const header = ['服务队', '文件夹', '文件名', '类型', '大小（字节）', '上传人', '上传时间', '对象存储路径']
+    const rows = files.map(file => [
+      MEDIA_TEAM_NAMES[album.organizationId],
+      (mediaAlbumBreadcrumbs(albumMap.get(file.resourceId), allAlbums) || []).map(item => item.title).join('/'),
+      file.originalFileName,
+      file.mediaType,
+      file.size,
+      file.uploaderName,
+      formatDate(file.createdAt),
+      file.objectKey
+    ])
+    content = Buffer.from(`\ufeff${[header].concat(rows).map(row => row.map(csvCell).join(',')).join('\n')}`)
+    fileName = `${baseName}-文件清单.csv`
+    fileType = 'text/csv'
+  } else {
+    const knownSize = files.reduce((sum, file) => sum + Math.max(0, Number(file.size) || 0), 0)
+    if (knownSize > MEDIA_EXPORT_MAX_BYTES) {
+      throw Object.assign(new Error('单次打包不能超过100MB，请分文件夹导出'), { code: 'MEDIA_EXPORT_TOO_LARGE' })
+    }
+    const zip = new JSZip()
+    let actualSize = 0
+    for (let index = 0; index < files.length; index += 1) {
+      const file = files[index]
+      if (!file.fileID) continue
+      const downloaded = await cloud.downloadFile({ fileID: file.fileID })
+      const fileContent = downloaded.fileContent
+      actualSize += fileContent.length
+      if (actualSize > MEDIA_EXPORT_MAX_BYTES) {
+        throw Object.assign(new Error('单次打包不能超过100MB，请分文件夹导出'), { code: 'MEDIA_EXPORT_TOO_LARGE' })
+      }
+      const breadcrumbs = mediaAlbumBreadcrumbs(albumMap.get(file.resourceId), allAlbums).map(item => safeExportName(item.title, '文件夹'))
+      const originalName = safeExportName(file.originalFileName, `文件-${index + 1}`)
+      zip.file(breadcrumbs.concat(originalName).join('/'), fileContent)
+    }
+    content = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: { level: 6 } })
+    fileName = `${baseName}.zip`
+    fileType = 'application/zip'
+  }
+  const objectKey = `中国狮子联会/哈尔滨代表处/二十一协作区/${MEDIA_TEAM_NAMES[album.organizationId]}/服务队云盘/导出/${new Date().getFullYear()}/${exportId}/${fileName}`
+  const uploaded = await cloud.uploadFile({ cloudPath: objectKey, fileContent: content })
+  const createdAt = now()
+  const expiresAt = new Date(createdAt.getTime() + 24 * 60 * 60 * 1000)
+  const data = {
+    id: exportId,
+    organizationId: album.organizationId,
+    albumId: album.id,
+    format,
+    fileName,
+    fileID: uploaded.fileID,
+    objectKey,
+    fileCount: files.length,
+    size: content.length,
+    creatorId: user.id,
+    creatorName: user.name,
+    status: 'ready',
+    expiresAt,
+    createdAt,
+    updatedAt: createdAt
+  }
+  await Promise.all([
+    db.collection(COLLECTIONS.mediaExport).add({ data }),
+    db.collection(COLLECTIONS.fileRecord).add({ data: {
+      id: businessId('file'),
+      organizationId: album.organizationId,
+      serviceTeamName: MEDIA_TEAM_NAMES[album.organizationId],
+      leaderRole: '服务队云盘',
+      departmentName: '导出',
+      eventName: album.title,
+      cloudPath: objectKey,
+      objectKey,
+      fileID: uploaded.fileID,
+      fileType,
+      originalFileName: fileName,
+      uploaderOpenid: user.openid,
+      uploaderName: user.name,
+      resourceType: 'media_export',
+      resourceId: exportId,
+      module: 'photos',
+      albumId: album.id,
+      provider: 'cloudbase',
+      size: content.length,
+      status: 'active',
+      createdAt,
+      updatedAt: createdAt
+    } })
+  ])
+  const linkResult = await cloud.getTempFileURL({ fileList: [uploaded.fileID] })
+  const downloadUrl = linkResult.fileList && linkResult.fileList[0] ? linkResult.fileList[0].tempFileURL : ''
+  await writePlatformLog(user, 'export', 'media_album', album.id, { organizationId: album.organizationId, exportId, format, fileCount: files.length })
+  return { ...data, downloadUrl }
+}
+
+async function saveFileRecord(openid, event = {}) {
   const input = event.record || {}
   const organizationId = canonicalOrganizationId(input.organizationId)
   const resourceType = cleanText(input.resourceType, 40) || 'event_record'
   const resourceId = cleanText(input.resourceId, 100)
   const module = cleanText(input.module, 40) || 'archives'
-  if (resourceType === 'event_record') {
+  const inputFileType = cleanText(input.fileType, 100) || 'application/octet-stream'
+  let user = null
+  if (resourceType === 'user_avatar') {
+    user = await findPlatformUser(openid)
+    if (!user || user.status === 'disabled') {
+      throw Object.assign(new Error('当前账号不可上传成员照片'), { code: 'PROFILE_AVATAR_USER_REQUIRED' })
+    }
+  } else {
+    user = await requirePlatformUser(openid)
+  }
+  let mediaAlbum = null
+  if (resourceType === 'media_album') {
+    await ensureCollection(COLLECTIONS.mediaAlbum)
+    mediaAlbum = await findMediaAlbum(resourceId)
+    if (!mediaAlbum || mediaAlbum.status !== 'active' || mediaAlbum.deletedAt) {
+      throw Object.assign(new Error('文件关联的云盘相册不存在'), { code: 'FILE_RESOURCE_NOT_FOUND' })
+    }
+    if (mediaAlbum.organizationId !== organizationId) {
+      throw Object.assign(new Error('文件组织与云盘相册不一致'), { code: 'FILE_ORGANIZATION_MISMATCH' })
+    }
+    await mediaPermission(openid, organizationId, 'upload')
+  } else if (resourceType === 'event_record') {
     const result = await db.collection(COLLECTIONS.eventRecord)
       .where({ id: resourceId })
       .limit(1)
@@ -2362,6 +3093,14 @@ async function saveFileRecord(openid, event = {}) {
   } else if (resourceType === 'home_banner') {
     if (!await canAdministerOrganization(user.id, organizationId)) {
       throw Object.assign(new Error('仅超管、协作区管理员或当前服务队管理员可上传首页轮播'), { code: 'PERMISSION_DENIED' })
+    }
+  } else if (resourceType === 'user_avatar') {
+    if (resourceId !== user.id || module !== 'contacts' || !inputFileType.startsWith('image/')) {
+      throw Object.assign(new Error('只能上传本人的成员照片'), { code: 'PROFILE_AVATAR_PERMISSION_DENIED' })
+    }
+    const organization = await requireActiveOrganization(organizationId)
+    if (!['region', 'team'].includes(organization.type)) {
+      throw Object.assign(new Error('请选择协作区或所属服务队'), { code: 'INVALID_PROFILE_ORGANIZATION' })
     }
   } else {
     const portModule = module === 'history' ? 'history' : 'archive'
@@ -2387,8 +3126,17 @@ async function saveFileRecord(openid, event = {}) {
     org_team_jingying: '精英服务队'
   }
   const expectedTeamName = serviceTeamNames[organizationId]
+  const mediaCategoryName = mediaAlbum ? MEDIA_CATEGORY_NAMES[mediaAlbum.category] || MEDIA_CATEGORY_NAMES.uncategorized : ''
+  const mediaYear = mediaAlbum && /^\d{4}/.test(mediaAlbum.eventDate || '') ? mediaAlbum.eventDate.slice(0, 4) : ''
+  const requiredPrefix = resourceType === 'media_album'
+    ? `${fixedPath}${serviceTeamName}/服务队云盘/${mediaCategoryName}/${mediaYear}/`
+    : `${fixedPath}${serviceTeamName}/`
   if (!expectedTeamName || serviceTeamName !== expectedTeamName ||
-      !cloudPath.startsWith(`${fixedPath}${serviceTeamName}/`) || !fileID || !leaderRole || !eventName) {
+      !cloudPath.startsWith(requiredPrefix) || !fileID || !leaderRole || !eventName ||
+      (resourceType === 'media_album' && (
+        leaderRole !== '服务队云盘' || departmentName !== mediaCategoryName || eventName !== mediaAlbum.title
+      )) ||
+      (resourceType === 'user_avatar' && (leaderRole !== '成员头像' || departmentName))) {
     throw Object.assign(new Error('文件归档路径或必填信息不完整'), { code: 'INVALID_FILE_RECORD' })
   }
   await ensureFileRecordCollection()
@@ -2403,20 +3151,40 @@ async function saveFileRecord(openid, event = {}) {
     departmentName,
     eventName,
     cloudPath,
+    objectKey: cloudPath,
     fileID,
-    fileType: cleanText(input.fileType, 100) || 'application/octet-stream',
+    fileType: inputFileType,
     originalFileName: cleanText(input.originalFileName, 200),
     uploaderOpenid: user.openid,
     uploaderName: user.name,
     resourceType,
     resourceId,
     module,
+    albumId: resourceType === 'media_album' ? resourceId : '',
+    category: resourceType === 'media_album' ? mediaAlbum.category : '',
+    mediaType: resourceType === 'media_album' && cleanText(input.mediaType, 10) === 'video' ? 'video' : 'image',
+    size: Number(input.size) || 0,
+    duration: Number(input.duration) || 0,
+    width: Number(input.width) || 0,
+    height: Number(input.height) || 0,
+    sortOrder: Number(input.sortOrder) || 0,
     provider: 'cloudbase',
     status: 'active',
     createdAt: now(),
     updatedAt: now()
   }
   await db.collection(COLLECTIONS.fileRecord).add({ data })
+  if (mediaAlbum) {
+    const mediaType = data.mediaType
+    const shouldUseAsCover = mediaType === 'image' && !Number(mediaAlbum.imageCount || 0)
+    await db.collection(COLLECTIONS.mediaAlbum).doc(mediaAlbum._id).update({ data: {
+      coverFileID: shouldUseAsCover ? data.fileID : mediaAlbum.coverFileID || '',
+      mediaCount: Number(mediaAlbum.mediaCount || 0) + 1,
+      imageCount: Number(mediaAlbum.imageCount || 0) + (mediaType === 'image' ? 1 : 0),
+      videoCount: Number(mediaAlbum.videoCount || 0) + (mediaType === 'video' ? 1 : 0),
+      updatedAt: now()
+    } })
+  }
   await writePlatformLog(user, 'upload', 'file_record', data.id, {
     organizationId, cloudPath, resourceType, resourceId
   })
@@ -2424,7 +3192,7 @@ async function saveFileRecord(openid, event = {}) {
 }
 
 async function listLedgerRecords(openid, event = {}) {
-  const user = await requirePlatformUser(openid)
+  await requirePlatformUser(openid)
   const organizationId = cleanText(event.organizationId, 100)
   if (!organizationId) return []
   const result = await db.collection(COLLECTIONS.ledgerRecord)
@@ -2432,9 +3200,7 @@ async function listLedgerRecords(openid, event = {}) {
     .orderBy('date', 'desc')
     .limit(200)
     .get()
-  const portGrants = await enforcingPortPermissions(user.id)
   return result.data.filter(item => !item.deletedAt)
-    .filter(item => !portGrants.length || portPermissionAllowed(portGrants, user.id, 'finance', 'read', item))
 }
 
 async function saveLedgerRecord(openid, event = {}) {
@@ -2447,6 +3213,10 @@ async function saveLedgerRecord(openid, event = {}) {
     creatorId: record.createdBy
   }
   const platformUser = await requirePlatformUser(openid)
+  const roles = await platformRoles(platformUser.id)
+  if (!roles.some(item => item.status === 'active' && item.role === 'super_admin')) {
+    throw Object.assign(new Error('财务账目仅允许超级管理员维护'), { code: 'LEDGER_WRITE_SUPER_ADMIN_REQUIRED' })
+  }
   const action = record.id ? 'update' : 'create'
   const portState = await portPermissionState(platformUser.id, 'finance', action, context)
   const user = portState.allowed
@@ -2497,6 +3267,10 @@ async function deleteLedgerRecord(openid, event = {}) {
     creatorId: record.createdBy
   }
   const platformUser = await requirePlatformUser(openid)
+  const roles = await platformRoles(platformUser.id)
+  if (!roles.some(item => item.status === 'active' && item.role === 'super_admin')) {
+    throw Object.assign(new Error('财务账目仅允许超级管理员删除'), { code: 'LEDGER_DELETE_SUPER_ADMIN_REQUIRED' })
+  }
   const portState = await portPermissionState(platformUser.id, 'finance', 'delete', context)
   const user = portState.allowed
     ? platformUser
@@ -2568,21 +3342,26 @@ async function listHomeBanners(openid, event = {}) {
     const rows = result.data
       .slice()
       .sort((a, b) => (Number(a.sortOrder) || 0) - (Number(b.sortOrder) || 0))
-    const withUrls = await attachImageUrls(rows.map(item => ({
+    const withUrls = await attachImageUrls(rows.filter(item => item.fileId || item.imageUrl).map(item => ({
       id: item.id,
       fileId: item.fileId,
       imageUrl: item.imageUrl,
       sortOrder: item.sortOrder
     })))
-    return withUrls.map(item => ({
-      id: item.id,
-      fileId: item.fileId,
-      imageUrl: item.imageUrl,
-      src: item.imageUrl || item.fileId,
-      sortOrder: item.sortOrder
-    }))
+    return {
+      configured: rows.length > 0,
+      banners: withUrls.map(item => ({
+        id: item.id,
+        fileId: item.fileId,
+        imageUrl: item.imageUrl,
+        src: item.imageUrl || item.fileId,
+        sortOrder: item.sortOrder
+      }))
+    }
   } catch (error) {
-    if (/collection|not exist|doesn't exist/i.test(error.message || '')) return []
+    if (/collection|not exist|doesn't exist/i.test(error.message || '')) {
+      return { configured: false, banners: [] }
+    }
     throw error
   }
 }
@@ -2590,9 +3369,6 @@ async function listHomeBanners(openid, event = {}) {
 async function saveHomeBanners(openid, event = {}) {
   const user = await requirePlatformUser(openid)
   const organizationId = normalizeHomeBannerOrganizationId(event.organizationId)
-  if (!await canAdministerOrganization(user.id, organizationId)) {
-    throw Object.assign(new Error('仅超管、协作区管理员或当前服务队管理员可编辑首页轮播'), { code: 'PERMISSION_DENIED' })
-  }
   await ensureHomeBannerCollection()
   const banners = (event.banners || [])
     .map(item => typeof item === 'string' ? item : item.fileId || item.fileID || item.imageUrl || item.src)
@@ -2603,9 +3379,47 @@ async function saveHomeBanners(openid, event = {}) {
     .where({ organizationId, status: 'active' })
     .limit(100)
     .get()
+  const currentValues = existing.data
+    .map(item => item.fileId || item.imageUrl || '')
+    .filter(Boolean)
+  const added = banners.filter(value => !currentValues.includes(value))
+  const removed = currentValues.filter(value => !banners.includes(value))
+  const commonOrderChanged = !added.length && !removed.length && banners.some((value, index) => currentValues[index] !== value)
+  const requiredActions = new Set()
+  if (added.length) { requiredActions.add('create'); requiredActions.add('upload') }
+  if (removed.length) requiredActions.add('delete')
+  if (commonOrderChanged) requiredActions.add('update')
+  if (!requiredActions.size) requiredActions.add('update')
+  const portGrants = await enforcingPortPermissions(user.id)
+  if (portGrants.length) {
+    const deniedAction = Array.from(requiredActions).find(action => !portPermissionAllowed(portGrants, user.id, 'home', action, { organizationId }))
+    if (deniedAction) {
+      throw Object.assign(new Error('当前账号缺少对应的轮播图操作权限'), { code: 'PERMISSION_DENIED' })
+    }
+  } else if (!await canAdministerOrganization(user.id, organizationId)) {
+    throw Object.assign(new Error('无权限编辑当前组织轮播图'), { code: 'PERMISSION_DENIED' })
+  }
   await Promise.all(existing.data.map(item => db.collection(COLLECTIONS.homeBanner).doc(item._id).update({
     data: { status: 'deleted', deletedAt: now(), updatedAt: now(), deletedBy: user.id }
   })))
+  if (!banners.length) {
+    await db.collection(COLLECTIONS.homeBanner).add({
+      data: {
+        id: businessId('home_banner'),
+        organizationId,
+        scopeName: cleanText(event.scopeName, 80),
+        fileId: '',
+        imageUrl: '',
+        sortOrder: 0,
+        emptyState: true,
+        status: 'active',
+        createdBy: user.id,
+        updatedBy: user.id,
+        createdAt: now(),
+        updatedAt: now()
+      }
+    })
+  }
   await Promise.all(banners.map((value, index) => {
     const isCloudFile = value.startsWith('cloud://')
     return db.collection(COLLECTIONS.homeBanner).add({
@@ -2631,17 +3445,205 @@ async function saveHomeBanners(openid, event = {}) {
   return listHomeBanners(openid, { organizationId })
 }
 
+const TODO_ORGANIZATION_ID = 'org_team_yuanhang'
+const TODO_ORGANIZATION_ANCESTORS = ['org_region_21_suihua']
+const TODO_CATEGORIES = ['生日关爱', '婚丧嫁娶', '公益服务', '联谊活动', '会议培训', '其他']
+const YUANHANG_BIRTHDAYS = {
+  刘建鑫: '07-09', 李珊珊: '07-22', 景殿贤: '08-06', 胡世领: '08-20', 徐春梅: '08-24', 张明星: '08-26',
+  徐铭宣: '09-26', 关丙刚: '09-28', 王奇: '10-06', 杨景辉: '10-21', 吴雪: '12-02', 李晶: '12-19',
+  李玲玲: '02-19', 宋永恒: '03-01', 李文强: '03-05', 吕媛媛: '03-11', 张芳: '03-20', 刘泉宏: '03-24',
+  徐雪峰: '04-01', 潘洋洋: '04-04', 谭振峰: '04-29', 景树生: '05-05', 徐双龙: '05-05', 隋志菊: '05-07'
+}
+const YUANHANG_PROFESSIONS = { 刘建鑫: 'teacher', 李珊珊: 'teacher', 胡世领: 'teacher' }
+const MEMBER_HOLIDAYS = [
+  { profession: 'teacher', name: '教师节', monthDay: '09-10' },
+  { profession: 'nurse', name: '护士节', monthDay: '05-12' },
+  { profession: 'doctor', name: '中国医师节', monthDay: '08-19' }
+]
+
+function normalizeProfession(value) {
+  const profession = cleanText(value, 20)
+  return ['teacher', 'nurse', 'doctor'].includes(profession) ? profession : ''
+}
+
+function chinaDateText() {
+  return new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10)
+}
+
+function nextBirthdayDate(monthDay, todayText) {
+  const [year, currentMonth, currentDay] = todayText.split('-').map(Number)
+  const [month, day] = String(monthDay).split('-').map(Number)
+  let date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+  if (date < todayText) date = `${year + 1}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+  const todayUtc = Date.UTC(year, currentMonth - 1, currentDay)
+  const [birthdayYear] = date.split('-').map(Number)
+  const birthdayUtc = Date.UTC(birthdayYear, month - 1, day)
+  return { date, difference: Math.round((birthdayUtc - todayUtc) / 86400000), year: birthdayYear }
+}
+
+async function ensureBirthdayTodos() {
+  const todayText = chinaDateText()
+  const existing = await db.collection(COLLECTIONS.tasks)
+    .where({ organizationId: TODO_ORGANIZATION_ID })
+    .limit(200)
+    .get()
+  const existingIds = new Set(existing.data.map(item => item.id))
+  const timestamp = now()
+  await Promise.all(Object.entries(YUANHANG_BIRTHDAYS).map(async ([name, birthday], index) => {
+    const upcoming = nextBirthdayDate(birthday, todayText)
+    if (upcoming.difference < 0 || upcoming.difference > 30) return
+    const id = `todo_birthday_${upcoming.year}_${index + 1}`
+    if (existingIds.has(id)) return
+    await db.collection(COLLECTIONS.tasks).doc(id).set({
+      data: {
+        id,
+        title: `${name}生日关爱`,
+        description: '系统根据成员生日提前30天自动生成',
+        category: '生日关爱',
+        date: upcoming.date,
+        time: '',
+        location: '',
+        managerId: '',
+        creatorId: 'system_birthday',
+        organizationId: TODO_ORGANIZATION_ID,
+        status: 'pending',
+        visible: true,
+        visibleToAll: true,
+        birthdayMemberName: name,
+        autoGenerated: true,
+        createdAt: timestamp,
+        updatedAt: timestamp
+      }
+    })
+  }))
+}
+
+async function ensureMemberHolidayTodos() {
+  const [members, existing] = await Promise.all([
+    directoryMembers(),
+    db.collection(COLLECTIONS.tasks).where({ organizationId: TODO_ORGANIZATION_ID }).limit(200).get()
+  ])
+  const existingIds = new Set(existing.data.map(item => item.id))
+  const todayText = chinaDateText()
+  const timestamp = now()
+  await Promise.all(MEMBER_HOLIDAYS.map(async (holiday, index) => {
+    const memberNames = members
+      .filter(item => item.organizationId === TODO_ORGANIZATION_ID && item.profession === holiday.profession)
+      .map(item => item.name)
+    if (!memberNames.length) return
+    const upcoming = nextBirthdayDate(holiday.monthDay, todayText)
+    if (upcoming.difference < 0 || upcoming.difference > 30) return
+    const id = `todo_member_holiday_${upcoming.year}_${index + 1}`
+    if (existingIds.has(id)) return
+    await db.collection(COLLECTIONS.tasks).doc(id).set({
+      data: {
+        id,
+        title: `${holiday.name}关怀提醒`,
+        description: `关怀成员：${memberNames.join('、')}`,
+        category: '生日关爱',
+        date: upcoming.date,
+        time: '',
+        location: '',
+        managerId: '',
+        creatorId: 'system_member_holiday',
+        organizationId: TODO_ORGANIZATION_ID,
+        status: 'pending',
+        visible: true,
+        visibleToAll: true,
+        holidayType: holiday.profession,
+        memberNames,
+        autoGenerated: true,
+        createdAt: timestamp,
+        updatedAt: timestamp
+      }
+    })
+  }))
+}
+
+async function ensureAutomaticTodos() {
+  await ensureBirthdayTodos()
+  await ensureMemberHolidayTodos()
+}
+
+async function isTodoAdmin(user) {
+  if (!user || user.status !== 'active') return false
+  const roles = await platformRoles(user.id)
+  return roles.some(item =>
+    item.status === 'active' &&
+    (item.role === 'super_admin' ||
+      ['federation_admin', 'office_admin', 'region_admin', 'area_admin', 'team_admin'].includes(item.role) &&
+      [TODO_ORGANIZATION_ID].concat(TODO_ORGANIZATION_ANCESTORS).includes(item.organizationId))
+  )
+}
+
+async function todoViewer(openid) {
+  const user = await findPlatformUser(openid)
+  return user && user.status === 'active' ? user : null
+}
+
+async function requireTodoCreator(openid) {
+  const user = await findPlatformUser(openid)
+  const canCreate = user && user.status === 'active' && (
+    canonicalOrganizationId(user.defaultOrganizationId) === TODO_ORGANIZATION_ID ||
+    await isTodoAdmin(user)
+  )
+  if (!canCreate) {
+    throw Object.assign(new Error('仅远航服务队内部成员可发布待办'), { code: 'TODO_MEMBER_REQUIRED' })
+  }
+  return user
+}
+
+async function requireTodoAdmin(openid) {
+  const user = await requirePlatformUser(openid)
+  if (!await isTodoAdmin(user)) {
+    throw Object.assign(new Error('仅管理员可编辑、删除或完成待办'), { code: 'TODO_ADMIN_REQUIRED' })
+  }
+  return user
+}
+
+function validDateText(value) {
+  const text = cleanText(value, 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return ''
+  const [year, month, day] = text.split('-').map(Number)
+  const date = new Date(Date.UTC(year, month - 1, day))
+  return Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== text ? '' : text
+}
+
+async function decorateTodos(items = []) {
+  return items.map(item => ({
+    ...item,
+    month: String(item.date || '').slice(0, 7),
+    day: String(item.date || '').slice(8, 10),
+    team: '远航服务队',
+    teamId: 'yuanhang',
+    visibleToAll: true,
+    createdBy: item.creatorId
+  }))
+}
+
+async function findTodo(id) {
+  const value = cleanText(id, 100)
+  if (!value) return null
+  try {
+    const result = await db.collection(COLLECTIONS.tasks).doc(value).get()
+    if (result.data) return result.data
+  } catch (error) {}
+  const result = await db.collection(COLLECTIONS.tasks).where({ id: value }).limit(1).get()
+  return result.data[0] || null
+}
+
 async function getHome(openid) {
-  await requireApproved(openid)
+  const viewer = await todoViewer(openid)
+  if (viewer) await ensureAutomaticTodos()
   const [tasksResult, memberCount, noticeResult, activityResult] = await Promise.all([
-    db.collection(COLLECTIONS.tasks).limit(200).get(),
-    db.collection(COLLECTIONS.members).where({ status: 'approved' }).count(),
+    viewer ? db.collection(COLLECTIONS.tasks).where({ organizationId: TODO_ORGANIZATION_ID }).limit(200).get() : Promise.resolve({ data: [] }),
+    db.collection(COLLECTIONS.user).where({ status: 'active' }).count(),
     db.collection(COLLECTIONS.notices).limit(50).get(),
     db.collection(COLLECTIONS.activities).limit(50).get()
   ])
-  const tasks = activeItems(tasksResult.data).sort((a, b) => {
-    return String(a.month).localeCompare(String(b.month)) || (a.order || 0) - (b.order || 0)
-  })
+  const tasks = activeItems(tasksResult.data)
+    .filter(item => item.visible !== false && item.status !== 'deleted')
+    .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')))
   const notices = activeItems(noticeResult.data)
     .sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) || new Date(b.updatedAt) - new Date(a.updatedAt))
     .slice(0, 3)
@@ -2655,79 +3657,122 @@ async function getHome(openid) {
       doneCount: tasks.filter(item => item.status === 'done').length,
       memberCount: memberCount.total
     },
-    tasks: tasks.filter(item => item.status !== 'done').slice(0, 4)
-      .map(item => ({ ...item, monthLabel: monthLabel(item.month) })),
+    tasks: await decorateTodos(tasks.filter(item => !['done', 'completed'].includes(item.status)).slice(0, 4)),
     notices,
     activities
   }
 }
 
 async function listTasks(openid, event) {
-  await requireApproved(openid)
-  const result = await db.collection(COLLECTIONS.tasks).limit(200).get()
-  const allTasks = activeItems(result.data).sort((a, b) => {
-    return String(a.month).localeCompare(String(b.month)) || (a.order || 0) - (b.order || 0)
-  })
+  if (!await todoViewer(openid)) return { tasks: [], months: [], categories: TODO_CATEGORIES }
+  await ensureAutomaticTodos()
+  const result = await db.collection(COLLECTIONS.tasks)
+    .where({ organizationId: TODO_ORGANIZATION_ID })
+    .limit(200)
+    .get()
+  const allTasks = activeItems(result.data)
+    .filter(item => item.visible !== false && item.status !== 'deleted')
+    .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')))
   const tasks = allTasks.filter(item => {
-    const monthMatches = !event.month || event.month === 'all' || item.month === event.month
+    const monthMatches = !event.month || event.month === 'all' || String(item.date || '').startsWith(event.month)
     const statusMatches = !event.status || event.status === 'all' || item.status === event.status
     return monthMatches && statusMatches
   })
-  const months = [...new Set(allTasks.map(item => item.month).filter(Boolean))]
+  const months = [...new Set(allTasks.map(item => String(item.date || '').slice(0, 7)).filter(Boolean))]
     .sort()
     .map(value => ({ value, label: monthLabel(value) }))
-  return { tasks, months }
+  return { tasks: await decorateTodos(tasks), months, categories: TODO_CATEGORIES }
 }
 
 async function getTask(openid, event) {
-  await requireEditor(openid)
-  const result = await db.collection(COLLECTIONS.tasks).doc(cleanText(event.id, 80)).get()
-  return result.data
+  await requireTodoAdmin(openid)
+  const task = await findTodo(event.id)
+  if (!task || task.visible === false || task.status === 'deleted') {
+    throw Object.assign(new Error('待办不存在或已删除'), { code: 'TODO_NOT_FOUND' })
+  }
+  return (await decorateTodos([task]))[0]
 }
 
 async function saveTask(openid, event) {
   const task = event.task || {}
-  const member = await requireLegacyPortEditor(openid, 'todo', event.id ? 'update' : 'create', {
-    organizationId: task.organizationId || task.teamId,
-    positionId: task.positionId || task.categoryId,
-    creatorId: task.createdBy
-  })
-  const data = {
-    title: cleanText(task.title, 100),
-    month: cleanText(task.month, 7),
-    category: cleanText(task.category, 30) || '其他',
-    owner: cleanText(task.owner, 40),
-    status: task.status === 'done' ? 'done' : 'pending',
-    description: cleanText(task.description, 1000),
-    order: Number(task.order) || 100,
-    updatedAt: new Date()
+  const user = event.id ? await requireTodoAdmin(openid) : await requireTodoCreator(openid)
+  const title = cleanText(task.title, 100)
+  const date = validDateText(task.date)
+  const category = TODO_CATEGORIES.includes(task.category) ? task.category : '其他'
+  if (!title || !date) {
+    throw Object.assign(new Error('请填写事项内容并选择有效日期'), { code: 'INVALID_TODO' })
   }
-  if (!data.title || !/^\d{4}-\d{2}$/.test(data.month)) {
-    throw Object.assign(new Error('事项名称或月份格式不正确'), { code: 'INVALID_TASK' })
+  const data = {
+    title,
+    description: cleanText(task.description, 1000),
+    category,
+    date,
+    time: cleanText(task.time, 5),
+    location: cleanText(task.location, 100),
+    managerId: '',
+    organizationId: TODO_ORGANIZATION_ID,
+    visibleToAll: true,
+    updatedAt: now()
   }
   if (event.id) {
-    const id = cleanText(event.id, 80)
-    await db.collection(COLLECTIONS.tasks).doc(id).update({ data })
-    await writeAudit(member, 'update', 'task', id, data.title)
-    return { id }
+    const existing = await findTodo(event.id)
+    if (!existing || existing.visible === false || existing.status === 'deleted') {
+      throw Object.assign(new Error('待办不存在或已删除'), { code: 'TODO_NOT_FOUND' })
+    }
+    await db.collection(COLLECTIONS.tasks).doc(existing._id).update({ data })
+    await writePlatformLog(user, 'update', 'todo', existing.id, data)
+    return { id: existing.id, _id: existing._id }
   }
-  data.createdAt = new Date()
+  data.id = businessId('todo')
+  data.creatorId = user.id
+  data.status = 'pending'
+  data.visible = true
+  data.createdAt = now()
   const result = await db.collection(COLLECTIONS.tasks).add({ data })
-  await writeAudit(member, 'create', 'task', result._id, data.title)
-  return { id: result._id }
+  await writePlatformLog(user, 'create', 'todo', data.id, data)
+  return { id: data.id, _id: result._id }
 }
 
 async function deleteTask(openid, event) {
-  const id = cleanText(event.id, 80)
-  const taskResult = await db.collection(COLLECTIONS.tasks).doc(id).get()
-  const task = taskResult.data || {}
-  const member = await requireLegacyPortEditor(openid, 'todo', 'delete', {
-    organizationId: task.organizationId || task.teamId,
-    positionId: task.positionId || task.categoryId,
-    creatorId: task.createdBy
+  const user = await requireTodoAdmin(openid)
+  const task = await findTodo(event.id)
+  if (!task) return true
+  await db.collection(COLLECTIONS.tasks).doc(task._id).update({
+    data: { status: 'deleted', visible: false, deletedAt: now(), updatedAt: now() }
   })
-  await db.collection(COLLECTIONS.tasks).doc(id).update({ data: { deletedAt: new Date(), deletedBy: openid } })
-  await writeAudit(member, 'delete', 'task', id)
+  await writePlatformLog(user, 'delete', 'todo', task.id, { title: task.title })
+  return true
+}
+
+async function completeTask(openid, event) {
+  const user = await requireTodoAdmin(openid)
+  const task = await findTodo(event.id)
+  if (!task || task.visible === false || task.status === 'deleted') {
+    throw Object.assign(new Error('待办不存在或已删除'), { code: 'TODO_NOT_FOUND' })
+  }
+  await db.collection(COLLECTIONS.tasks).doc(task._id).update({
+    data: { status: 'completed', updatedAt: now() }
+  })
+  await writePlatformLog(user, 'complete', 'todo', task.id, { title: task.title, status: 'completed' })
+  return true
+}
+
+async function reopenTask(openid, event) {
+  const user = await requireTodoAdmin(openid)
+  const task = await findTodo(event.id)
+  if (!task || task.visible === false || task.status === 'deleted') {
+    throw Object.assign(new Error('待办不存在或已删除'), { code: 'TODO_NOT_FOUND' })
+  }
+  if (!['done', 'completed'].includes(task.status)) return true
+  const data = {
+    status: 'pending',
+    completedAt: null,
+    completedBy: '',
+    archiveMonth: '',
+    updatedAt: now()
+  }
+  await db.collection(COLLECTIONS.tasks).doc(task._id).update({ data })
+  await writePlatformLog(user, 'reopen', 'todo', task.id, { title: task.title, status: 'pending' })
   return true
 }
 
@@ -2746,7 +3791,7 @@ function memberLetter(name) {
   const map = {
     安: 'A', 白: 'B', 陈: 'C', 崔: 'C', 丁: 'D', 董: 'D', 付: 'F', 冯: 'F',
     高: 'G', 郭: 'G', 关: 'G', 韩: 'H', 何: 'H', 胡: 'H', 黄: 'H',
-    荆: 'J', 景: 'J', 姜: 'J', 孔: 'K', 李: 'L', 刘: 'L', 吕: 'L',
+    荆: 'J', 景: 'J', 井: 'J', 姜: 'J', 孔: 'K', 李: 'L', 刘: 'L', 吕: 'L',
     梁: 'L', 林: 'L', 米: 'M', 马: 'M', 潘: 'P', 彭: 'P', 任: 'R',
     宋: 'S', 孙: 'S', 滕: 'T', 田: 'T', 王: 'W', 吴: 'W', 徐: 'X',
     许: 'X', 谢: 'X', 杨: 'Y', 姚: 'Y', 张: 'Z', 赵: 'Z', 周: 'Z'
@@ -2779,9 +3824,12 @@ function safeBirthday(value) {
 
 const DIRECTORY_ROSTER = {
   org_team_linghang: ['王刚', '刘宝山', '于波', '范信银', '陈维凡', '刘金辉', '腾保国', '贾晓梅', '杨磊', '吴含', '朱连春', '蒋萧彤', '辛志武', '马玉红', '李洪志', '李力安', '侯盛楠', '王连会', '孙建', '金萍', '徐红霞', '王玉宝', '王洪伟', '王立彬', '关向星'],
-  org_team_jingying: ['王丽', '杨帆', '陈纯玉', '杨丽莹', '付艳秋', '张永祺', '孙明龙', '孙洪涛', '于永和', '张影', '周玉慧', '裴大伟', '林衍伟', '安铁', '薛允丽', '郭晓红', '张淑云', '李永生', '王继芳', '吕洪威', '任凤影', '张南翔', '程传海'],
+  org_team_jingying: ['王丽', '杨帆', '陈纯玉', '杨丽莹', '付艳超', '孙明龙', '孙洪涛', '于永和', '张影', '周钰慧', '裴大伟', '林衍伟', '安铁', '薛允丽', '郭晓红', '张淑云', '李永生', '王继芳', '吕洪威', '任凤影', '张南翔', '程传海', '刘明海', '陈俊超', '谢巍巍'],
   org_team_ailinghang: ['陈纯颖', '王必东', '张书慧', '杨振忠', '陈冬彬', '孙显波', '王秋香', '谢志琴', '邓福友', '陈瓯', '王磊', '辛福恩', '毛烨', '吴亚娟', '杨秀娟', '张成功', '孙慧霖', '刘磊', '李红太', '刘金岭', '范晓波', '李玉博', '邰欢欢'],
-  org_team_yuanhang: ['关丙刚', '张明星', '徐双龙', '张芳', '李晶', '刘建鑫', '李姗姗', '刘圣亮', '杨景辉', '李文强', '吕媛媛', '王奇', '潘洋洋', '景树生', '徐雪峰', '胡世领', '徐铭宣', '徐春梅', '吴雪', '谭振峰', '腾飞']
+  org_team_yuanhang: ['关丙刚', '张明星', '徐双龙', '张芳', '李晶', '刘建鑫', '李珊珊', '刘圣亮', '杨景辉', '李文强', '李玲玲', '吕媛媛', '王奇', '潘洋洋', '景树生', '徐雪峰', '胡世领', '徐铭宣', '徐春梅', '吴雪', '谭振峰', '腾飞', '宋永恒', '景殿贤', '刘泉宏', '隋志菊', '井续海', '王必东']
+}
+const DIRECTORY_POSITION_OVERRIDES = {
+  org_team_yuanhang: { 李玲玲: '秘书' }
 }
 
 async function organizationNameMap() {
@@ -2806,7 +3854,8 @@ async function organizationNameMap() {
 function publicDirectoryMember(user, organizations = {}) {
   const organizationId = canonicalOrganizationId(user.defaultOrganizationId || user.organizationId)
   const organization = organizations[organizationId] || {}
-  const name = cleanText(user.name || user.nickname, 40)
+  const sourceName = cleanText(user.name || user.nickname, 40)
+  const name = organizationId === 'org_team_yuanhang' && sourceName === '李姗姗' ? '李珊珊' : sourceName
   return {
     _id: user.id || user._id,
     id: user.id || user._id,
@@ -2818,7 +3867,8 @@ function publicDirectoryMember(user, organizations = {}) {
     organizationId,
     defaultOrganizationId: organizationId,
     position: cleanText(user.position, 80) || cleanText(user.roleName, 80) || '成员',
-    birthday: safeBirthday(user.birthday),
+    birthday: safeBirthday(user.birthday) || (organizationId === 'org_team_yuanhang' ? YUANHANG_BIRTHDAYS[name] || '' : ''),
+    profession: normalizeProfession(user.profession) || (organizationId === 'org_team_yuanhang' ? YUANHANG_PROFESSIONS[name] || '' : ''),
     memberCode: cleanText(user.memberCode, 30),
     accountSuffix: String(user.id || user._id || '').slice(-6),
     resource: cleanText(user.resource, 100),
@@ -2836,7 +3886,9 @@ function staticDirectoryMembers(organizations = {}) {
       id: `roster_${organizationId}_${index + 1}`,
       name,
       defaultOrganizationId: organizationId,
-      position: '成员',
+      position: DIRECTORY_POSITION_OVERRIDES[organizationId] && DIRECTORY_POSITION_OVERRIDES[organizationId][name] || '成员',
+      birthday: organizationId === 'org_team_yuanhang' ? YUANHANG_BIRTHDAYS[name] || '' : '',
+      profession: organizationId === 'org_team_yuanhang' ? YUANHANG_PROFESSIONS[name] || '' : '',
       status: 'active'
     }, organizations)))
 }
@@ -2845,8 +3897,7 @@ function findStaticDirectoryMember(id, organizations = {}) {
   return staticDirectoryMembers(organizations).find(item => item.id === id || item._id === id) || null
 }
 
-async function listDirectoryMembers(openid) {
-  await requireApproved(openid)
+async function directoryMembers() {
   const [userResult, organizations] = await Promise.all([
     db.collection(COLLECTIONS.user).limit(500).get(),
     organizationNameMap()
@@ -2856,17 +3907,33 @@ async function listDirectoryMembers(openid) {
     directory[`${item.organizationId}:${item.name}`] = item
   })
   userResult.data
-    .filter(item =>
-      item.status !== 'disabled' &&
-      cleanText(item.name, 40) &&
-      !cleanText(item.name, 40).startsWith('待认证用户-')
-    )
-    .map(item => publicDirectoryMember(item, organizations))
+    .slice()
+    .sort((a, b) => String(a.updatedAt || a.createdAt || '').localeCompare(String(b.updatedAt || b.createdAt || '')))
+    .filter(item => cleanText(item.name, 40) && !cleanText(item.name, 40).startsWith('待认证用户-'))
+    .filter(item => {
+      const organizationId = canonicalOrganizationId(item.defaultOrganizationId || item.organizationId)
+      if (organizationId !== 'org_team_jingying' || item.directoryManaged) return true
+      return DIRECTORY_ROSTER.org_team_jingying.includes(cleanText(item.name, 40))
+    })
     .forEach(item => {
-      directory[`${item.organizationId}:${item.name}`] = item
+      const member = publicDirectoryMember(item, organizations)
+      const key = `${member.organizationId}:${member.name}`
+      const rosterMember = directory[key]
+      if (member.position === '成员' && rosterMember && rosterMember.position !== '成员') {
+        member.position = rosterMember.position
+      }
+      if (!member.birthday && rosterMember && rosterMember.birthday) member.birthday = rosterMember.birthday
+      if (!member.profession && rosterMember && rosterMember.profession) member.profession = rosterMember.profession
+      if (item.status === 'disabled') delete directory[key]
+      else directory[key] = member
     })
   return Object.values(directory)
     .sort((a, b) => String(a.letter || '#').localeCompare(String(b.letter || '#')) || a.name.localeCompare(b.name, 'zh-Hans-CN'))
+}
+
+async function listDirectoryMembers(openid) {
+  await requireApproved(openid)
+  return directoryMembers()
 }
 
 async function findDirectoryUser(id) {
@@ -2882,13 +3949,18 @@ async function findDirectoryUser(id) {
   }
 }
 
-async function canManageDirectoryMember(openid, target = {}) {
+async function canManageDirectoryMember(openid, target = {}, requestedAction = '') {
   const platformUser = await findPlatformUser(openid)
+  const action = requestedAction || (target.id ? 'update' : 'create')
   if (platformUser && platformUser.status === 'active') {
-    const state = await portPermissionState(platformUser.id, 'contacts', target.id ? 'update' : 'create', {
-      organizationId: target.defaultOrganizationId || target.organizationId
+    const organizationId = target.defaultOrganizationId || target.organizationId
+    if (await canAdministerOrganization(platformUser.id, organizationId)) return true
+    const state = await portPermissionState(platformUser.id, 'contacts', action, {
+      organizationId
     })
     if (state.allowed) return true
+    if (!state.configured && await hasPlatformGrant(platformUser.id, 'contacts', action, { organizationId })) return true
+    return false
   }
   const legacy = await requireApproved(openid)
   return ['superadmin', 'editor', 'admin'].includes(legacy.role)
@@ -2898,8 +3970,8 @@ async function getMember(openid, event = {}) {
   await requireApproved(openid)
   const organizations = await organizationNameMap()
   const user = await findDirectoryUser(event.id)
-  const member = user && user.status !== 'disabled'
-    ? publicDirectoryMember(user, organizations)
+  const member = user
+    ? user.status !== 'disabled' ? publicDirectoryMember(user, organizations) : null
     : findStaticDirectoryMember(cleanText(event.id, 100), organizations)
   if (!member) {
     throw Object.assign(new Error('未找到成员资料'), { code: 'MEMBER_NOT_FOUND' })
@@ -2907,7 +3979,8 @@ async function getMember(openid, event = {}) {
   return {
     member,
     canViewContact: true,
-    canManage: await canManageDirectoryMember(openid, member)
+    canManage: await canManageDirectoryMember(openid, member, 'update'),
+    canDelete: await canManageDirectoryMember(openid, member, 'delete')
   }
 }
 
@@ -2916,15 +3989,15 @@ async function saveMember(openid, event = {}) {
   const id = cleanText(input.id || input._id, 100)
   const existing = id ? await findDirectoryUser(id) : null
   const organizationId = canonicalOrganizationId(input.organizationId || input.defaultOrganizationId || input.teamId || (existing && existing.defaultOrganizationId))
-  const operator = await requireLegacyPortEditor(openid, 'contacts', existing ? 'update' : 'create', { organizationId })
+  const operator = await requireDirectoryMemberEditor(openid, existing ? 'update' : 'create', organizationId)
   const platformOperator = await findPlatformUser(openid)
   const organization = await requireActiveOrganization(organizationId)
   if (!['region', 'team'].includes(organization.type)) {
     throw Object.assign(new Error('请选择协作区或服务队'), { code: 'INVALID_MEMBER_ORGANIZATION' })
   }
   const name = cleanText(input.name || input.nickname, 40)
-  if (!name || name.length < 2) {
-    throw Object.assign(new Error('请填写至少两个字的成员姓名'), { code: 'INVALID_MEMBER_NAME' })
+  if (!name) {
+    throw Object.assign(new Error('请填写成员姓名'), { code: 'INVALID_MEMBER_NAME' })
   }
   const data = {
     id: existing ? existing.id : businessId('user'),
@@ -2932,11 +4005,13 @@ async function saveMember(openid, event = {}) {
     defaultOrganizationId: organizationId,
     position: cleanText(input.position, 80) || '成员',
     birthday: normalizeBirthday(input.birthday),
+    profession: normalizeProfession(input.profession),
     resource: cleanText(input.resource, 100),
     avatar: cleanText(input.avatarUrl || input.avatar, 1000),
     letter: cleanText(input.letter, 2) || memberLetter(name),
     status: cleanText(input.status, 20) || (existing && existing.status) || 'active',
     profileCompleted: true,
+    directoryManaged: true,
     updatedAt: now()
   }
   if (cleanText(input.memberCode, 30)) data.memberCode = cleanText(input.memberCode, 30).toUpperCase()
@@ -2953,16 +4028,38 @@ async function saveMember(openid, event = {}) {
 }
 
 async function deleteMember(openid, event = {}) {
-  const existing = await findDirectoryUser(event.id)
-  if (!existing) return true
-  const operator = await requireLegacyPortEditor(openid, 'contacts', 'delete', {
-    organizationId: existing.defaultOrganizationId
-  })
+  let existing = await findDirectoryUser(event.id)
+  let staticMember = null
+  if (!existing) {
+    const organizations = await organizationNameMap()
+    staticMember = findStaticDirectoryMember(cleanText(event.id, 100), organizations)
+  }
+  if (!existing && !staticMember) return true
+  const organizationId = canonicalOrganizationId(
+    (existing && existing.defaultOrganizationId) || (staticMember && staticMember.defaultOrganizationId)
+  )
+  const operator = await requireDirectoryMemberEditor(openid, 'delete', organizationId)
   const platformOperator = await findPlatformUser(openid)
-  await db.collection(COLLECTIONS.user).doc(existing._id).update({
-    data: { status: 'disabled', deletedAt: now(), updatedAt: now() }
-  })
-  await writePlatformLog(platformOperator || { id: operator._id, defaultOrganizationId: existing.defaultOrganizationId }, 'delete', 'user', existing.id, { name: existing.name })
+  const deletedAt = now()
+  if (existing) {
+    await db.collection(COLLECTIONS.user).doc(existing._id).update({
+      data: { status: 'disabled', deletedAt, updatedAt: deletedAt }
+    })
+  } else {
+    existing = {
+      id: businessId('user'),
+      name: staticMember.name,
+      defaultOrganizationId: organizationId,
+      position: staticMember.position || '成员',
+      status: 'disabled',
+      profileCompleted: true,
+      deletedAt,
+      createdAt: deletedAt,
+      updatedAt: deletedAt
+    }
+    await db.collection(COLLECTIONS.user).add({ data: existing })
+  }
+  await writePlatformLog(platformOperator || { id: operator._id, defaultOrganizationId: organizationId }, 'delete', 'user', existing.id, { name: existing.name, organizationId })
   return true
 }
 
@@ -3230,13 +4327,8 @@ async function reviewMember(openid, event) {
 }
 
 async function setMemberRole(openid, event) {
-  const member = await requireSuperAdmin(openid)
-  const role = ['member', 'editor', 'admin'].includes(event.role) ? event.role : 'member'
-  const id = cleanText(event.id, 80)
-  if (role !== 'member') await requireLegacyAuthorizationTarget(id)
-  await db.collection(COLLECTIONS.members).doc(id).update({ data: { role, updatedAt: new Date() } })
-  await writeAudit(member, 'role', 'member', id, role)
-  return true
+  await requireSuperAdmin(openid)
+  throw Object.assign(new Error('旧管理员角色入口已停用，请使用组织角色与用户权限'), { code: 'LEGACY_PERMISSION_DISABLED' })
 }
 
 async function listAdminMembers(openid) {
@@ -3277,18 +4369,8 @@ async function listAdminCandidates(openid) {
 }
 
 async function saveAdminPermissions(openid, event) {
-  const member = await requireSuperAdmin(openid)
-  const allowed = ['tasks', 'archives', 'contacts', 'photos', 'notices']
-  const permissions = Array.isArray(event.permissions)
-    ? event.permissions.filter(value => allowed.includes(value))
-    : []
-  const id = cleanText(event.id, 80)
-  if (permissions.length) await requireLegacyAuthorizationTarget(id)
-  await db.collection(COLLECTIONS.members).doc(id).update({
-    data: { permissions, updatedAt: new Date() }
-  })
-  await writeAudit(member, 'role', 'member', id, `permissions:${permissions.join(',')}`)
-  return true
+  await requireSuperAdmin(openid)
+  throw Object.assign(new Error('旧板块权限入口已停用，请使用组织角色与用户权限'), { code: 'LEGACY_PERMISSION_DISABLED' })
 }
 
 async function requireLegacyAuthorizationTarget(id) {
@@ -3331,27 +4413,6 @@ async function listAuditLogs(openid) {
     .map(item => ({ ...item, actionLabel: labels[item.action] || item.action, createdAtLabel: formatDate(item.createdAt) }))
 }
 
-const seedTasks = [
-  ['2025-06', '服务', '孩子走访', '双龙', 'done'],
-  ['2025-06', '外交', '哈尔滨八协联合换届', '款姐', 'done'],
-  ['2025-06', '资产', '名牌、马甲和短袖订制', '泉宏', 'done'],
-  ['2025-06', '关爱', '芳姐孩子高考关爱', '建鑫', 'done'],
-  ['2025-06', '服务', '垃圾桶到货', '芳姐', 'done'],
-  ['2025-06', '外交', '爱领航换届', '款姐', 'done'],
-  ['2025-06', '服务', '红色行动', '芳姐', 'done'],
-  ['2025-06', '协作区', '投票', '明星', 'done'],
-  ['2025-06', '培训', '大庆13-15候任干部培训', '丙刚', 'done'],
-  ['2025-06', '联谊', '户外烤肉团建', '砖哥', 'pending'],
-  ['2025-06', '外交', '哈尔滨27主任', '款姐', 'pending'],
-  ['2025-06', '服务队', '签约社区', '丙刚', 'pending'],
-  ['2025-07', '会议', '4日开会', '', 'pending'],
-  ['2025-07', '服务', '8日捐赠垃圾桶', '', 'pending'],
-  ['2025-07', '助学', '22日圆梦助学', '', 'pending'],
-  ['2025-07', '关爱', '31日慰问老兵', '', 'pending'],
-  ['2025-08', '服务', '战立行动', '', 'pending'],
-  ['2025-08', '活动', '28日慕思音乐会', '', 'pending']
-]
-
 const seedOrg = [
   ['第一副队长', '李晶', '', 10],
   ['会员发展与保留委员会主席', '徐雪峰', '会员发展与保留委员会', 11],
@@ -3373,26 +4434,8 @@ const seedOrg = [
 
 async function seedData(openid) {
   const member = await requireEditor(openid)
-  const [taskCount, orgCount] = await Promise.all([
-    db.collection(COLLECTIONS.tasks).count(),
-    db.collection(COLLECTIONS.org).count()
-  ])
+  const orgCount = await db.collection(COLLECTIONS.org).count()
   const now = new Date()
-  if (taskCount.total === 0) {
-    await Promise.all(seedTasks.map((item, index) => db.collection(COLLECTIONS.tasks).add({
-      data: {
-        month: item[0],
-        category: item[1],
-        title: item[2],
-        owner: item[3],
-        status: item[4],
-        description: '',
-        order: index,
-        createdAt: now,
-        updatedAt: now
-      }
-    })))
-  }
   if (orgCount.total === 0) {
     await Promise.all(seedOrg.map(item => db.collection(COLLECTIONS.org).add({
       data: {
@@ -3412,7 +4455,518 @@ async function seedData(openid) {
   return true
 }
 
+async function adminAccountByUsername(username) {
+  const result = await db.collection(COLLECTIONS.adminAccount)
+    .where({ username: cleanText(username, 60).toLowerCase(), status: 'active' })
+    .limit(1)
+    .get()
+  return result.data[0] || null
+}
+
+async function adminOperatorFromAccount(account) {
+  const result = await db.collection(COLLECTIONS.user).where({ id: account.userId, status: 'active' }).limit(1).get()
+  const user = result.data[0]
+  if (!user) throw Object.assign(new Error('绑定的成员账号不可用'), { code: 'ADMIN_USER_DISABLED' })
+  const roles = await platformRoles(user.id)
+  if (!roles.some(item => ['super_admin', 'area_admin', 'region_admin', 'team_admin'].includes(item.role))) {
+    throw Object.assign(new Error('当前账号已无管理员权限'), { code: 'ADMIN_ROLE_REQUIRED' })
+  }
+  return { ...user, roles }
+}
+
+async function issueAdminSession(account, user) {
+  const accessToken = randomToken()
+  const refreshToken = randomToken()
+  const timestamp = Date.now()
+  const data = {
+    id: businessId('admin_session'),
+    accountId: account.id,
+    userId: user.id,
+    accessTokenHash: tokenHash(accessToken),
+    refreshTokenHash: tokenHash(refreshToken),
+    accessExpiresAt: new Date(timestamp + ADMIN_ACCESS_TTL),
+    refreshExpiresAt: new Date(timestamp + ADMIN_REFRESH_TTL),
+    status: 'active',
+    createdAt: now(),
+    updatedAt: now()
+  }
+  await db.collection(COLLECTIONS.adminSession).add({ data })
+  return {
+    accessToken,
+    refreshToken,
+    expiresIn: ADMIN_ACCESS_TTL / 1000,
+    user: { id: user.id, name: user.name, roles: user.roles }
+  }
+}
+
+async function requireAdminSession(event = {}) {
+  const hash = tokenHash(event.adminToken)
+  const result = await db.collection(COLLECTIONS.adminSession)
+    .where({ accessTokenHash: hash, status: 'active' })
+    .limit(1)
+    .get()
+  const session = result.data[0]
+  if (!session || new Date(session.accessExpiresAt).getTime() <= Date.now()) {
+    throw Object.assign(new Error('后台会话已过期'), { code: 'ADMIN_SESSION_EXPIRED' })
+  }
+  const accountResult = await db.collection(COLLECTIONS.adminAccount).where({ id: session.accountId, status: 'active' }).limit(1).get()
+  const account = accountResult.data[0]
+  if (!account) throw Object.assign(new Error('后台账号已停用'), { code: 'ADMIN_ACCOUNT_DISABLED' })
+  return { session, account, user: await adminOperatorFromAccount(account) }
+}
+
+async function bootstrapAdminAccount(openid, event = {}) {
+  const secret = cleanText(process.env.ADMIN_BOOTSTRAP_SECRET, 200)
+  if (!secret || cleanText(event.bootstrapSecret, 200) !== secret) {
+    throw Object.assign(new Error('初始化密钥无效'), { code: 'ADMIN_BOOTSTRAP_DENIED' })
+  }
+  const username = cleanText(event.username, 60).toLowerCase()
+  const password = String(event.password || '')
+  const userId = cleanText(event.userId, 100)
+  if (!/^[a-z0-9_.-]{4,60}$/.test(username) || password.length < 12 || !userId) {
+    throw Object.assign(new Error('账号需至少 4 位，密码需至少 12 位'), { code: 'INVALID_ADMIN_ACCOUNT' })
+  }
+  const existingCount = await db.collection(COLLECTIONS.adminAccount).count()
+  if (existingCount.total) throw Object.assign(new Error('初始管理员已存在'), { code: 'ADMIN_ALREADY_BOOTSTRAPPED' })
+  const userResult = await db.collection(COLLECTIONS.user).where({ id: userId, status: 'active' }).limit(1).get()
+  const user = userResult.data[0]
+  if (!user) throw Object.assign(new Error('未找到绑定成员'), { code: 'ADMIN_USER_NOT_FOUND' })
+  const roles = await platformRoles(userId)
+  if (!roles.some(item => item.role === 'super_admin')) {
+    throw Object.assign(new Error('首个后台账号必须绑定超级管理员'), { code: 'SUPER_ADMIN_REQUIRED' })
+  }
+  const totpSecret = authenticator.generateSecret()
+  const recoveryCode = randomToken(12)
+  const data = {
+    id: businessId('admin_account'), username, userId,
+    passwordHash: passwordHash(password), totpSecret,
+    recoveryCodeHash: tokenHash(recoveryCode), status: 'active', failedAttempts: 0,
+    createdAt: now(), updatedAt: now()
+  }
+  await db.collection(COLLECTIONS.adminAccount).add({ data })
+  return {
+    username,
+    totpSecret,
+    otpauth: authenticator.keyuri(username, '21纪事本管理后台', totpSecret),
+    recoveryCode
+  }
+}
+
+async function adminLogin(openid, event = {}) {
+  const account = await adminAccountByUsername(event.username)
+  if (!account) throw Object.assign(new Error('账号或密码错误'), { code: 'ADMIN_LOGIN_FAILED' })
+  if (account.lockedUntil && new Date(account.lockedUntil).getTime() > Date.now()) {
+    throw Object.assign(new Error('尝试次数过多，请稍后再试'), { code: 'ADMIN_ACCOUNT_LOCKED' })
+  }
+  if (!passwordMatches(event.password, account.passwordHash)) {
+    const failedAttempts = Number(account.failedAttempts || 0) + 1
+    await db.collection(COLLECTIONS.adminAccount).doc(account._id).update({ data: {
+      failedAttempts,
+      lockedUntil: failedAttempts >= ADMIN_MAX_FAILURES ? new Date(Date.now() + 15 * 60 * 1000) : null,
+      updatedAt: now()
+    } })
+    throw Object.assign(new Error('账号或密码错误'), { code: 'ADMIN_LOGIN_FAILED' })
+  }
+  const user = await adminOperatorFromAccount(account)
+  await db.collection(COLLECTIONS.adminAccount).doc(account._id).update({ data: {
+    failedAttempts: 0, lockedUntil: null, lastLoginAt: now(),
+    updatedAt: now()
+  } })
+  await writePlatformLog(user, 'admin_login', 'admin_account', account.id, { username: account.username })
+  return issueAdminSession(account, user)
+}
+
+async function adminRefresh(openid, event = {}) {
+  const hash = tokenHash(event.refreshToken)
+  const result = await db.collection(COLLECTIONS.adminSession).where({ refreshTokenHash: hash, status: 'active' }).limit(1).get()
+  const session = result.data[0]
+  if (!session || new Date(session.refreshExpiresAt).getTime() <= Date.now()) {
+    throw Object.assign(new Error('刷新会话已过期'), { code: 'ADMIN_REFRESH_EXPIRED' })
+  }
+  const accountResult = await db.collection(COLLECTIONS.adminAccount).where({ id: session.accountId, status: 'active' }).limit(1).get()
+  const account = accountResult.data[0]
+  const user = account && await adminOperatorFromAccount(account)
+  if (!user) throw Object.assign(new Error('后台账号不可用'), { code: 'ADMIN_ACCOUNT_DISABLED' })
+  await db.collection(COLLECTIONS.adminSession).doc(session._id).update({ data: { status: 'rotated', updatedAt: now() } })
+  return issueAdminSession(account, user)
+}
+
+async function adminLogout(openid, event = {}) {
+  const auth = await requireAdminSession(event)
+  await db.collection(COLLECTIONS.adminSession).doc(auth.session._id).update({ data: { status: 'revoked', updatedAt: now() } })
+  return true
+}
+
+async function adminChangePassword(openid, event = {}) {
+  const auth = await requireAdminSession(event)
+  const currentPassword = String(event.currentPassword || '')
+  const newPassword = String(event.newPassword || '')
+  if (!passwordMatches(currentPassword, auth.account.passwordHash)) {
+    throw Object.assign(new Error('当前密码不正确'), { code: 'ADMIN_CURRENT_PASSWORD_INVALID' })
+  }
+  if (newPassword.length < 12) {
+    throw Object.assign(new Error('新密码至少需要 12 位'), { code: 'ADMIN_PASSWORD_TOO_SHORT' })
+  }
+  if (currentPassword === newPassword) {
+    throw Object.assign(new Error('新密码不能与当前密码相同'), { code: 'ADMIN_PASSWORD_UNCHANGED' })
+  }
+  const timestamp = now()
+  const sessions = await db.collection(COLLECTIONS.adminSession).where({ accountId: auth.account.id, status: 'active' }).limit(100).get()
+  await db.collection(COLLECTIONS.adminAccount).doc(auth.account._id).update({ data: {
+    passwordHash: passwordHash(newPassword), failedAttempts: 0, lockedUntil: null, passwordChangedAt: timestamp, updatedAt: timestamp
+  } })
+  await Promise.all(sessions.data.map(item => db.collection(COLLECTIONS.adminSession).doc(item._id).update({ data: { status: 'revoked', updatedAt: timestamp } })))
+  await writePlatformLog(auth.user, 'change_admin_password', 'admin_account', auth.account.id, {})
+  return true
+}
+
+function adminAllowedOrganizationIds(user, organizations) {
+  const activeRoles = user.roles.filter(item => item.status !== 'inactive' && item.status !== 'revoked')
+  if (activeRoles.some(item => item.role === 'super_admin')) return organizations.map(item => item.id)
+  const allowed = new Set()
+  const areaRoles = activeRoles.filter(item => ['area_admin', 'region_admin'].includes(item.role))
+  if (areaRoles.length) {
+    organizations.forEach(org => {
+      if (org.type === 'team' || areaRoles.some(role => org.id === canonicalOrganizationId(role.organizationId))) {
+        allowed.add(org.id)
+      }
+    })
+  }
+  activeRoles.forEach(role => {
+    if (!['area_admin', 'region_admin', 'team_admin'].includes(role.role)) return
+    organizations.forEach(org => {
+      const organizationId = canonicalOrganizationId(role.organizationId)
+      if (org.id === organizationId || (org.ancestorIds || []).map(canonicalOrganizationId).includes(organizationId)) allowed.add(org.id)
+    })
+  })
+  return Array.from(allowed)
+}
+
+async function adminGraph(openid, event = {}) {
+  const { user } = await requireAdminSession(event)
+  const [orgResult, userResult, positionResult, roleResult, assignmentResult, grantResult, portResult] = await Promise.all([
+    db.collection(COLLECTIONS.organization).where({ status: 'active' }).limit(500).get(),
+    db.collection(COLLECTIONS.user).limit(500).get(),
+    db.collection(COLLECTIONS.position).where({ status: 'active' }).limit(500).get(),
+    db.collection(COLLECTIONS.userRole).where({ status: 'active' }).limit(500).get(),
+    db.collection(COLLECTIONS.roleAssignment).where({ status: 'active' }).limit(500).get(),
+    db.collection(COLLECTIONS.permissionGrant).where({ status: 'active' }).limit(500).get(),
+    db.collection(COLLECTIONS.userPermissions).where({ status: 'active' }).limit(500).get()
+  ])
+  const allowedIds = adminAllowedOrganizationIds(user, orgResult.data)
+  const selectedId = canonicalOrganizationId(event.organizationId)
+  const visibleIds = selectedId && allowedIds.includes(selectedId) ? [selectedId] : allowedIds
+  const inScope = item => !item.organizationId || visibleIds.includes(canonicalOrganizationId(item.organizationId || item.teamId))
+  const assignments = assignmentResult.data.filter(inScope)
+  const grants = grantResult.data.filter(inScope)
+  const portPermissions = portResult.data.filter(item => visibleIds.includes(canonicalOrganizationId(item.teamId)))
+  const userIds = new Set(assignments.concat(grants, portPermissions).map(item => item.userId).concat(roleResult.data.filter(inScope).map(item => item.userId)))
+  userResult.data.filter(item => visibleIds.includes(canonicalOrganizationId(item.defaultOrganizationId))).forEach(item => userIds.add(item.id))
+  if (user.roles.some(item => item.role === 'super_admin')) userResult.data.forEach(item => userIds.add(item.id))
+  const visibleUsers = userResult.data.filter(item => userIds.has(item.id) && item.status !== 'deleted')
+  const normalizedMemberName = name => cleanText(name, 100).replace(/^[^—-]{1,20}[—-]/, '')
+  const deduplicatedUsers = new Map()
+  visibleUsers
+    .slice()
+    .sort((a, b) => Number(Boolean(b.openid)) - Number(Boolean(a.openid)) || Number(!String(b.id).startsWith('directory_')) - Number(!String(a.id).startsWith('directory_')))
+    .forEach(item => {
+      const key = `${canonicalOrganizationId(item.defaultOrganizationId)}:${normalizedMemberName(item.name)}`
+      if (!deduplicatedUsers.has(key)) deduplicatedUsers.set(key, item)
+    })
+  return {
+    viewer: { id: user.id, name: user.name, roles: user.roles, allowedOrganizationIds: allowedIds },
+    organizations: orgResult.data.filter(item => visibleIds.includes(item.id)),
+    users: Array.from(deduplicatedUsers.values()).map(item => ({
+      id: item.id,
+      name: item.name,
+      organizationId: item.defaultOrganizationId,
+      memberCode: item.memberCode || '',
+      status: item.status || 'pending',
+      profileCompleted: Boolean(item.profileCompleted || (item.name && !item.name.startsWith('待认证用户-')))
+    })),
+    positions: positionResult.data.filter(inScope),
+    roles: roleResult.data.filter(inScope), assignments, grants, portPermissions
+  }
+}
+
+function validateGraphDraft(draft = {}) {
+  const normalized = {
+    id: cleanText(draft.id, 100), userId: cleanText(draft.userId, 100),
+    organizationId: canonicalOrganizationId(draft.organizationId),
+    module: cleanText(draft.module, 30), actions: Array.from(new Set((draft.actions || []).map(item => cleanText(item, 20)))),
+    scopeType: cleanText(draft.scopeType, 30), scopeId: cleanText(draft.scopeId, 140),
+    startDate: cleanText(draft.startDate, 10), endDate: cleanText(draft.endDate, 10),
+    roleCode: cleanText(draft.roleCode, 30),
+    capabilities: Array.from(new Set((draft.capabilities || []).map(item => cleanText(item, 20))))
+  }
+  if (!normalized.userId || !normalized.organizationId || !PERMISSION_MODULES.includes(normalized.module) ||
+      !normalized.actions.length || normalized.actions.some(item => !PERMISSION_ACTIONS.includes(item)) ||
+      !PERMISSION_SCOPES.includes(normalized.scopeType) || !normalized.startDate || !normalized.endDate) {
+    throw Object.assign(new Error('请补全用户、组织、模块、操作、范围和任期'), { code: 'INVALID_GRAPH_GRANT' })
+  }
+  if (normalized.actions.some(item => !(PERMISSION_MODULE_ACTIONS[normalized.module] || []).includes(item))) {
+    throw Object.assign(new Error('所选界面不支持其中一项操作'), { code: 'INVALID_GRAPH_GRANT_ACTION' })
+  }
+  if (['position', 'position_tree'].includes(normalized.scopeType) && !normalized.scopeId) {
+    throw Object.assign(new Error('岗位权限必须指定岗位'), { code: 'POSITION_SCOPE_REQUIRED' })
+  }
+  if (normalized.startDate > normalized.endDate) throw Object.assign(new Error('开始日期不能晚于结束日期'), { code: 'INVALID_GRAPH_GRANT_DATE' })
+  if (normalized.roleCode) {
+    const allowedRoles = ['super_admin', 'team_admin']
+    const allowedCapabilities = ['create', 'delete', 'update', 'search', 'access']
+    if (!allowedRoles.includes(normalized.roleCode) || !normalized.capabilities.length || normalized.capabilities.some(item => !allowedCapabilities.includes(item))) {
+      throw Object.assign(new Error('管理员角色或权限不正确'), { code: 'INVALID_ADMIN_ROLE_GRANT' })
+    }
+    if (normalized.roleCode === 'super_admin' && (normalized.scopeType !== 'global' || normalized.organizationId !== 'org_federation_china' || normalized.capabilities.length !== allowedCapabilities.length)) {
+      throw Object.assign(new Error('超级管理员必须使用全体范围和全部权限'), { code: 'INVALID_SUPER_ADMIN_GRANT' })
+    }
+    if (normalized.roleCode === 'team_admin' && normalized.scopeType !== 'organization') {
+      throw Object.assign(new Error('服务队管理员只能使用本服务队范围'), { code: 'INVALID_TEAM_ADMIN_GRANT' })
+    }
+  }
+  return normalized
+}
+
+async function adminGrantPreflight(openid, event = {}, existingAuth = null) {
+  const draft = validateGraphDraft(event.draft)
+  const [auth, organizationResult] = await Promise.all([
+    existingAuth || requireAdminSession(event),
+    db.collection(COLLECTIONS.organization).where({ status: 'active' }).limit(500).get(),
+    requireAuthorizationTarget(draft.userId)
+  ])
+  const { user } = auth
+  const organizations = organizationResult.data
+  if (draft.module === 'ledger' && draft.actions.some(item => item !== 'read')) {
+    throw Object.assign(new Error('财务账目对所有成员只读，维护操作仅限超级管理员'), { code: 'LEDGER_GRANT_READ_ONLY' })
+  }
+  if (draft.roleCode === 'team_admin' && draft.capabilities.includes('delete')) {
+    throw Object.assign(new Error('服务队管理员不能获得删除权限'), { code: 'TEAM_ADMIN_DELETE_DENIED' })
+  }
+  if (draft.roleCode === 'team_admin') {
+    const existingTeamRoles = (await db.collection(COLLECTIONS.userRole)
+      .where({ userId: draft.userId, role: 'team_admin' })
+      .limit(100)
+      .get()).data
+    if (existingTeamRoles.some(item => canonicalOrganizationId(item.organizationId) !== draft.organizationId)) {
+      throw Object.assign(new Error('服务队管理员的所属服务队首次设置后不可变更'), { code: 'TEAM_ADMIN_ORGANIZATION_LOCKED' })
+    }
+  }
+  if (!adminAllowedOrganizationIds(user, organizations).includes(draft.organizationId)) {
+    throw Object.assign(new Error('不能超出当前管理范围授权'), { code: 'AUTHORIZATION_SCOPE_DENIED' })
+  }
+  if (draft.roleCode === 'team_admin') {
+    const team = organizations.find(item => item.id === draft.organizationId && item.type === 'team')
+    if (!team) throw Object.assign(new Error('请选择有效的服务队'), { code: 'INVALID_TEAM_ADMIN_ORGANIZATION' })
+  }
+  if (['position', 'position_tree'].includes(draft.scopeType)) {
+    const positionResult = await db.collection(COLLECTIONS.position)
+      .where({ id: draft.scopeId, organizationId: draft.organizationId, status: 'active' })
+      .limit(1).get()
+    if (!positionResult.data[0]) {
+      throw Object.assign(new Error('所选岗位不属于授权组织'), { code: 'INVALID_AUTHORIZATION_POSITION' })
+    }
+  }
+  const roleLabel = draft.roleCode === 'super_admin' ? '超级管理员' : draft.roleCode === 'team_admin' ? '服务队管理员' : ''
+  const capabilityLabels = { create: '创建', delete: '删除', update: '修改', search: '查找', access: '访问' }
+  const impact = roleLabel
+    ? `将设为${roleLabel}，范围为${draft.roleCode === 'super_admin' ? '全体' : '本服务队'}，权限为${draft.capabilities.map(item => capabilityLabels[item]).join('/')}，有效期 ${draft.startDate} 至 ${draft.endDate}`
+    : `将授予 ${draft.module} 模块 ${draft.actions.join('/')}权限，有效期 ${draft.startDate} 至 ${draft.endDate}`
+  return { draft, impact }
+}
+
+async function adminGrantCommit(openid, event = {}) {
+  const auth = await requireAdminSession(event)
+  const checked = await adminGrantPreflight(openid, event, auth)
+  const draft = checked.draft
+  const existing = draft.id ? await db.collection(COLLECTIONS.permissionGrant).where({ id: draft.id }).limit(1).get() : { data: [] }
+  const id = draft.id || businessId('grant')
+  const data = { ...draft, id, status: 'active', grantedBy: auth.user.id, updatedAt: now() }
+  if (existing.data[0]) await db.collection(COLLECTIONS.permissionGrant).doc(existing.data[0]._id).update({ data })
+  else {
+    data.createdAt = now()
+    await db.collection(COLLECTIONS.permissionGrant).add({ data })
+  }
+  if (draft.roleCode) {
+    const [roleResult, portResult] = await Promise.all([
+      db.collection(COLLECTIONS.userRole).where({ sourcePermissionId: id }).limit(1).get(),
+      draft.roleCode === 'team_admin'
+        ? db.collection(COLLECTIONS.userPermissions).where({ userId: draft.userId, status: 'active' }).limit(100).get()
+        : Promise.resolve({ data: [] })
+    ])
+    const roleData = {
+      id: roleResult.data[0] ? roleResult.data[0].id : businessId('role'), sourcePermissionId: id,
+      userId: draft.userId, organizationId: draft.organizationId, role: draft.roleCode,
+      startDate: draft.startDate, endDate: draft.endDate, expiresAt: draft.endDate,
+      status: 'active', grantedBy: auth.user.id, grantedAt: now(), updatedAt: now()
+    }
+    const roleWrite = roleResult.data[0]
+      ? db.collection(COLLECTIONS.userRole).doc(roleResult.data[0]._id).update({ data: roleData })
+      : (() => { roleData.createdAt = now(); return db.collection(COLLECTIONS.userRole).add({ data: roleData }) })()
+    if (draft.roleCode === 'team_admin') {
+      const capabilityActions = Array.from(new Set(draft.capabilities.map(item => ['search', 'access'].includes(item) ? 'read' : item)))
+      const permissions = {}
+      Object.entries(PORT_PERMISSION_ACTIONS).forEach(([module, supported]) => {
+        permissions[module] = capabilityActions.filter(action => supported.includes(action))
+      })
+      permissions.finance = ['read']
+      const linkedPort = portResult.data.find(item => item.sourcePermissionId === id) || portResult.data.find(item =>
+        item.roleCode === 'team_admin' && canonicalOrganizationId(item.teamId) === draft.organizationId)
+      const portData = {
+        id: linkedPort ? linkedPort.id : businessId('user_permission'), sourcePermissionId: id,
+        userId: draft.userId, userName: '', teamId: draft.organizationId,
+        roleCode: 'team_admin', roleName: '服务队管理员', dataScope: 'team', positionId: '',
+        permissions, startDate: draft.startDate, endDate: draft.endDate,
+        status: 'active', grantedBy: auth.user.id, updatedAt: now()
+      }
+      const portWrite = linkedPort
+        ? db.collection(COLLECTIONS.userPermissions).doc(linkedPort._id).update({ data: portData })
+        : (() => { portData.createdAt = now(); return db.collection(COLLECTIONS.userPermissions).add({ data: portData }) })()
+      await Promise.all([roleWrite, portWrite])
+    } else {
+      await roleWrite
+    }
+  }
+  await writePlatformLog(auth.user, existing.data[0] ? 'update_permission' : 'grant_permission', 'permission_grant', id, data)
+  return data
+}
+
+async function adminGrantRevoke(openid, event = {}) {
+  const auth = await requireAdminSession(event)
+  const id = cleanText(event.id, 100)
+  const result = await db.collection(COLLECTIONS.permissionGrant).where({ id, status: 'active' }).limit(1).get()
+  const grant = result.data[0]
+  if (!grant) return true
+  await adminGrantPreflight(openid, { ...event, draft: grant })
+  await db.collection(COLLECTIONS.permissionGrant).doc(grant._id).update({ data: { status: 'revoked', revokedAt: now(), updatedAt: now() } })
+  const linkedRoles = await db.collection(COLLECTIONS.userRole).where({ sourcePermissionId: id, status: 'active' }).limit(20).get()
+  const linkedPortPermissions = await db.collection(COLLECTIONS.userPermissions).where({ sourcePermissionId: id, status: 'active' }).limit(20).get()
+  await Promise.all([
+    ...linkedRoles.data.map(item => db.collection(COLLECTIONS.userRole).doc(item._id).update({ data: { status: 'inactive', updatedAt: now() } })),
+    ...linkedPortPermissions.data.map(item => db.collection(COLLECTIONS.userPermissions).doc(item._id).update({ data: { status: 'deleted', updatedAt: now() } }))
+  ])
+  await writePlatformLog(auth.user, 'revoke_permission', 'permission_grant', id, grant)
+  return true
+}
+
+async function adminSaveUserPermissions(openid, event = {}) {
+  const auth = await requireAdminSession(event)
+  const input = event.userPermissions || {}
+  const isSuperAdmin = auth.user.roles.some(item => item.role === 'super_admin' && item.status === 'active')
+  const isAreaAdmin = auth.user.roles.some(item => ['area_admin', 'region_admin'].includes(item.role) && item.status === 'active')
+  if (isAreaAdmin && !isSuperAdmin) {
+    const organizations = (await db.collection(COLLECTIONS.organization).where({ status: 'active' }).limit(500).get()).data
+    const teamId = canonicalOrganizationId(input.teamId)
+    if (!adminAllowedOrganizationIds(auth.user, organizations).includes(teamId)) {
+      throw Object.assign(new Error('协作区管理员不能超出本协作区授权'), { code: 'AREA_ADMIN_SCOPE_DENIED' })
+    }
+    if (['super_admin', 'area_admin'].includes(cleanText(input.roleCode, 100))) {
+      throw Object.assign(new Error('协作区管理员不能授予主管理员或协作区管理员角色'), { code: 'AREA_ADMIN_ROLE_GRANT_DENIED' })
+    }
+    const permissions = sanitizePortPermissions(input.permissions)
+    if ((permissions.finance || []).some(action => action !== 'read')) {
+      throw Object.assign(new Error('财务账目维护权限仅限超级管理员'), { code: 'AREA_ADMIN_FINANCE_DENIED' })
+    }
+  } else if (!isSuperAdmin) {
+    const teamIds = auth.user.roles.filter(item => item.role === 'team_admin' && item.status === 'active').map(item => canonicalOrganizationId(item.organizationId))
+    const teamId = canonicalOrganizationId(input.teamId)
+    const permissions = sanitizePortPermissions(input.permissions)
+    const hasForbiddenAction = Object.values(permissions).flat().some(action => action === 'delete') ||
+      (permissions.finance || []).some(action => action !== 'read') ||
+      (permissions.permission || []).some(action => action !== 'read')
+    if (!teamIds.includes(teamId)) {
+      throw Object.assign(new Error('服务队管理员只能维护本服务队权限'), { code: 'TEAM_ADMIN_SCOPE_DENIED' })
+    }
+    if (['super_admin', 'area_admin'].concat(TEAM_SCOPED_ADMIN_ROLE_CODES).includes(cleanText(input.roleCode, 100))) {
+      throw Object.assign(new Error('服务队管理员不能授予管理员角色'), { code: 'TEAM_ADMIN_ROLE_GRANT_DENIED' })
+    }
+    if (cleanText(input.dataScope, 20) === 'district' || hasForbiddenAction) {
+      throw Object.assign(new Error('服务队管理员不能授予跨队、删除、财务维护或权限管理操作'), { code: 'TEAM_ADMIN_PERMISSION_DENIED' })
+    }
+  }
+  return saveUserPermissions(openid, event, auth.user)
+}
+
+async function adminRevokeUserPermissions(openid, event = {}) {
+  const auth = await requireAdminSession(event)
+  const isSuperAdmin = auth.user.roles.some(item => item.role === 'super_admin' && item.status === 'active')
+  const isAreaAdmin = auth.user.roles.some(item => ['area_admin', 'region_admin'].includes(item.role) && item.status === 'active')
+  if (isAreaAdmin && !isSuperAdmin) {
+    const id = cleanText(event.id, 100)
+    const [result, organizationsResult] = await Promise.all([
+      db.collection(COLLECTIONS.userPermissions).where({ id, status: 'active' }).limit(1).get(),
+      db.collection(COLLECTIONS.organization).where({ status: 'active' }).limit(500).get()
+    ])
+    const grant = result.data[0]
+    const allowedIds = adminAllowedOrganizationIds(auth.user, organizationsResult.data)
+    if (!grant || !allowedIds.includes(canonicalOrganizationId(grant.teamId)) || ['super_admin', 'area_admin'].includes(grant.roleCode)) {
+      throw Object.assign(new Error('协作区管理员只能撤销本协作区下属权限'), { code: 'AREA_ADMIN_REVOKE_DENIED' })
+    }
+  } else if (!isSuperAdmin) {
+    const id = cleanText(event.id, 100)
+    const result = await db.collection(COLLECTIONS.userPermissions).where({ id, status: 'active' }).limit(1).get()
+    const grant = result.data[0]
+    const teamIds = auth.user.roles.filter(item => item.role === 'team_admin' && item.status === 'active').map(item => canonicalOrganizationId(item.organizationId))
+    if (!grant || !teamIds.includes(canonicalOrganizationId(grant.teamId)) || ['super_admin', 'area_admin'].concat(TEAM_SCOPED_ADMIN_ROLE_CODES).includes(grant.roleCode)) {
+      throw Object.assign(new Error('服务队管理员只能撤销本服务队的成员或岗位权限'), { code: 'TEAM_ADMIN_REVOKE_DENIED' })
+    }
+  }
+  return revokeUserPermissions(openid, event, auth.user)
+}
+
+async function adminDeleteUser(openid, event = {}) {
+  const auth = await requireAdminSession(event)
+  const isSuperAdmin = auth.user.roles.some(item => item.role === 'super_admin' && item.status === 'active')
+  const isAreaAdmin = auth.user.roles.some(item => ['area_admin', 'region_admin'].includes(item.role) && item.status === 'active')
+  if (!isSuperAdmin && !isAreaAdmin) {
+    throw Object.assign(new Error('只有超级管理员或协作区管理员可以删除用户'), { code: 'AREA_ADMIN_REQUIRED' })
+  }
+  const userId = cleanText(event.userId, 100)
+  if (!userId || userId === auth.user.id) {
+    throw Object.assign(new Error('不能删除当前登录的超级管理员'), { code: 'ADMIN_SELF_DELETE_DENIED' })
+  }
+  const [userResult, roleResult] = await Promise.all([
+    db.collection(COLLECTIONS.user).where({ id: userId }).limit(1).get(),
+    db.collection(COLLECTIONS.userRole).where({ userId, status: 'active' }).limit(100).get()
+  ])
+  const target = userResult.data[0]
+  if (!target) return true
+  if (!isSuperAdmin) {
+    const organizations = (await db.collection(COLLECTIONS.organization).where({ status: 'active' }).limit(500).get()).data
+    if (!adminAllowedOrganizationIds(auth.user, organizations).includes(canonicalOrganizationId(target.defaultOrganizationId))) {
+      throw Object.assign(new Error('协作区管理员不能删除管理范围外用户'), { code: 'AREA_ADMIN_SCOPE_DENIED' })
+    }
+  }
+  if (roleResult.data.some(item => item.role === 'super_admin')) {
+    throw Object.assign(new Error('请先撤销该用户的超级管理员角色'), { code: 'SUPER_ADMIN_DELETE_DENIED' })
+  }
+  const timestamp = now()
+  const [portResult, grantResult] = await Promise.all([
+    db.collection(COLLECTIONS.userPermissions).where({ userId, status: 'active' }).limit(500).get(),
+    db.collection(COLLECTIONS.permissionGrant).where({ userId, status: 'active' }).limit(500).get()
+  ])
+  await Promise.all([
+    db.collection(COLLECTIONS.user).doc(target._id).update({ data: { status: 'deleted', deletedAt: timestamp, updatedAt: timestamp } }),
+    ...roleResult.data.map(item => db.collection(COLLECTIONS.userRole).doc(item._id).update({ data: { status: 'inactive', updatedAt: timestamp } })),
+    ...portResult.data.map(item => db.collection(COLLECTIONS.userPermissions).doc(item._id).update({ data: { status: 'deleted', updatedAt: timestamp } })),
+    ...grantResult.data.map(item => db.collection(COLLECTIONS.permissionGrant).doc(item._id).update({ data: { status: 'revoked', revokedAt: timestamp, updatedAt: timestamp } }))
+  ])
+  await writePlatformLog(auth.user, 'delete_user', 'user', userId, { name: target.name })
+  return true
+}
+
 const handlers = {
+  bootstrapAdminAccount,
+  adminLogin,
+  adminRefresh,
+  adminLogout,
+  adminChangePassword,
+  adminGraph,
+  adminGrantPreflight,
+  adminGrantCommit,
+  adminGrantRevoke,
+  adminSaveUserPermissions,
+  adminRevokeUserPermissions,
+  adminDeleteUser,
   getSession,
   bootstrapV2,
   getPlatformSession,
@@ -3451,6 +5005,15 @@ const handlers = {
   listEventImages,
   saveEventImages,
   saveFileRecord,
+  listMediaAlbums,
+  listMediaTeams: mediaAvailableTeams,
+  getMediaAlbum,
+  saveMediaAlbum,
+  deleteMediaFile,
+  deleteMediaAlbum,
+  createMediaShare,
+  getMediaShare,
+  createMediaExport,
   listLedgerRecords,
   saveLedgerRecord,
   deleteLedgerRecord,
@@ -3462,6 +5025,8 @@ const handlers = {
   getTask,
   saveTask,
   deleteTask,
+  completeTask,
+  reopenTask,
   listMembers: listDirectoryMembers,
   getMember,
   saveMember,
@@ -3493,6 +5058,9 @@ const handlers = {
 
 exports.main = async event => {
   const { OPENID } = cloud.getWXContext()
+  if (!OPENID && !WEB_ADMIN_ACTIONS.has(event.action)) {
+    return fail('ANONYMOUS_ACTION_DENIED', '匿名会话无权访问该接口')
+  }
   const handler = handlers[event.action]
   if (!handler) return fail('UNKNOWN_ACTION', '不支持的操作')
   try {

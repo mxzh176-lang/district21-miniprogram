@@ -1,0 +1,27 @@
+const fs = require('node:fs')
+const path = require('node:path')
+const test = require('node:test')
+const assert = require('node:assert/strict')
+
+const ROOT = path.resolve(__dirname, '..')
+
+test('archive event editor uses the compact event form', () => {
+  const template = fs.readFileSync(path.join(ROOT, 'miniprogram/pages/archive/edit/index.wxml'), 'utf8')
+  const script = fs.readFileSync(path.join(ROOT, 'miniprogram/pages/archive/edit/index.js'), 'utf8')
+  const service = fs.readFileSync(path.join(ROOT, 'miniprogram/services/event-service.js'), 'utf8')
+
+  assert.doesNotMatch(template, /分类记录模板|详细记录|录入人|建议上传|记录附件/)
+  assert.doesNotMatch(template, />上传照片</)
+  assert.match(template, /'添加照片'/)
+  assert.match(template, /事件说明（选填）/)
+  assert.match(template, /记录日期/)
+  assert.match(template, /事件分类/)
+  assert.match(script, /onEventCategoryChange/)
+  assert.match(template, /item\.expanded/)
+  assert.match(template, /participantPickerExpanded \? '收起' : '选择'/)
+  assert.match(template, /wx:if="\{\{participantPickerExpanded\}\}"/)
+  assert.match(script, /toggleParticipantPicker\(\)/)
+  assert.match(script, /expanded: team\.id === teamId \? shouldExpand : false/)
+  assert.doesNotMatch(service, /ownerName: entry\.uploadedBy/)
+  assert.match(script, /const \{ date, title, location \} = this\.data\.form/)
+})

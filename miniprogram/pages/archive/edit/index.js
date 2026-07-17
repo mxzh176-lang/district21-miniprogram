@@ -1,5 +1,8 @@
 const api = require('../../../utils/api')
 const permission = require('../../../utils/permission')
+const orgScope = require('../../../utils/org-scope')
+const { EVENT_CATEGORIES, normalizeEventCategory } = require('../../../utils/event-category')
+const MEMBER_SYNC_INTERVAL = 5000
 
 const CATEGORY_NAMES = {
   main: '记事本总目录',
@@ -148,6 +151,67 @@ function selectedIdsFromParticipants(participants = []) {
   return ids
 }
 
+function flattenEditableCategories(organization = {}) {
+  const seen = new Set()
+  return (organization.categories || [])
+    .flatMap(category => [category].concat(category.children || []))
+    .filter(category => {
+      if (!category.id || category.id === 'treasurer' || seen.has(category.id)) return false
+      seen.add(category.id)
+      return true
+    })
+    .map(category => ({
+      id: category.id,
+      name: category.name || CATEGORY_NAMES[category.id] || '档案事件'
+    }))
+}
+
+function buildCategoryDirectory(organization = {}, session = null) {
+  const supportIds = ['secretary', 'tamer', 'treasurer', 'admin']
+  const sourceCategories = organization.categories || []
+  const captainCategory = sourceCategories.find(item => item.id === 'captain') || {}
+  const supportMap = {}
+  ;(captainCategory.children || [])
+    .concat(sourceCategories.filter(item => supportIds.includes(item.id)))
+    .filter(item => supportIds.includes(item.id))
+    .forEach(item => { supportMap[item.id] = { ...item, compact: true } })
+  const supportCategories = supportIds.map(item => supportMap[item]).filter(Boolean)
+  const displayCategories = sourceCategories
+    .filter(item => !supportIds.includes(item.id))
+    .map(item => item.id === 'captain'
+      ? { ...item, children: supportCategories }
+      : item)
+  const canEditPositionDirectory = permission.canEditServiceTeamPositions(session, organization)
+  return displayCategories.map(category => ({
+    ...category,
+    canEditDirectory: canEditPositionDirectory || Boolean(category.canEditDirectory),
+    canMaintain: category.id === 'treasurer'
+      ? permission.canMaintainLedger(session, {
+        organizationId: organization.id,
+        cloudOrganizationId: organization.cloudId,
+        positionId: category.positionId || category.id,
+        person: category.person
+      })
+      : permission.canMaintainPosition(session, {
+        organizationId: organization.id,
+        cloudOrganizationId: organization.cloudId,
+        positionId: category.positionId || category.id,
+        person: category.person
+      }),
+    children: (category.children || []).map(child => ({
+      ...child,
+      canEditDirectory: canEditPositionDirectory || Boolean(child.canEditDirectory),
+      canMaintain: permission.canMaintainPosition(session, {
+        organizationId: organization.id,
+        cloudOrganizationId: organization.cloudId,
+        positionId: child.positionId || child.id,
+        parentPositionId: category.positionId || category.id,
+        person: child.person
+      })
+    }))
+  }))
+}
+
 Page({
   data: {
     id: '',
@@ -156,21 +220,33 @@ Page({
     positionId: '',
     organizationName: '',
     categoryName: '',
+    organizations: [],
+    organizationOptions: [],
+    organizationIndex: 0,
+    categoryOptions: [],
+    categoryIndex: 0,
+    eventCategoryOptions: EVENT_CATEGORIES,
+    eventCategoryIndex: 0,
+    selectedOrganization: {},
+    categoryDirectory: [],
+    session: null,
     canEdit: false,
     canUpload: false,
+    saving: false,
     form: {
       date: '',
+      eventCategory: EVENT_CATEGORIES[0],
       title: '',
       location: '',
       participantCount: '',
       keywords: '',
       summary: '',
       content: '',
-      uploadedBy: '',
       photoCount: 0,
       photos: []
     },
     participantTeams: [],
+    participantPickerExpanded: false,
     participantMembers: [],
     selectedParticipantIds: [],
     legacyParticipantNote: '',
@@ -183,18 +259,84 @@ Page({
   },
 
   async onLoad(options) {
+    await this.initializeEditor(options || {})
+  },
+
+  onShow() {
+    this.startParticipantMemberSync()
+  },
+
+  onHide() {
+    this.stopParticipantMemberSync()
+  },
+
+  onUnload() {
+    this.stopParticipantMemberSync()
+  },
+
+  startParticipantMemberSync() {
+    this.stopParticipantMemberSync()
+    this._participantMemberSyncTimer = setInterval(() => {
+      this.refreshParticipantMembers().catch(() => {})
+    }, MEMBER_SYNC_INTERVAL)
+  },
+
+  stopParticipantMemberSync() {
+    if (!this._participantMemberSyncTimer) return
+    clearInterval(this._participantMemberSyncTimer)
+    this._participantMemberSyncTimer = null
+  },
+
+  async refreshParticipantMembers() {
+    if (this._participantMemberSyncing) return
+    this._participantMemberSyncing = true
+    try {
+      const participantMembers = await api.call('listOrg', {}, { forceRefresh: true })
+      const availableIds = new Set(participantMembers.map(participantId).map(String))
+      const selectedParticipantIds = this.data.selectedParticipantIds.filter(id => availableIds.has(String(id)))
+      this.setData({
+        participantMembers,
+        selectedParticipantIds,
+        'form.participantCount': String(selectedParticipantIds.length),
+        participantTeams: this.buildParticipantTeams(participantMembers, selectedParticipantIds)
+      })
+    } finally {
+      this._participantMemberSyncing = false
+    }
+  },
+
+  async onTabItemTap() {
+    await this.initializeEditor({})
+  },
+
+  async initializeEditor(options) {
     const [member, organizations, participantMembers] = await Promise.all([
       api.call('getSession'),
       api.call('listArchives'),
       api.call('listOrg')
     ])
+    const currentScope = orgScope.getCurrentScope()
+    const defaultOrganizationId = options.organization ||
+      (currentScope.orgType === 'team' ? currentScope.orgId : currentScope.dataId) ||
+      'district'
     const organization = organizations.find(
-      (item) => item.id === (options.organization || 'yuanhang')
+      (item) => item.id === defaultOrganizationId || item.cloudId === defaultOrganizationId
     ) || organizations[0]
-    const categoryId = options.category || 'service'
+    const categoryOptions = flattenEditableCategories(organization)
+    const categoryId = options.category || (categoryOptions[0] && categoryOptions[0].id) || 'service-plan'
     const position = permission.findArchivePosition(organization, categoryId)
+    const initialEventCategory = normalizeEventCategory('', categoryId, position && position.name)
     const baseData = {
       id: options.id || '',
+      organizations,
+      organizationOptions: organizations.map(item => item.name || item.shortName || item.id),
+      organizationIndex: Math.max(0, organizations.findIndex(item => item.id === organization.id)),
+      categoryOptions,
+      categoryIndex: Math.max(0, categoryOptions.findIndex(item => item.id === categoryId)),
+      eventCategoryIndex: Math.max(0, EVENT_CATEGORIES.indexOf(initialEventCategory)),
+      selectedOrganization: organization,
+      categoryDirectory: buildCategoryDirectory(organization, member),
+      session: member,
       organizationId: organization.id,
       categoryId,
       positionId: position && (position.positionId || position.id) || categoryId,
@@ -210,36 +352,124 @@ Page({
       honorRequestedLevel: 'none',
       confirmPositionName: CONFIRM_POSITION_BY_CATEGORY[categoryId] || '',
       formCopy: FORM_COPY[categoryId] || DEFAULT_FORM_COPY,
-      'form.date': this.formatDate(new Date()),
-      'form.uploadedBy': member.name || member.nickname || '当前岗位负责人',
+      form: {
+        date: this.formatDate(new Date()),
+        eventCategory: initialEventCategory,
+        title: '',
+        location: '',
+        participantCount: '',
+        keywords: '',
+        summary: '',
+        content: '',
+        photoCount: 0,
+        photos: []
+      },
       participantMembers,
+      participantPickerExpanded: false,
+      selectedParticipantIds: [],
+      legacyParticipantNote: '',
+      templateApplied: false,
       participantTeams: this.buildParticipantTeams(participantMembers, [])
     }
     this.setData(baseData)
     if (options.id) {
       const entry = await api.call('getArchiveEntry', { id: options.id })
       const selectedParticipantIds = selectedIdsFromParticipants(entry.participants)
+      const entryEventCategory = normalizeEventCategory(entry.eventCategory, entry.categoryId, entry.uploaderRole)
       const legacyParticipantNote = !selectedParticipantIds.length && Number(entry.participantCount) > 0
         ? `旧记录仅保存了 ${entry.participantCount} 人，未保存参与人名单；可在此补选。`
         : ''
       this.setData({
         form: {
           date: entry.date || '',
+          eventCategory: entryEventCategory,
           title: entry.title || '',
           location: entry.location || '',
           participantCount: selectedParticipantIds.length ? String(selectedParticipantIds.length) : (entry.participantCount === undefined ? '' : String(entry.participantCount)),
           keywords: (entry.keywords || []).join(' '),
           summary: entry.summary || '',
           content: entry.content || '',
-          uploadedBy: entry.uploadedBy || member.nickname,
           photoCount: (entry.photos || []).length,
           photos: entry.photos || []
         },
         selectedParticipantIds,
+        eventCategoryIndex: Math.max(0, EVENT_CATEGORIES.indexOf(entryEventCategory)),
         legacyParticipantNote,
         participantTeams: this.buildParticipantTeams(participantMembers, selectedParticipantIds)
       })
     }
+  },
+
+  refreshArchiveSelection(organizationId, categoryId) {
+    if (this.data.id) return
+    const organizations = this.data.organizations || []
+    const organization = organizations.find(item => item.id === organizationId || item.cloudId === organizationId) || organizations[0]
+    if (!organization) return
+    const categoryOptions = flattenEditableCategories(organization)
+    const resolvedCategoryId = categoryOptions.some(item => item.id === categoryId)
+      ? categoryId
+      : (categoryOptions[0] && categoryOptions[0].id) || 'service-plan'
+    const position = permission.findArchivePosition(organization, resolvedCategoryId)
+    const eventCategory = normalizeEventCategory('', resolvedCategoryId, position && position.name)
+    const canEdit = permission.canMaintainArchive(this.data.session, organization, resolvedCategoryId, 'create')
+    const canUpload = permission.hasPortPermission(this.data.session, 'history', 'upload', {
+      organizationId: organization.id,
+      cloudOrganizationId: organization.cloudId,
+      positionId: position && (position.positionId || position.id)
+    }) || (!permission.activePortPermissions(this.data.session).length && permission.canMaintainArchive(this.data.session, organization, resolvedCategoryId, 'update'))
+    this.setData({
+      organizationIndex: Math.max(0, organizations.findIndex(item => item.id === organization.id)),
+      categoryOptions,
+      categoryIndex: Math.max(0, categoryOptions.findIndex(item => item.id === resolvedCategoryId)),
+      eventCategoryIndex: Math.max(0, EVENT_CATEGORIES.indexOf(eventCategory)),
+      selectedOrganization: organization,
+      categoryDirectory: buildCategoryDirectory(organization, this.data.session),
+      organizationId: organization.id,
+      categoryId: resolvedCategoryId,
+      positionId: position && (position.positionId || position.id) || resolvedCategoryId,
+      organizationName: organization.name,
+      categoryName: position ? position.name : CATEGORY_NAMES[resolvedCategoryId] || '档案事件',
+      canEdit,
+      canUpload,
+      honorEligible: HONOR_ELIGIBLE_CATEGORY_IDS.includes(resolvedCategoryId),
+      honorRequestedLevel: 'none',
+      confirmPositionName: CONFIRM_POSITION_BY_CATEGORY[resolvedCategoryId] || '',
+      formCopy: FORM_COPY[resolvedCategoryId] || DEFAULT_FORM_COPY,
+      'form.eventCategory': eventCategory,
+      templateApplied: false
+    })
+  },
+
+  changeOrganization(event) {
+    const index = Number(event.detail.value) || 0
+    const organization = this.data.organizations[index]
+    if (!organization) return
+    this.refreshArchiveSelection(organization.id, '')
+  },
+
+  changeCategory(event) {
+    const index = Number(event.detail.value) || 0
+    const category = this.data.categoryOptions[index]
+    if (!category) return
+    this.refreshArchiveSelection(this.data.organizationId, category.id)
+  },
+
+  chooseArchiveCategory(event) {
+    const category = event.currentTarget.dataset.category
+    if (!category) return
+    if (category === 'treasurer') {
+      wx.navigateTo({ url: `/pages/archive/ledger/index?organization=${this.data.organizationId}` })
+      return
+    }
+    this.refreshArchiveSelection(this.data.organizationId, category)
+  },
+
+  editPosition(event) {
+    const positionId = event.currentTarget.dataset.position
+    const organizationId = this.data.selectedOrganization.cloudId || this.data.selectedOrganization.id
+    wx.navigateTo({
+      url: `/pages/archive/position-edit/index?organizationId=${encodeURIComponent(organizationId)}&positionId=${encodeURIComponent(positionId)}`
+    })
   },
 
   formatDate(date) {
@@ -251,6 +481,14 @@ Page({
 
   onDateChange(event) {
     this.setData({ 'form.date': event.detail.value })
+  },
+
+  onEventCategoryChange(event) {
+    const eventCategoryIndex = Number(event.detail.value) || 0
+    this.setData({
+      eventCategoryIndex,
+      'form.eventCategory': EVENT_CATEGORIES[eventCategoryIndex] || EVENT_CATEGORIES[0]
+    })
   },
 
   onInput(event) {
@@ -304,11 +542,22 @@ Page({
     })
   },
 
+  toggleParticipantPicker() {
+    const participantPickerExpanded = !this.data.participantPickerExpanded
+    this.setData({
+      participantPickerExpanded,
+      participantTeams: participantPickerExpanded
+        ? this.data.participantTeams
+        : this.data.participantTeams.map(team => ({ ...team, expanded: false }))
+    })
+  },
+
   toggleParticipantTeam(event) {
     const teamId = event.currentTarget.dataset.teamId
+    const selectedTeam = this.data.participantTeams.find(team => team.id === teamId)
+    const shouldExpand = selectedTeam ? !selectedTeam.expanded : false
     const participantTeams = this.data.participantTeams.map(team => {
-      if (team.id !== teamId) return team
-      return { ...team, expanded: !team.expanded }
+      return { ...team, expanded: team.id === teamId ? shouldExpand : false }
     })
     this.setData({ participantTeams })
   },
@@ -371,6 +620,10 @@ Page({
     const index = Number(event.currentTarget.dataset.index)
     const photos = this.data.form.photos.filter((item, photoIndex) => photoIndex !== index)
     this.setData({ 'form.photos': photos, 'form.photoCount': photos.length })
+  },
+
+  scrollToPhotos() {
+    wx.pageScrollTo({ selector: '#photo-section', duration: 300 })
   },
 
   applyTemplate() {
@@ -484,8 +737,8 @@ Page({
   },
 
   validate() {
-    const { date, title, location, content } = this.data.form
-    if (!date || !title.trim() || !location.trim() || !content.trim()) {
+    const { date, title, location } = this.data.form
+    if (!date || !title.trim() || !location.trim()) {
       wx.showToast({ title: '请完整填写事件必填项', icon: 'none' })
       return false
     }
@@ -512,13 +765,13 @@ Page({
         categoryId,
         positionId,
         date: form.date,
+        eventCategory: form.eventCategory,
         dateLabel: form.date,
         title: form.title.trim(),
         location: form.location.trim(),
         participantCount,
         participants,
         team: organizationName,
-        uploadedBy: form.uploadedBy,
         uploaderRole: categoryName,
         status: requestedLevel === 'none' ? 'published' : 'pending_leader_confirm',
         eventStatus: requestedLevel === 'none' ? 'archived' : 'pending_leader_confirm',
@@ -544,12 +797,30 @@ Page({
   },
 
   async saveEvent() {
+    if (this.data.saving || this._saveInProgress) return
     if (!this.validate()) return
+    this._saveInProgress = true
+    this.setData({ saving: true })
+    wx.showLoading({ title: '正在保存，请稍候', mask: true })
     try {
       await this.saveEntry()
-      wx.showToast({ title: '事件已保存', icon: 'success' })
-      setTimeout(() => wx.navigateBack(), 800)
+      wx.hideLoading()
+      await new Promise(resolve => {
+        wx.showModal({
+          title: '保存成功',
+          content: '事件已经进入历史档案，请勿重复提交。',
+          showCancel: false,
+          confirmText: '返回档案',
+          success: resolve,
+          fail: resolve
+        })
+      })
+      if (getCurrentPages().length > 1) wx.navigateBack()
+      else wx.switchTab({ url: '/pages/archive/index' })
     } catch (error) {
+      wx.hideLoading()
+      this._saveInProgress = false
+      this.setData({ saving: false })
       api.showError(error)
     }
   }

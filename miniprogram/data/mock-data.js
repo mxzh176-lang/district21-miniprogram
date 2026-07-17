@@ -1,9 +1,12 @@
+const yuanhangBirthdays = require('./yuanhang-birthdays')
+const yuanhangProfessions = require('./yuanhang-professions')
+
 const teams = [
   { id: 'district', name: '二十一协作区', shortName: '协作区', color: '#b1843d', members: 120 },
   { id: 'linghang', name: '领航服务队', shortName: '领航', color: '#2f6d5d', members: 31 },
   { id: 'ailinghang', name: '爱领航服务队', shortName: '爱领航', color: '#b55d57', members: 29 },
-  { id: 'yuanhang', name: '远航服务队', shortName: '远航', color: '#346b8c', members: 32 },
-  { id: 'jingying', name: '精英服务队', shortName: '精英', color: '#7a5b91', members: 28 }
+  { id: 'yuanhang', name: '远航服务队', shortName: '远航', color: '#346b8c', members: 33 },
+  { id: 'jingying', name: '精英服务队', shortName: '精英', color: '#7a5b91', members: 25 }
 ]
 
 const tasks = [
@@ -33,7 +36,7 @@ function photosFor(activity) {
 const memberLetters = {
   安: 'A', 白: 'B', 陈: 'C', 崔: 'C', 丁: 'D', 董: 'D', 付: 'F', 冯: 'F',
   高: 'G', 郭: 'G', 关: 'G', 韩: 'H', 何: 'H', 胡: 'H', 黄: 'H',
-  荆: 'J', 景: 'J', 姜: 'J', 孔: 'K', 李: 'L', 刘: 'L', 吕: 'L',
+  荆: 'J', 景: 'J', 井: 'J', 姜: 'J', 孔: 'K', 李: 'L', 刘: 'L', 吕: 'L',
   梁: 'L', 林: 'L', 米: 'M', 马: 'M', 潘: 'P', 彭: 'P', 任: 'R',
   宋: 'S', 孙: 'S', 滕: 'T', 田: 'T', 王: 'W', 吴: 'W', 徐: 'X',
   许: 'X', 谢: 'X', 杨: 'Y', 姚: 'Y', 张: 'Z', 赵: 'Z', 周: 'Z',
@@ -43,9 +46,13 @@ const memberLetters = {
 
 const memberRoster = {
   linghang: ['王刚', '刘宝山', '于波', '范信银', '陈维凡', '刘金辉', '腾保国', '贾晓梅', '杨磊', '吴含', '朱连春', '蒋萧彤', '辛志武', '马玉红', '李洪志', '李力安', '侯盛楠', '王连会', '孙建', '金萍', '徐红霞', '王玉宝', '王洪伟', '王立彬', '关向星'],
-  jingying: ['王丽', '杨帆', '陈纯玉', '杨丽莹', '付艳秋', '张永祺', '孙明龙', '孙洪涛', '于永和', '张影', '周玉慧', '裴大伟', '林衍伟', '安铁', '薛允丽', '郭晓红', '张淑云', '李永生', '王继芳', '吕洪威', '任凤影', '张南翔', '程传海'],
+  jingying: ['王丽', '杨帆', '陈纯玉', '杨丽莹', '付艳超', '孙明龙', '孙洪涛', '于永和', '张影', '周钰慧', '裴大伟', '林衍伟', '安铁', '薛允丽', '郭晓红', '张淑云', '李永生', '王继芳', '吕洪威', '任凤影', '张南翔', '程传海', '刘明海', '陈俊超', '谢巍巍'],
   ailinghang: ['陈纯颖', '王必东', '张书慧', '杨振忠', '陈冬彬', '孙显波', '王秋香', '谢志琴', '邓福友', '陈瓯', '王磊', '辛福恩', '毛烨', '吴亚娟', '杨秀娟', '张成功', '孙慧霖', '刘磊', '李红太', '刘金岭', '范晓波', '李玉博', '邰欢欢'],
-  yuanhang: ['关丙刚', '张明星', '徐双龙', '张芳', '李晶', '刘建鑫', '李姗姗', '刘圣亮', '杨景辉', '李文强', '吕媛媛', '王奇', '潘洋洋', '景树生', '徐雪峰', '胡世领', '徐铭宣', '徐春梅', '吴雪', '谭振峰', '腾飞']
+  yuanhang: ['关丙刚', '张明星', '徐双龙', '张芳', '李晶', '刘建鑫', '李珊珊', '刘圣亮', '杨景辉', '李文强', '李玲玲', '吕媛媛', '王奇', '潘洋洋', '景树生', '徐雪峰', '胡世领', '徐铭宣', '徐春梅', '吴雪', '谭振峰', '腾飞', '宋永恒', '景殿贤', '刘泉宏', '隋志菊', '井续海', '王必东']
+}
+
+const memberPositions = {
+  yuanhang: { 李玲玲: '秘书' }
 }
 
 const teamInfo = teams.reduce((map, team) => {
@@ -61,7 +68,9 @@ const members = Object.keys(memberRoster).flatMap(teamId => {
     letter: memberLetters[name.slice(0, 1)] || '#',
     team: team.name,
     teamId,
-    position: '成员',
+    position: memberPositions[teamId] && memberPositions[teamId][name] || '成员',
+    birthday: teamId === 'yuanhang' ? yuanhangBirthdays[name] || '' : '',
+    profession: teamId === 'yuanhang' ? yuanhangProfessions[name] || '' : '',
     initial: name.slice(0, 1),
     avatarTone: teamId === 'linghang' ? 'green' : teamId === 'ailinghang' ? 'red' : teamId === 'yuanhang' ? 'blue' : 'purple'
   }))
@@ -130,7 +139,7 @@ const archiveOrganizations = [{
   name: '远航服务队',
   shortName: '远航',
   color: '#346b8c',
-  members: 32,
+  members: 33,
   seal: '远',
   captain: '张明星',
   description: '远航服务队队长——张明星；一二三副队长与秘书、纠察、司库、总务共 8 个主栏目',
@@ -231,7 +240,7 @@ const structureTerms = [
         leaderTitle: '创队队长',
         roles: [
           { position: '第一副队长', person: '孙明龙' },
-          { position: '第二副队长', person: '周玉慧' },
+          { position: '第二副队长', person: '周钰慧' },
           { position: '第三副队长', person: '郭晓红' },
           { position: '秘书', person: '薛允丽' },
           { position: '司库', person: '张影' },

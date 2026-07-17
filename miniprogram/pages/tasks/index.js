@@ -2,6 +2,7 @@ const api = require('../../utils/api')
 const permission = require('../../utils/permission')
 const orgScope = require('../../utils/org-scope')
 const todoDisplay = require('../../utils/todo-display')
+const TODO_SYNC_INTERVAL = 5000
 
 Page({
   data: {
@@ -26,11 +27,10 @@ Page({
   },
 
   onLoad(options) {
-    const selectedMonth = todoDisplay.currentMonth()
     const currentScope = orgScope.getCurrentScope()
     this.setData({
-      selectedMonth,
-      monthLabel: `${Number(selectedMonth.slice(5, 7))}月`,
+      selectedMonth: 'all',
+      monthLabel: '全部',
       category: options.category || 'all',
       teamId: todoDisplay.normalizeTeamId(options.teamId) || currentScope.teamId || 'all',
       currentScope
@@ -39,28 +39,41 @@ Page({
 
   async onShow() {
     const currentScope = orgScope.getCurrentScope()
-    const session = await api.call('getSession')
+    const [session, monthData] = await Promise.all([
+      api.call('getSession'),
+      api.call('listTasks', { month: this.data.selectedMonth })
+    ])
     this.setData({
       currentScope,
       teamId: currentScope.teamId || 'all',
-      canEdit: permission.canPerform(session, 'todo', 'update'),
-      canCreate: permission.canPerform(session, 'todo', 'create')
+      canEdit: permission.canManageTodo(session),
+      canCreate: permission.canCreateTodo(session)
     })
     this.session = session
-    await this.loadDates()
-    await this.loadTasks()
+    this.applyMonthData(monthData)
+    this.startTodoSync()
   },
 
-  async loadDates() {
-    const data = await api.call('listTasks', { month: this.data.selectedMonth })
+  onHide() {
+    this.stopTodoSync()
+  },
+
+  onUnload() {
+    this.stopTodoSync()
+  },
+
+  buildTaskDates(data) {
     const grouped = {}
     data.tasks.forEach(item => {
-      if (item.day) grouped[item.day] = (grouped[item.day] || 0) + 1
+      if (item.date) grouped[item.date] = (grouped[item.date] || 0) + 1
     })
-    const taskDates = Object.keys(grouped)
+    return Object.keys(grouped)
       .sort()
-      .map(day => ({ day, count: grouped[day] }))
-    this.setData({ taskDates })
+      .map(date => ({
+        date,
+        label: `${Number(date.slice(5, 7))}月${Number(date.slice(8, 10))}日`,
+        count: grouped[date]
+      }))
   },
 
   selectDay(event) {
@@ -68,14 +81,37 @@ Page({
     this.loadTasks()
   },
 
-  async loadTasks() {
-    const monthData = await api.call('listTasks', { month: this.data.selectedMonth })
+  async loadTasks(options = {}) {
+    if (this.todoSyncing) return
+    this.todoSyncing = true
+    try {
+      const monthData = await api.call('listTasks', { month: this.data.selectedMonth }, options)
+      this.applyMonthData(monthData)
+    } finally {
+      this.todoSyncing = false
+    }
+  },
+
+  startTodoSync() {
+    this.stopTodoSync()
+    this.todoSyncTimer = setInterval(() => {
+      this.loadTasks({ forceRefresh: true }).catch(() => {})
+    }, TODO_SYNC_INTERVAL)
+  },
+
+  stopTodoSync() {
+    if (!this.todoSyncTimer) return
+    clearInterval(this.todoSyncTimer)
+    this.todoSyncTimer = null
+  },
+
+  applyMonthData(monthData) {
     const tasks = monthData.tasks
       .filter(item => this.data.status === 'all' || (this.data.status === 'done'
         ? ['done', 'completed'].includes(item.status)
         : item.status === this.data.status))
       .filter(item => this.data.category === 'all' || item.category === this.data.category)
-      .filter(item => this.data.selectedDay === 'all' || String(item.day) === String(this.data.selectedDay))
+      .filter(item => this.data.selectedDay === 'all' || item.date === this.data.selectedDay)
       .filter(item => todoDisplay.matchesTeam(item, this.data.teamId))
       .map(item => todoDisplay.decorateTask(item, this.session))
     const sortedTasks = todoDisplay.sortTasks(tasks)
@@ -83,6 +119,7 @@ Page({
     this.setData({
       tasks: sortedTasks,
       ...grouped,
+      taskDates: this.buildTaskDates(monthData),
       categories: monthData.categories || [...new Set(monthData.tasks.map(item => item.category).filter(Boolean))],
       doneCount: monthData.tasks.filter(item => ['done', 'completed'].includes(item.status)).length,
       totalCount: monthData.tasks.length
@@ -136,13 +173,13 @@ Page({
     const task = this.data.tasks.find(item => item._id === id)
     if (!task || task.completed) return
     if (!task.canComplete) {
-      wx.showToast({ title: '仅创建人、岗位负责人或管理员可完成', icon: 'none' })
+      wx.showToast({ title: '仅管理员可完成待办', icon: 'none' })
       return
     }
     const confirmed = await new Promise(resolve => {
       wx.showModal({
         title: '完成待办',
-        content: '确认完成后，会自动生成历史事件并归入对应档案。',
+        content: '确认将此内部提醒标记为已完成？',
         confirmText: '完成',
         success: result => resolve(result.confirm)
       })
@@ -150,9 +187,34 @@ Page({
     if (!confirmed) return
     try {
       await api.call('completeTask', { id })
-      wx.showToast({ title: '已完成并入档案', icon: 'success' })
-      await this.loadDates()
+      wx.showToast({ title: '已标记完成', icon: 'success' })
       await this.loadTasks()
+    } catch (error) {
+      api.showError(error)
+    }
+  },
+
+  async reopenTask(event) {
+    const id = event.detail && event.detail.id ? event.detail.id : event.currentTarget.dataset.id
+    const task = this.data.completedTasks.find(item => item._id === id || item.id === id)
+    if (!task || !task.completed) return
+    if (!task.canComplete) {
+      wx.showToast({ title: '仅管理员可重新待办', icon: 'none' })
+      return
+    }
+    const confirmed = await new Promise(resolve => {
+      wx.showModal({
+        title: '重新变为待办',
+        content: '确认将该已完成事项重新发回待办列表？',
+        confirmText: '重新待办',
+        success: result => resolve(result.confirm)
+      })
+    })
+    if (!confirmed) return
+    try {
+      await api.call('reopenTask', { id })
+      wx.showToast({ title: '已重新变为待办', icon: 'success' })
+      await this.loadTasks({ forceRefresh: true })
     } catch (error) {
       api.showError(error)
     }

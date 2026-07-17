@@ -4,6 +4,7 @@
     "pages/home/index",
     "pages/tasks/index",
     "pages/archive/index",
+    "pages/archive/create/index",
     "pages/archive/list/index",
     "pages/archive/detail/index",
     "pages/archive/edit/index",
@@ -12,6 +13,9 @@
     "pages/archive/import/index",
     "pages/archive/ledger/index",
     "pages/archive/position-edit/index",
+    "pages/media-drive/index",
+    "pages/media-drive/album/index",
+    "pages/media-drive/share/index",
     "pages/activities/index",
     "pages/activities/detail/index",
     "pages/org/index",
@@ -23,6 +27,7 @@
     "pages/honors/edit/index",
     "pages/profile/index",
     "pages/profile/edit/index",
+    "pages/profile/agreement/index",
     "pages/admin/index",
     "pages/admin/role-assignments/index",
     "pages/admin/user-roles/index",
@@ -41,6 +46,7 @@
     "backgroundTextStyle": "dark"
   },
   "tabBar": {
+    "custom": true,
     "color": "#8F959E",
     "selectedColor": "#1456F0",
     "backgroundColor": "#FFFFFF",
@@ -53,6 +59,10 @@
       {
         "pagePath": "pages/archive/index",
         "text": "档案"
+      },
+      {
+        "pagePath": "pages/archive/create/index",
+        "text": "＋"
       },
       {
         "pagePath": "pages/org/index",

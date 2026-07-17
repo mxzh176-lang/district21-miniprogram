@@ -31,6 +31,7 @@ const ORGANIZATION_ANCESTORS = {
   org_team_yuanhang: ['org_region_21_suihua'],
   org_team_jingying: ['org_region_21_suihua']
 }
+const TODO_ORGANIZATION_ID = 'org_team_yuanhang'
 const TEAM_ROLE_SUPERVISORS = {
   secretary: ['captain', 'secretary'],
   treasurer: ['captain', 'secretary'],
@@ -187,14 +188,18 @@ function hasGrant(user, module, action = 'read', context = {}) {
 
 function canPerform(user, module, action = 'read', context = {}) {
   if (isSuperAdmin(user)) return true
-  if (activePortPermissions(user).length) return hasPortPermission(user, module, action, context)
-  if (hasAnyTeamFullAccess(user) &&
-    !(context.organizationId || context.cloudOrganizationId || context.teamId)) return true
+  const normalizedModule = MODULE_ALIASES[module] || module
   const organization = {
     id: context.organizationId || context.teamId,
     cloudId: context.cloudOrganizationId,
     ancestorIds: context.organizationAncestorIds || context.ancestorIds || []
   }
+  if (normalizedModule === 'member' && organization.id && canManage(user) && canAccessOrganization(user, organization)) {
+    return true
+  }
+  if (activePortPermissions(user).length) return hasPortPermission(user, module, action, context)
+  if (hasAnyTeamFullAccess(user) &&
+    !(context.organizationId || context.cloudOrganizationId || context.teamId)) return true
   if (canManage(user) && (!organization.id || canAccessOrganization(user, organization))) return true
   return hasGrant(user, module, action, context)
 }
@@ -344,29 +349,41 @@ function canMaintainArchive(user, organization, categoryId, action = 'update') {
     : canMaintainPosition(user, context, action)
 }
 
-function canCompleteTodo(user, todo = {}) {
+function canOpenArchiveCreate(user) {
   if (!user) return false
-  const userId = user.id || user._id
-  if (activePortPermissions(user).length) {
-    return hasPortPermission(user, 'todo', 'complete', {
-      organizationId: todo.organizationId || todo.teamId,
-      teamId: todo.teamId,
-      positionId: todo.positionId || todo.categoryId,
-      creatorId: todo.createdBy
-    })
-  }
-  if (todo.createdBy && todo.createdBy === userId) return true
-  if (hasGrant(user, 'tasks', 'update', {
-    organizationId: todo.organizationId || todo.teamId,
-    teamId: todo.teamId,
-    positionId: todo.positionId || todo.categoryId
-  })) return true
-  if (canManage(user) && (isSuperAdmin(user) || canAccessOrganization(user, todo.organizationId || todo.teamId))) return true
-  return canMaintainPosition(user, {
-    organizationId: todo.organizationId || todo.teamId,
-    positionId: todo.positionId || todo.categoryId,
-    person: todo.owner
+  if (canManage(user)) return true
+  if (hasGrant(user, 'archives', 'create') || hasGrant(user, 'history', 'create')) return true
+  if (hasPortPermission(user, 'archive', 'create') || hasPortPermission(user, 'history', 'create')) return true
+  return (user.roles || []).some(item =>
+    item && typeof item === 'object' &&
+    normalizeRole(item.role) === 'role_manager' &&
+    isActiveAssignment(item)
+  )
+}
+
+function canManageTodo(user) {
+  if (!user || !canManage(user)) return false
+  if (isSuperAdmin(user)) return true
+  return canAccessOrganization(user, {
+    id: TODO_ORGANIZATION_ID,
+    cloudId: TODO_ORGANIZATION_ID,
+    ancestorIds: ORGANIZATION_ANCESTORS[TODO_ORGANIZATION_ID]
   })
+}
+
+function canCreateTodo(user) {
+  if (!user || !['active', 'approved'].includes(user.status)) return false
+  const sourceOrganizationId = user.defaultOrganizationId || user.organizationId
+  const organizationId = ORGANIZATION_ALIASES[sourceOrganizationId] || sourceOrganizationId
+  return organizationId === TODO_ORGANIZATION_ID || canManageTodo(user)
+}
+
+function canOpenCreateCenter(user) {
+  return canOpenArchiveCreate(user) || canCreateTodo(user)
+}
+
+function canCompleteTodo(user) {
+  return canManageTodo(user)
 }
 
 function isAdministrativeRoleValue(role) {
@@ -421,8 +438,12 @@ module.exports = {
   canMaintainPosition,
   canMaintainLedger,
   canMaintainHonors,
+  canCreateTodo,
+  canManageTodo,
   findArchivePosition,
   canMaintainArchive,
+  canOpenArchiveCreate,
+  canOpenCreateCenter,
   canCompleteTodo,
   isAdministrativeRoleValue,
   decorateAdminMember,

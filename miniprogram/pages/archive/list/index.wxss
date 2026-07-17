@@ -111,6 +111,10 @@
   margin-top: 18rpx;
 }
 
+.event-category-filter .filter-picker {
+  width: 100%;
+}
+
 .filter-picker {
   flex: 1;
   min-width: 0;
