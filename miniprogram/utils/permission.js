@@ -95,11 +95,16 @@ function canManageTeamHomeBanner(user, organization) {
   const sourceId = typeof organization === 'string' ? organization : organization.cloudId || organization.id
   const organizationId = ORGANIZATION_ALIASES[sourceId] || sourceId
   if (!String(organizationId || '').startsWith('org_team_')) return false
-  return (user.roles || []).some(item =>
+  const isTeamAdmin = (user.roles || []).some(item =>
     item && typeof item === 'object' &&
     normalizeRole(item.role) === 'team_admin' &&
     (ORGANIZATION_ALIASES[item.organizationId] || item.organizationId) === organizationId &&
     isActiveAssignment(item)
+  )
+  if (isTeamAdmin) return true
+  const context = { organizationId, cloudOrganizationId: organizationId, teamId: organizationId }
+  return ['create', 'update', 'delete', 'upload'].every(action =>
+    hasPortPermission(user, 'home', action, context)
   )
 }
 

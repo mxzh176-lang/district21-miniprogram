@@ -67,6 +67,15 @@ test('super admin and assigned team admin can manage team home banners', () => {
   assert.equal(permission.canManageTeamHomeBanner({
     roles: [{ role: 'role_manager', organizationId: 'org_team_yuanhang', status: 'active' }]
   }, yuanhang), false)
+  assert.equal(permission.canManageTeamHomeBanner({
+    roles: [],
+    portPermissions: [{
+      status: 'active',
+      dataScope: 'team',
+      teamId: 'org_team_yuanhang',
+      permissions: { home: ['create', 'update', 'delete', 'upload'] }
+    }]
+  }, yuanhang), true)
 })
 
 test('members remain read only while admins can edit non-team directories', () => {

@@ -2,6 +2,7 @@ const api = require('../../../utils/api')
 const permission = require('../../../utils/permission')
 
 const MODULE_OPTIONS = [
+  { value: 'home', label: '首页轮播' },
   { value: 'archives', label: '档案' },
   { value: 'contacts', label: '通讯录' },
   { value: 'tasks', label: '待办事项' },
@@ -29,6 +30,7 @@ const ACTION_OPTIONS = [
 ]
 
 const ROLE_PRESETS = [
+  { label: '服务队轮播管理员', module: 'home', scopeType: 'organization', actions: ['create', 'update', 'upload', 'delete'] },
   { label: '单个岗位管理员（秘书、司库、委员会等）', module: 'archives', scopeType: 'position', actions: ['read', 'create', 'update', 'upload', 'delete'] },
   { label: '分管负责人：维护岗位及子类目', module: 'archives', scopeType: 'position_tree', actions: ['read', 'create', 'update'] },
   { label: '栏目负责人：维护职务与负责人资料', module: 'archives', scopeType: 'position', actions: ['read', 'update'] },
