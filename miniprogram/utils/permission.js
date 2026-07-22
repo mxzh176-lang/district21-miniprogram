@@ -90,6 +90,19 @@ function canAccessOrganization(user, organization) {
   )
 }
 
+function canManageTeamHomeBanner(user, organization) {
+  if (!user || !organization) return false
+  const sourceId = typeof organization === 'string' ? organization : organization.cloudId || organization.id
+  const organizationId = ORGANIZATION_ALIASES[sourceId] || sourceId
+  if (!String(organizationId || '').startsWith('org_team_')) return false
+  return (user.roles || []).some(item =>
+    item && typeof item === 'object' &&
+    normalizeRole(item.role) === 'team_admin' &&
+    (ORGANIZATION_ALIASES[item.organizationId] || item.organizationId) === organizationId &&
+    isActiveAssignment(item)
+  )
+}
+
 function canAccessMenu(user, menu) {
   if (isSuperAdmin(user)) return true
   if (hasAnyTeamFullAccess(user)) return true
@@ -422,6 +435,7 @@ module.exports = {
   canManage,
   canEditContent,
   canAccessOrganization,
+  canManageTeamHomeBanner,
   canAccessMenu,
   activeGrants,
   activePortPermissions,

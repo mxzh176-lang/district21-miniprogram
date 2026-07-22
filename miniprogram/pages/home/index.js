@@ -14,13 +14,6 @@ const BANNER_ORGANIZATION_IDS = {
   yuanhang: 'org_team_yuanhang',
   jingying: 'org_team_jingying'
 }
-const TEAM_BANNER_ORGANIZATIONS = [
-  'org_team_linghang',
-  'org_team_ailinghang',
-  'org_team_yuanhang',
-  'org_team_jingying'
-]
-
 function archiveOrganizationId(scope = {}) {
   return scope.dataId || scope.orgId || 'district'
 }
@@ -28,15 +21,6 @@ function archiveOrganizationId(scope = {}) {
 function bannerOrganizationId(scope = {}) {
   const rawId = scope.cloudId || scope.organizationId || scope.orgId || scope.dataId || 'district'
   return BANNER_ORGANIZATION_IDS[rawId] || rawId || 'org_region_21_suihua'
-}
-
-function bannerOrganizationContext(scope = {}) {
-  const id = bannerOrganizationId(scope)
-  return {
-    id,
-    cloudId: id,
-    ancestorIds: TEAM_BANNER_ORGANIZATIONS.includes(id) ? ['org_region_21_suihua'] : []
-  }
 }
 
 function formatArchiveDate(value) {
@@ -123,9 +107,7 @@ Page({
   },
 
   refreshBannerPermission(session = this.data.session, currentOrg = this.data.currentOrg) {
-    const context = bannerOrganizationContext(currentOrg)
-    const canManageBanners = permission.canAccessOrganization(session, context) ||
-      ['create', 'update', 'delete', 'upload'].some(action => permission.hasPortPermission(session, 'home', action, context))
+    const canManageBanners = permission.canManageTeamHomeBanner(session, bannerOrganizationId(currentOrg))
     this.setData({ canManageBanners })
   },
 

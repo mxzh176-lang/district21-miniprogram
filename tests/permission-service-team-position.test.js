@@ -57,10 +57,16 @@ test('team admin can create members in the assigned team even with restricted po
 })
 
 test('super admin and assigned team admin can manage team home banners', () => {
-  assert.equal(permission.canAccessOrganization({ platformRole: 'super_admin' }, yuanhang), true)
-  assert.equal(permission.canAccessOrganization({
+  assert.equal(permission.canManageTeamHomeBanner({ platformRole: 'super_admin' }, yuanhang), false)
+  assert.equal(permission.canManageTeamHomeBanner({
     roles: [{ role: 'team_admin', organizationId: 'org_team_yuanhang', status: 'active' }]
   }, yuanhang), true)
+  assert.equal(permission.canManageTeamHomeBanner({
+    roles: [{ role: 'team_admin', organizationId: 'org_team_linghang', status: 'active' }]
+  }, yuanhang), false)
+  assert.equal(permission.canManageTeamHomeBanner({
+    roles: [{ role: 'role_manager', organizationId: 'org_team_yuanhang', status: 'active' }]
+  }, yuanhang), false)
 })
 
 test('members remain read only while admins can edit non-team directories', () => {

@@ -360,6 +360,17 @@ async function canAdministerOrganization(userId, organizationId) {
   )
 }
 
+async function canManageTeamHomeBanner(userId, organizationId) {
+  organizationId = canonicalOrganizationId(organizationId)
+  if (!HOME_BANNER_ALLOWED_ORGANIZATIONS.includes(organizationId) || organizationId === 'org_region_21_suihua') return false
+  const roles = await platformRoles(userId)
+  return roles.some(item =>
+    item.status === 'active' &&
+    item.role === 'team_admin' &&
+    canonicalOrganizationId(item.organizationId) === organizationId
+  )
+}
+
 async function canEditServiceTeamPositions(userId, organizationId) {
   return canAdministerOrganization(userId, organizationId)
 }
@@ -3091,8 +3102,8 @@ async function saveFileRecord(openid, event = {}) {
     }
     await requireEventEditor(openid, record, 'upload')
   } else if (resourceType === 'home_banner') {
-    if (!await canAdministerOrganization(user.id, organizationId)) {
-      throw Object.assign(new Error('仅超管、协作区管理员或当前服务队管理员可上传首页轮播'), { code: 'PERMISSION_DENIED' })
+    if (!await canManageTeamHomeBanner(user.id, organizationId)) {
+      throw Object.assign(new Error('仅当前服务队管理员可上传首页轮播'), { code: 'PERMISSION_DENIED' })
     }
   } else if (resourceType === 'user_avatar') {
     if (resourceId !== user.id || module !== 'contacts' || !inputFileType.startsWith('image/')) {
@@ -3369,6 +3380,9 @@ async function listHomeBanners(openid, event = {}) {
 async function saveHomeBanners(openid, event = {}) {
   const user = await requirePlatformUser(openid)
   const organizationId = normalizeHomeBannerOrganizationId(event.organizationId)
+  if (!await canManageTeamHomeBanner(user.id, organizationId)) {
+    throw Object.assign(new Error('仅当前服务队管理员可编辑轮播图'), { code: 'PERMISSION_DENIED' })
+  }
   await ensureHomeBannerCollection()
   const banners = (event.banners || [])
     .map(item => typeof item === 'string' ? item : item.fileId || item.fileID || item.imageUrl || item.src)
@@ -3379,26 +3393,6 @@ async function saveHomeBanners(openid, event = {}) {
     .where({ organizationId, status: 'active' })
     .limit(100)
     .get()
-  const currentValues = existing.data
-    .map(item => item.fileId || item.imageUrl || '')
-    .filter(Boolean)
-  const added = banners.filter(value => !currentValues.includes(value))
-  const removed = currentValues.filter(value => !banners.includes(value))
-  const commonOrderChanged = !added.length && !removed.length && banners.some((value, index) => currentValues[index] !== value)
-  const requiredActions = new Set()
-  if (added.length) { requiredActions.add('create'); requiredActions.add('upload') }
-  if (removed.length) requiredActions.add('delete')
-  if (commonOrderChanged) requiredActions.add('update')
-  if (!requiredActions.size) requiredActions.add('update')
-  const portGrants = await enforcingPortPermissions(user.id)
-  if (portGrants.length) {
-    const deniedAction = Array.from(requiredActions).find(action => !portPermissionAllowed(portGrants, user.id, 'home', action, { organizationId }))
-    if (deniedAction) {
-      throw Object.assign(new Error('当前账号缺少对应的轮播图操作权限'), { code: 'PERMISSION_DENIED' })
-    }
-  } else if (!await canAdministerOrganization(user.id, organizationId)) {
-    throw Object.assign(new Error('无权限编辑当前组织轮播图'), { code: 'PERMISSION_DENIED' })
-  }
   await Promise.all(existing.data.map(item => db.collection(COLLECTIONS.homeBanner).doc(item._id).update({
     data: { status: 'deleted', deletedAt: now(), updatedAt: now(), deletedBy: user.id }
   })))
