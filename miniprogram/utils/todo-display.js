@@ -203,13 +203,15 @@ function buildHomeGroups(tasks) {
   const pendingTasks = sortTasks(tasks).filter(task => !task.completed)
   const grouped = buildGroups(pendingTasks, { includeTomorrow: false }).taskGroups
   const limits = { today: 1, week: 2, later: 2 }
-  let used = 0
   return grouped.map(group => {
     const limit = limits[group.key] || 0
-    const sliced = group.tasks.slice(0, Math.max(0, limit))
-    used += sliced.length
-    return { ...group, tasks: sliced, count: group.tasks.length }
-  }).filter(group => group.tasks.length && used <= 5)
+    const summaryTasks = group.tasks.slice(0, Math.max(0, limit))
+    const visibleTasks = group.tasks.filter(task =>
+      summaryTasks.includes(task) ||
+      (task.difference !== null && task.difference >= 0 && task.difference <= 30)
+    )
+    return { ...group, tasks: visibleTasks, count: group.tasks.length }
+  }).filter(group => group.tasks.length)
 }
 
 module.exports = {
