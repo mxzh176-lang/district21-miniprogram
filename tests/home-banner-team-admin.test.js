@@ -13,6 +13,13 @@ test('home banner edit button uses exact service-team administrator permission',
   assert.doesNotMatch(homeScript, /hasPortPermission\(session, 'home'/)
 })
 
+test('home banner editor can append multiple images without replacing existing slides', () => {
+  assert.match(homeScript, /itemList: \['新增轮播图', '替换全部轮播图', '清空当前轮播图'\]/)
+  assert.match(homeScript, /count: remainingCount/)
+  assert.match(homeScript, /existingBanners\s*\.concat\(uploaded\.map\(item => item\.fileID\)\.filter\(Boolean\)\)/)
+  assert.match(homeScript, /\.slice\(0, 9\)/)
+})
+
 test('permission center offers a service-team banner-only administrator preset', () => {
   assert.match(grantScript, /value: 'home', label: '首页轮播'/)
   assert.match(grantScript, /label: '服务队轮播管理员', module: 'home', scopeType: 'organization', actions: \['create', 'update', 'upload', 'delete'\]/)

@@ -288,19 +288,26 @@ Page({
   editHomeBanners() {
     if (!this.data.canManageBanners || this.data.bannerSaving) return
     wx.showActionSheet({
-      itemList: ['替换当前轮播图', '清空当前轮播图'],
+      itemList: ['新增轮播图', '替换全部轮播图', '清空当前轮播图'],
       success: result => {
-        if (result.tapIndex === 0) this.chooseHomeBanners()
-        if (result.tapIndex === 1) this.clearHomeBanners()
+        if (result.tapIndex === 0) this.chooseHomeBanners('append')
+        if (result.tapIndex === 1) this.chooseHomeBanners('replace')
+        if (result.tapIndex === 2) this.clearHomeBanners()
       }
     })
   },
 
-  async chooseHomeBanners() {
+  async chooseHomeBanners(mode = 'replace') {
+    const existingCount = mode === 'append' ? this.data.banners.length : 0
+    const remainingCount = Math.max(0, 9 - existingCount)
+    if (!remainingCount) {
+      wx.showToast({ title: '轮播图最多 9 张', icon: 'none' })
+      return
+    }
     try {
       const media = await new Promise((resolve, reject) => {
         wx.chooseMedia({
-          count: 9,
+          count: remainingCount,
           mediaType: ['image'],
           sourceType: ['album', 'camera'],
           sizeType: ['compressed'],
@@ -310,15 +317,16 @@ Page({
       })
       const files = media.tempFiles || []
       if (!files.length) return
-      await this.saveSelectedHomeBanners(files)
+      await this.saveSelectedHomeBanners(files, { append: mode === 'append' })
     } catch (error) {
       if (error && !String(error.errMsg || '').includes('cancel')) api.showError(error)
     }
   },
 
-  async saveSelectedHomeBanners(files = []) {
+  async saveSelectedHomeBanners(files = [], options = {}) {
     const currentOrg = this.data.currentOrg || ORG_OPTIONS[0]
     const organizationId = bannerOrganizationId(currentOrg)
+    const existingBanners = options.append ? this.data.banners.slice(0, 9) : []
     this.setData({ bannerSaving: true })
     wx.showLoading({ title: '上传轮播图' })
     try {
@@ -328,12 +336,14 @@ Page({
         leaderRole: '首页轮播',
         departmentName: '',
         eventName: `${currentOrg.orgName || '当前范围'}首页轮播`,
-        sequence: index,
+        sequence: existingBanners.length + index,
         resourceType: 'home_banner',
         resourceId: organizationId,
         module: 'photos'
       })))
-      const banners = uploaded.map(item => item.fileID).filter(Boolean)
+      const banners = existingBanners
+        .concat(uploaded.map(item => item.fileID).filter(Boolean))
+        .slice(0, 9)
       await api.call('saveHomeBanners', {
         organizationId,
         scopeName: currentOrg.orgName,
