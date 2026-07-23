@@ -25,3 +25,10 @@ test('cloud reauthorizes banner upload and replacement with team-scoped banner p
   assert.match(cloudScript, /canonicalOrganizationId\(item\.organizationId\) === organizationId/)
   assert.match(cloudScript, /portPermissionAllowed\(portGrants, userId, 'home', action, \{ organizationId \}\)/)
 })
+
+test('home banner reads use the current platform user model', () => {
+  const listHandler = cloudScript.match(/async function listHomeBanners[\s\S]*?\n}\n\nasync function saveHomeBanners/)
+  assert.ok(listHandler)
+  assert.match(listHandler[0], /await requirePlatformUser\(openid\)/)
+  assert.doesNotMatch(listHandler[0], /requireApproved\(openid\)/)
+})

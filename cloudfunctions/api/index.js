@@ -3345,7 +3345,7 @@ async function ensureHomeBannerCollection() {
 }
 
 async function listHomeBanners(openid, event = {}) {
-  await requireApproved(openid)
+  await requirePlatformUser(openid)
   const organizationId = normalizeHomeBannerOrganizationId(event.organizationId)
   try {
     const result = await db.collection(COLLECTIONS.homeBanner)
