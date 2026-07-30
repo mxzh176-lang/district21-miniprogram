@@ -60,7 +60,8 @@ Page({
     session: null,
     canCreateTask: false,
     canManageBanners: false,
-    bannerSaving: false
+    bannerSaving: false,
+    bannerSelecting: false
   },
 
   onLoad() {
@@ -78,10 +79,12 @@ Page({
   },
 
   onHide() {
+    this.exitBannerSelection()
     this.stopTodoSync()
   },
 
   onUnload() {
+    this.exitBannerSelection()
     this.stopTodoSync()
   },
 
@@ -137,7 +140,8 @@ Page({
         banners: sources,
         bannerValues: values,
         heroSlides: this.buildHeroSlides(visibleSources),
-        currentHeroIndex: 0
+        currentHeroIndex: 0,
+        bannerSelecting: false
       })
     } catch (error) {
       const fallback = this.data.baseBanners || []
@@ -145,7 +149,8 @@ Page({
         banners: fallback,
         bannerValues: fallback,
         heroSlides: this.buildHeroSlides(fallback),
-        currentHeroIndex: 0
+        currentHeroIndex: 0,
+        bannerSelecting: false
       })
     }
   },
@@ -289,6 +294,7 @@ Page({
     wx.showActionSheet({
       itemList: ORG_OPTIONS.map(item => item.orgName),
       success: result => {
+        this.exitBannerSelection()
         const currentOrg = orgScope.setCurrentScope(ORG_OPTIONS[result.tapIndex])
         this.setData({ currentOrg })
         this.refreshBannerPermission()
@@ -304,21 +310,30 @@ Page({
       itemList: ['新增轮播图', '替换当前轮播图', '替换全部轮播图', '清空当前轮播图'],
       success: result => {
         if (result.tapIndex === 0) this.chooseHomeBanners('append')
-        if (result.tapIndex === 1) this.chooseSelectedHomeBanner()
+        if (result.tapIndex === 1) this.enterBannerSelection()
         if (result.tapIndex === 2) this.chooseHomeBanners('replace')
         if (result.tapIndex === 3) this.clearHomeBanners()
       }
     })
   },
 
+  enterBannerSelection() {
+    this.setData({ bannerSelecting: true })
+  },
+
+  exitBannerSelection() {
+    if (!this.data.bannerSelecting) return
+    this.setData({ bannerSelecting: false })
+  },
+
   changeHeroSlide(event) {
     this.setData({ currentHeroIndex: Number(event.detail.current) || 0 })
   },
 
-  async chooseSelectedHomeBanner() {
+  async confirmSelectedHomeBanner() {
     const selectedIndex = this.data.currentHeroIndex - 1
     if (selectedIndex < 0 || selectedIndex >= this.data.banners.length) {
-      wx.showToast({ title: '请先滑动到要替换的图片', icon: 'none' })
+      wx.showToast({ title: '请滑动选择图片', icon: 'none' })
       return
     }
     try {
@@ -403,6 +418,7 @@ Page({
         banners
       })
       await this.loadHomeBannersForScope()
+      this.exitBannerSelection()
       wx.showToast({ title: '轮播已更新', icon: 'success' })
     } catch (error) {
       api.showError(error)

@@ -538,6 +538,54 @@
   box-shadow: 0 8rpx 22rpx rgba(31, 35, 41, .12);
 }
 
+.banner-select-panel {
+  position: absolute;
+  right: 18rpx;
+  bottom: 18rpx;
+  left: 18rpx;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  padding: 14rpx 16rpx;
+  border-radius: 20rpx;
+  background: rgba(31, 35, 41, .82);
+  box-shadow: 0 8rpx 24rpx rgba(31, 35, 41, .18);
+}
+
+.banner-select-copy {
+  min-width: 0;
+  color: #fff;
+  font-size: 21rpx;
+  font-weight: 700;
+}
+
+.banner-select-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 10rpx;
+}
+
+.banner-select-cancel,
+.banner-select-confirm {
+  padding: 9rpx 14rpx;
+  border-radius: 999rpx;
+  font-size: 20rpx;
+  font-weight: 800;
+}
+
+.banner-select-cancel {
+  color: #fff;
+  background: rgba(255, 255, 255, .18);
+}
+
+.banner-select-confirm {
+  color: #1456f0;
+  background: #fff;
+}
+
 .hero {
   border: 0;
   background:

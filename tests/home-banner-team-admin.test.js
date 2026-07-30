@@ -22,12 +22,28 @@ test('home banner editor can append multiple images without replacing existing s
   assert.match(homeScript, /\.slice\(0, 9\)/)
 })
 
-test('home banner editor replaces only the selected image slide', () => {
+test('home banner editor pauses autoplay while selecting one image slide', () => {
+  assert.match(homeTemplate, /autoplay="{{!bannerSelecting}}"/)
+  assert.match(homeTemplate, /circular="{{!bannerSelecting}}"/)
   assert.match(homeTemplate, /bindchange="changeHeroSlide"/)
+  assert.match(homeTemplate, /wx:if="{{bannerSelecting}}"/)
+  assert.match(homeTemplate, /catchtap="confirmSelectedHomeBanner"/)
+  assert.match(homeTemplate, /catchtap="exitBannerSelection"/)
+  assert.match(homeScript, /enterBannerSelection\(\)/)
+  assert.match(homeScript, /exitBannerSelection\(\)/)
+  assert.match(homeScript, /confirmSelectedHomeBanner\(\)/)
   assert.match(homeScript, /changeHeroSlide\(event\)/)
   assert.match(homeScript, /count: 1/)
   assert.match(homeScript, /replaceIndex: selectedIndex/)
   assert.match(homeScript, /banners\[replaceIndex\] = replacement/)
+})
+
+test('home banner selection mode exits on lifecycle and scope changes', () => {
+  const exitCalls = homeScript.match(/this\.exitBannerSelection\(\)/g) || []
+  assert.ok(exitCalls.length >= 4)
+  assert.match(homeScript, /onHide\(\) \{[\s\S]*?this\.exitBannerSelection\(\)/)
+  assert.match(homeScript, /onUnload\(\) \{[\s\S]*?this\.exitBannerSelection\(\)/)
+  assert.match(homeScript, /chooseOrgScope\(\) \{[\s\S]*?this\.exitBannerSelection\(\)/)
 })
 
 test('permission center offers a service-team banner-only administrator preset', () => {
