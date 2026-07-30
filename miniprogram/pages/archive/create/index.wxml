@@ -27,7 +27,7 @@
   <view wx:if="{{hasArchiveAccess}}" class="section-row">
     <view>
       <view class="section-title">职位与下级录入</view>
-      <view class="section-desc">点击职位或下级栏目进入新事件录入；负责人编辑仅超级管理员可见。</view>
+      <view class="section-desc">点击职位或下级栏目进入新事件录入。</view>
     </view>
   </view>
 
@@ -42,7 +42,6 @@
       <view class="category-heading">
         <view class="category-name">{{item.displayName || item.name}}</view>
         <view class="category-person">{{item.person}}</view>
-        <view wx:if="{{item.canEditDirectory}}" class="position-edit" data-position="{{item.positionId}}" catchtap="editPosition">编辑</view>
       </view>
       <view wx:if="{{item.children && item.children.length}}" class="committee-list">
         <view
@@ -57,7 +56,6 @@
             <view class="committee-role">{{item.person}}</view>
           </view>
           <view class="committee-arrow">›</view>
-          <view wx:if="{{item.canEditDirectory}}" class="position-edit child-edit" data-position="{{item.positionId}}" catchtap="editPosition">编辑</view>
         </view>
       </view>
       <view class="category-footer">

@@ -22,7 +22,6 @@ function buildCategoryDirectory(organization = {}, session = null) {
     .map(item => item.id === 'captain'
       ? { ...item, children: supportCategories }
       : item)
-  const canEditPositionDirectory = permission.isSuperAdmin(session)
   return displayCategories.map(category => {
     const canMaintain = category.id === 'treasurer'
       ? permission.canMaintainLedger(session, {
@@ -48,18 +47,16 @@ function buildCategoryDirectory(organization = {}, session = null) {
       return {
         ...child,
         displayName: displayPositionName(child.name),
-        canEditDirectory: canEditPositionDirectory,
         canMaintain: childCanMaintain
       }
-    }).filter(child => child.canMaintain || child.canEditDirectory)
+    }).filter(child => child.canMaintain)
     return {
       ...category,
       displayName: displayPositionName(category.name),
-      canEditDirectory: canEditPositionDirectory,
       canMaintain,
       children
     }
-  }).filter(category => category.canMaintain || category.canEditDirectory || category.children.length)
+  }).filter(category => category.canMaintain || category.children.length)
 }
 
 Page({
@@ -174,15 +171,6 @@ Page({
     }
     wx.navigateTo({
       url: `/pages/archive/edit/index?organization=${this.data.selectedOrganization.id}&category=${category}`
-    })
-  },
-
-  editPosition(event) {
-    if (!permission.isSuperAdmin(this.data.session)) return
-    const positionId = event.currentTarget.dataset.position
-    const organizationId = this.data.selectedOrganization.cloudId || this.data.selectedOrganization.id
-    wx.navigateTo({
-      url: `/pages/archive/position-edit/index?organizationId=${encodeURIComponent(organizationId)}&positionId=${encodeURIComponent(positionId)}`
     })
   }
 })

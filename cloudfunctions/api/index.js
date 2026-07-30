@@ -1966,7 +1966,7 @@ async function listOrganizations(openid, event = {}) {
   return result.data
 }
 
-const EVENT_TYPES = ['例会事件', '联谊事件', '关爱事件', '纠察事件', '培训事件', '会员发展']
+const EVENT_TYPES = ['例会事件', '联谊事件', '关爱事件', '纠察事件', '培训事件', '会员发展', '服务事件']
 
 function inferEventType(categoryId = '', category = '') {
   const value = `${categoryId} ${category}`.toLowerCase()
