@@ -10,7 +10,7 @@
 ## 1. 项目基本信息
 
 - 项目名称：21纪事本
-- 正式目录：`/Users/xz/Documents/Codex/district21-miniprogram`
+- 正式目录：`/Users/a0000/Documents/21的事小程序开发`
 - 正式分支：`codex/main`
 - 小程序 AppID：`wxfe3c3da5ae16aa1d`
 - 云环境 ID：`cloud1-d6ghj5dev32a15a81`
@@ -507,7 +507,7 @@
 正式集成目录：
 
 ```bash
-/Users/xz/Documents/Codex/district21-miniprogram
+/Users/a0000/Documents/21的事小程序开发
 ```
 
 正式分支：
@@ -550,14 +550,14 @@ git push origin codex/main
 /Applications/wechatwebdevtools.app/Contents/MacOS/cli cloud functions deploy \
   --env cloud1-d6ghj5dev32a15a81 \
   --names api \
-  --project /Users/xz/Documents/Codex/district21-miniprogram \
+  --project /Users/a0000/Documents/21的事小程序开发 \
   --remote-npm-install
 ```
 
 如果 CLI 失败，用微信开发者工具手动部署：
 
 1. 打开微信开发者工具
-2. 导入 `/Users/xz/Documents/Codex/district21-miniprogram`
+2. 导入 `/Users/a0000/Documents/21的事小程序开发`
 3. 找到 `cloudfunctions/api`
 4. 右键 `api`
 5. 选择“上传并部署：云端安装依赖”
