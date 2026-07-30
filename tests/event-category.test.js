@@ -7,7 +7,7 @@ const { EVENT_CATEGORIES, inferEventCategory } = require('../miniprogram/utils/e
 const ROOT = path.resolve(__dirname, '..')
 
 test('event categories contain the seven selectable archive types', () => {
-  assert.deepEqual(EVENT_CATEGORIES, ['例会事件', '联谊事件', '关爱事件', '纠察事件', '培训事件', '会员发展', '服务事件'])
+  assert.deepEqual(EVENT_CATEGORIES, ['服务事件', '例会事件', '联谊事件', '关爱事件', '纠察事件', '培训事件', '会员发展'])
 })
 
 test('cloud API accepts the service event category', () => {
