@@ -362,8 +362,11 @@ async function canAdministerOrganization(userId, organizationId) {
 
 async function canManageTeamHomeBanner(userId, organizationId, actions = ['create', 'update', 'delete', 'upload']) {
   organizationId = canonicalOrganizationId(organizationId)
-  if (!HOME_BANNER_ALLOWED_ORGANIZATIONS.includes(organizationId) || organizationId === 'org_region_21_suihua') return false
+  if (!HOME_BANNER_ALLOWED_ORGANIZATIONS.includes(organizationId)) return false
   const roles = await platformRoles(userId)
+  if (organizationId === 'org_region_21_suihua') {
+    return roles.some(item => item.status === 'active' && item.role === 'super_admin')
+  }
   if (roles.some(item =>
     item.status === 'active' &&
     item.role === 'team_admin' &&

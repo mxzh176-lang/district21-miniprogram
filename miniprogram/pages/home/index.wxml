@@ -8,7 +8,7 @@
   </view>
 
   <view class="hero-wrap">
-    <swiper class="hero-swiper" autoplay circular indicator-dots interval="3500">
+    <swiper class="hero-swiper" autoplay circular indicator-dots interval="3500" current="{{currentHeroIndex}}" bindchange="changeHeroSlide">
       <swiper-item wx:for="{{heroSlides}}" wx:key="key">
         <view wx:if="{{item.type === 'intro'}}" class="hero">
           <view class="hero-top">

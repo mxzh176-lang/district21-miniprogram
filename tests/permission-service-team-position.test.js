@@ -78,6 +78,18 @@ test('super admin and assigned team admin can manage team home banners', () => {
   }, yuanhang), true)
 })
 
+test('only super admins can manage the district home banner', () => {
+  const district = { id: 'district', cloudId: 'org_region_21_suihua', type: 'region' }
+  assert.equal(permission.canManageTeamHomeBanner({ platformRole: 'super_admin' }, district), true)
+  assert.equal(permission.canManageTeamHomeBanner({ platformRole: 'member', roles: [] }, district), false)
+  assert.equal(permission.canManageTeamHomeBanner({
+    roles: [{ role: 'area_admin', organizationId: 'org_region_21_suihua', status: 'active' }]
+  }, district), false)
+  assert.equal(permission.canManageTeamHomeBanner({
+    roles: [{ role: 'team_admin', organizationId: 'org_team_yuanhang', status: 'active' }]
+  }, district), false)
+})
+
 test('members remain read only while admins can edit non-team directories', () => {
   assert.equal(permission.canEditServiceTeamPositions({ platformRole: 'member', roles: [] }, yuanhang), false)
   assert.equal(permission.canEditServiceTeamPositions({ platformRole: 'super_admin' }, {

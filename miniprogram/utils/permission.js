@@ -94,6 +94,7 @@ function canManageTeamHomeBanner(user, organization) {
   if (!user || !organization) return false
   const sourceId = typeof organization === 'string' ? organization : organization.cloudId || organization.id
   const organizationId = ORGANIZATION_ALIASES[sourceId] || sourceId
+  if (organizationId === 'org_region_21_suihua') return isSuperAdmin(user)
   if (!String(organizationId || '').startsWith('org_team_')) return false
   const isTeamAdmin = (user.roles || []).some(item =>
     item && typeof item === 'object' &&

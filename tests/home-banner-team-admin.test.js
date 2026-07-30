@@ -5,6 +5,7 @@ const path = require('node:path')
 
 const ROOT = path.resolve(__dirname, '..')
 const homeScript = fs.readFileSync(path.join(ROOT, 'miniprogram/pages/home/index.js'), 'utf8')
+const homeTemplate = fs.readFileSync(path.join(ROOT, 'miniprogram/pages/home/index.wxml'), 'utf8')
 const cloudScript = fs.readFileSync(path.join(ROOT, 'cloudfunctions/api/index.js'), 'utf8')
 const grantScript = fs.readFileSync(path.join(ROOT, 'miniprogram/pages/admin/permission-grants/index.js'), 'utf8')
 
@@ -14,10 +15,19 @@ test('home banner edit button uses exact service-team administrator permission',
 })
 
 test('home banner editor can append multiple images without replacing existing slides', () => {
-  assert.match(homeScript, /itemList: \['新增轮播图', '替换全部轮播图', '清空当前轮播图'\]/)
+  assert.match(homeScript, /itemList: \['新增轮播图', '替换当前轮播图', '替换全部轮播图', '清空当前轮播图'\]/)
   assert.match(homeScript, /count: remainingCount/)
-  assert.match(homeScript, /existingBanners\s*\.concat\(uploaded\.map\(item => item\.fileID\)\.filter\(Boolean\)\)/)
+  assert.match(homeScript, /uploadedValues = uploaded\.map\(item => item\.fileID\)\.filter\(Boolean\)/)
+  assert.match(homeScript, /existingBanners\.concat\(uploadedValues\)/)
   assert.match(homeScript, /\.slice\(0, 9\)/)
+})
+
+test('home banner editor replaces only the selected image slide', () => {
+  assert.match(homeTemplate, /bindchange="changeHeroSlide"/)
+  assert.match(homeScript, /changeHeroSlide\(event\)/)
+  assert.match(homeScript, /count: 1/)
+  assert.match(homeScript, /replaceIndex: selectedIndex/)
+  assert.match(homeScript, /banners\[replaceIndex\] = replacement/)
 })
 
 test('permission center offers a service-team banner-only administrator preset', () => {
@@ -31,6 +41,13 @@ test('cloud reauthorizes banner upload and replacement with team-scoped banner p
   assert.match(cloudScript, /item\.role === 'team_admin'/)
   assert.match(cloudScript, /canonicalOrganizationId\(item\.organizationId\) === organizationId/)
   assert.match(cloudScript, /portPermissionAllowed\(portGrants, userId, 'home', action, \{ organizationId \}\)/)
+})
+
+test('cloud limits district banner writes to active super administrators', () => {
+  const permissionHandler = cloudScript.match(/async function canManageTeamHomeBanner[\s\S]*?\n}\n\nasync function canEditServiceTeamPositions/)
+  assert.ok(permissionHandler)
+  assert.match(permissionHandler[0], /if \(organizationId === 'org_region_21_suihua'\)/)
+  assert.match(permissionHandler[0], /item\.status === 'active' && item\.role === 'super_admin'/)
 })
 
 test('home banner reads use the current platform user model', () => {
