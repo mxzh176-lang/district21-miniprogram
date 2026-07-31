@@ -3,6 +3,7 @@ const crypto = require('crypto')
 const JSZip = require('jszip')
 const { authenticator } = require('otplib')
 const { loadArchiveImages } = require('./archive-image-fallback')
+const { ensureMonthlyMeetingTodo: reconcileMonthlyMeetingTodo } = require('./monthly-meeting-todo')
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
@@ -3559,9 +3560,30 @@ async function ensureMemberHolidayTodos() {
   }))
 }
 
+async function ensureMonthlyMeetingTodo() {
+  return reconcileMonthlyMeetingTodo({
+    todayText: chinaDateText,
+    timestamp: now,
+    listTasks: async () => {
+      const result = await db.collection(COLLECTIONS.tasks)
+        .where({ organizationId: TODO_ORGANIZATION_ID })
+        .limit(200)
+        .get()
+      return result.data
+    },
+    createTask: data => db.collection(COLLECTIONS.tasks).doc(data.id).set({ data }),
+    updateTask: (task, data) => db.collection(COLLECTIONS.tasks).doc(task._id).update({ data }),
+    writeAudit: (action, taskId, data) => writePlatformLog({
+      id: 'system_monthly_meeting',
+      defaultOrganizationId: TODO_ORGANIZATION_ID
+    }, action, 'todo', taskId, data)
+  })
+}
+
 async function ensureAutomaticTodos() {
   await ensureBirthdayTodos()
   await ensureMemberHolidayTodos()
+  await ensureMonthlyMeetingTodo()
 }
 
 async function isTodoAdmin(user) {
