@@ -528,13 +528,17 @@ const PORT_PERMISSION_ACTIONS = {
 }
 const PORT_DATA_SCOPES = ['district', 'team', 'position', 'self']
 
+async function loadConfiguredUserPermissions(userId) {
+  const result = await db.collection(COLLECTIONS.userPermissions)
+    .where({ userId, status: 'active' })
+    .limit(100)
+    .get()
+  return result.data
+}
+
 async function configuredUserPermissions(userId) {
   try {
-    const result = await db.collection(COLLECTIONS.userPermissions)
-      .where({ userId, status: 'active' })
-      .limit(100)
-      .get()
-    return result.data
+    return await loadConfiguredUserPermissions(userId)
   } catch (error) {
     console.warn('user_permissions unavailable', error.message)
     return []
@@ -595,30 +599,55 @@ function portPermissionAllowed(grants, userId, module, action, context = {}) {
   )
 }
 
-async function historyReadPermissionSnapshot(userId) {
-  const [roles, assignments, configuredGrants] = await Promise.all([
-    platformRoles(userId),
-    activeRoleAssignments(userId),
-    configuredUserPermissions(userId)
+async function historyReadPermissionSnapshot(user) {
+  const [roles, assignmentResult, configuredGrants, organizationResult] = await Promise.all([
+    platformRoles(user.id),
+    db.collection(COLLECTIONS.roleAssignment)
+      .where({ userId: user.id, status: 'active' })
+      .limit(100)
+      .get(),
+    loadConfiguredUserPermissions(user.id),
+    db.collection(COLLECTIONS.organization)
+      .where({ status: 'active' })
+      .limit(500)
+      .get()
   ])
   if (roles.some(item => item.role === 'super_admin')) {
     return { canRead: () => true }
   }
   const today = new Date().toISOString().slice(0, 10)
+  const assignments = assignmentResult.data.filter(item =>
+    (!item.startDate || item.startDate <= today) &&
+    (!item.endDate || item.endDate >= today)
+  )
   const activeGrants = configuredGrants.filter(item =>
     (!item.startDate || item.startDate <= today) &&
     (!item.endDate || item.endDate >= today)
   )
+  const historyPermissionConfigured = configuredGrants.some(item =>
+    ((item.permissions || {}).history || []).length > 0
+  )
+  const organizations = new Map(organizationResult.data.map(item => [canonicalOrganizationId(item.id), item]))
+  const scopedAdminRoles = roles.filter(item =>
+    ['federation_admin', 'office_admin', 'region_admin', 'area_admin', 'team_admin'].includes(item.role)
+  )
+  const defaultOrganizationId = canonicalOrganizationId(user.defaultOrganizationId)
   return {
     canRead(context = {}) {
       const organizationId = canonicalOrganizationId(context.organizationId || context.teamId)
+      const organization = organizations.get(organizationId)
+      const scopeIds = organization ? [organizationId].concat(organization.ancestorIds || []).map(canonicalOrganizationId) : []
+      const isScopedAdmin = scopedAdminRoles.some(item =>
+        scopeIds.includes(canonicalOrganizationId(item.organizationId))
+      )
+      if (isScopedAdmin) return true
       const isCurrentTeamOfficer = assignments.some(item =>
         canonicalOrganizationId(item.organizationId) === organizationId &&
         ['captain', 'secretary'].some(code => positionIdMatches(item.positionId, code))
       )
       if (isCurrentTeamOfficer) return true
-      if (!configuredGrants.length) return true
-      return portPermissionAllowed(activeGrants, userId, 'history', 'read', context)
+      if (!historyPermissionConfigured && organization && organizationId === defaultOrganizationId) return true
+      return portPermissionAllowed(activeGrants, user.id, 'history', 'read', context)
     }
   }
 }
@@ -2038,7 +2067,7 @@ function normalizeEventType(value, categoryId = '', category = '') {
 
 async function listEventRecords(openid, event = {}) {
   const user = await requirePlatformUser(openid)
-  const historyRead = await historyReadPermissionSnapshot(user.id)
+  const historyRead = await historyReadPermissionSnapshot(user)
   const status = cleanText(event.status, 30) || 'published'
   const organizationId = cleanText(event.organizationId, 80)
   const category = cleanText(event.category, 40)

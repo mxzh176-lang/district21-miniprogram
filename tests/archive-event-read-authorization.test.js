@@ -23,6 +23,7 @@ function createDatabase(rows) {
         skip(value) { state.skip = value || 0; return query },
         limit(value) { state.limit = value; return query },
         async get() {
+          if (rows.__errors && rows.__errors[name]) throw rows.__errors[name]
           const data = (rows[name] || []).filter(row => matches(row, state.where))
           return { data: data.slice(state.skip, state.skip + state.limit) }
         }
@@ -65,10 +66,15 @@ async function runListEventRecords(rows, event = {}) {
 
 function baseRows(permission) {
   return {
-    user: [{ id: 'user_reader', openid: 'reader-openid', status: 'active' }],
+    user: [{ id: 'user_reader', openid: 'reader-openid', status: 'active', defaultOrganizationId: 'org_team_yuanhang' }],
     user_role: [],
     role_assignment: [],
-    user_permissions: [permission],
+    user_permissions: [permission].filter(Boolean),
+    organization: [
+      { id: 'org_region_21_suihua', status: 'active', ancestorIds: [] },
+      { id: 'org_team_yuanhang', status: 'active', ancestorIds: ['org_region_21_suihua'] },
+      { id: 'org_team_jingying', status: 'active', ancestorIds: ['org_region_21_suihua'] }
+    ],
     event_record: [
       { id: 'event_yuanhang_captain', organizationId: 'org_team_yuanhang', categoryId: 'captain', status: 'published' },
       { id: 'event_yuanhang_secretary', organizationId: 'org_team_yuanhang', categoryId: 'secretary', status: 'published' },
@@ -125,4 +131,50 @@ test('listEventRecords denies an expired term instead of treating it as unrestri
 
   assert.deepEqual(response.data, [])
   assert.deepEqual(requestedFiles, [])
+})
+
+test('ordinary active users without grants are limited to their default organization', async () => {
+  const rows = baseRows()
+  const { response, requestedFiles } = await runListEventRecords(rows)
+
+  assert.deepEqual(response.data.map(item => item.id), ['event_yuanhang_captain', 'event_yuanhang_secretary'])
+  assert.deepEqual(requestedFiles.sort(), ['cloud://yuanhang-captain', 'cloud://yuanhang-secretary'])
+})
+
+test('permission-store failure fails closed before archive image URLs are created', async () => {
+  const rows = baseRows()
+  rows.__errors = { user_permissions: new Error('permission store unavailable') }
+  const { response, requestedFiles } = await runListEventRecords(rows)
+
+  assert.equal(response.ok, false)
+  assert.deepEqual(requestedFiles, [])
+})
+
+test('active scoped administrators retain history read access for descendant organizations', async () => {
+  const rows = baseRows({
+    ...permissionBase,
+    permissions: { todo: ['read'] },
+    dataScope: 'team',
+    teamId: 'org_team_yuanhang'
+  })
+  rows.user_role = [{
+    userId: 'user_reader',
+    status: 'active',
+    role: 'region_admin',
+    organizationId: 'org_region_21_suihua',
+    startDate: '2000-01-01',
+    endDate: '2099-12-31'
+  }]
+  const { response, requestedFiles } = await runListEventRecords(rows)
+
+  assert.deepEqual(response.data.map(item => item.id), [
+    'event_yuanhang_captain',
+    'event_yuanhang_secretary',
+    'event_jingying'
+  ])
+  assert.deepEqual(requestedFiles.sort(), [
+    'cloud://jingying',
+    'cloud://yuanhang-captain',
+    'cloud://yuanhang-secretary'
+  ])
 })
