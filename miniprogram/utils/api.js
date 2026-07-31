@@ -1197,4 +1197,4 @@ function showError(error) {
   wx.showToast({ title: error && error.message ? error.message : '数据加载失败', icon: 'none' })
 }
 
-module.exports = { initialize, call, showError }
+module.exports = { initialize, call, showError, __test: { localCall } }

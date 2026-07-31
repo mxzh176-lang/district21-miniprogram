@@ -133,3 +133,97 @@ test('loader keeps primary images when file_records lookup fails', async () => {
   assert.equal(selected.event_primary[0].imageUrl, 'https://temp.example/primary')
   assert.deepEqual(warnings, ['file_records list unavailable: file_records unavailable'])
 })
+
+test('loader requests every visible event id so images after legacy query limits remain visible', async () => {
+  const records = Array.from({ length: 1001 }, (_, index) => ({
+    id: `event_${index + 1}`,
+    organizationId: 'org_team_yuanhang'
+  }))
+  const requestedPrimaryIds = []
+  const requestedFallbackIds = []
+  const selected = await loadArchiveImages(records, {
+    listEventImages: async eventIds => {
+      requestedPrimaryIds.push(eventIds.slice())
+      return eventIds.map(eventId => ({
+        eventId,
+        organizationId: 'org_team_yuanhang',
+        status: 'active',
+        fileId: `cloud://primary/${eventId}`
+      }))
+    },
+    listFileRecords: async (organizationId, eventIds) => {
+      requestedFallbackIds.push({ organizationId, eventIds: eventIds.slice() })
+      return []
+    },
+    attachImageUrls: async images => images
+  })
+
+  assert.equal(requestedPrimaryIds.flat().length, 1001)
+  assert.equal(requestedPrimaryIds.flat().at(-1), 'event_1001')
+  assert.equal(requestedFallbackIds.length, 1)
+  assert.equal(requestedFallbackIds[0].organizationId, 'org_team_yuanhang')
+  assert.equal(requestedFallbackIds[0].eventIds.length, 1001)
+  assert.equal(requestedFallbackIds[0].eventIds.at(-1), 'event_1001')
+  assert.equal(selected.event_1001[0].fileId, 'cloud://primary/event_1001')
+})
+
+test('archive query adapter paginates only visible event ids for primary and fallback images', async () => {
+  const { createArchiveImageQueryAdapter } = require('../cloudfunctions/api/archive-image-query')
+  const eventIds = Array.from({ length: 73 }, (_, index) => `event_${index + 1}`)
+  const rows = {
+    event_image: eventIds.map(eventId => ({ eventId, organizationId: 'org_team_yuanhang', status: 'active' })),
+    file_records: eventIds.map(resourceId => ({ resourceId, organizationId: 'org_team_yuanhang', resourceType: 'event_record', status: 'active' }))
+  }
+  const queries = []
+  const db = {
+    command: { in: values => ({ values }) },
+    collection(name) {
+      return {
+        where(where) {
+          return {
+            skip(skip) {
+              return {
+                limit(limit) {
+                  return {
+                    get: async () => {
+                      queries.push({ name, where, skip, limit })
+                      const filtered = rows[name].filter(row => Object.entries(where).every(([key, value]) => {
+                        if (value && value.values) return value.values.includes(row[key])
+                        return row[key] === value
+                      }))
+                      return { data: filtered.slice(skip, skip + limit) }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  const adapter = createArchiveImageQueryAdapter({
+    db,
+    collections: { eventImage: 'event_image', fileRecord: 'file_records' },
+    idBatchSize: 17,
+    pageSize: 10
+  })
+
+  const [primary, fallback] = await Promise.all([
+    adapter.listEventImages(eventIds),
+    adapter.listFileRecords('org_team_yuanhang', eventIds)
+  ])
+
+  assert.equal(primary.length, 73)
+  assert.equal(fallback.length, 73)
+  assert.ok(queries.some(query => query.skip > 0))
+  queries.filter(query => query.name === 'event_image').forEach(query => {
+    assert.ok(query.where.eventId.values.every(eventId => eventIds.includes(eventId)))
+  })
+  queries.filter(query => query.name === 'file_records').forEach(query => {
+    assert.equal(query.where.organizationId, 'org_team_yuanhang')
+    assert.equal(query.where.resourceType, 'event_record')
+    assert.equal(query.where.status, 'active')
+    assert.ok(query.where.resourceId.values.every(eventId => eventIds.includes(eventId)))
+  })
+})

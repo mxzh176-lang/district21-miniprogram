@@ -76,7 +76,8 @@ function memoryTodoDependencies(initialTasks = []) {
     dependencies: {
       todayText: () => '2026-07-31',
       timestamp: () => '2026-07-31T12:00:00.000Z',
-      listTasks: async () => tasks.map(item => ({ ...item })),
+      findTaskById: async id => tasks.find(item => item.id === id),
+      findMatchingTasks: async target => tasks.filter(item => cloudMonthlyMeeting.matchesMonthlyMeetingTodo(item, target)),
       createTask: async data => { tasks.push({ ...data, _id: data.id }) },
       updateTask: async (task, data) => Object.assign(tasks.find(item => item._id === task._id), data),
       writeAudit: async (action, taskId, data) => { audits.push({ action, taskId, data }) }
@@ -124,4 +125,102 @@ test('cloud monthly meeting adopts the legacy row without overwriting manual fie
   assert.equal(memory.tasks[0].location, '远航会议室')
   assert.equal(memory.tasks[0].description, '人工填写的会议说明')
   assert.deepEqual(memory.audits.map(item => item.action), ['update'])
+})
+
+test('cloud monthly meeting uses deterministic and compatible targeted lookups instead of a capped task scan', async () => {
+  const legacy = {
+    _id: 'legacy-document-id',
+    id: 'legacy-business-id',
+    organizationId: 'org_team_yuanhang',
+    date: '2026-08-05',
+    title: '远航第二次例会',
+    status: 'completed',
+    time: '18:30',
+    location: '远航会议室',
+    description: '人工填写的会议说明',
+    visible: true
+  }
+  const lookups = []
+  let updated
+  const result = await cloudMonthlyMeeting.ensureMonthlyMeetingTodo({
+    todayText: () => '2026-07-31',
+    timestamp: () => '2026-07-31T12:00:00.000Z',
+    findTaskById: async id => {
+      lookups.push({ type: 'id', id })
+      return null
+    },
+    findMatchingTasks: async target => {
+      lookups.push({ type: 'meeting', target })
+      return [legacy]
+    },
+    createTask: async () => assert.fail('legacy task must be updated, not duplicated'),
+    updateTask: async (task, data) => { updated = { task, data } },
+    writeAudit: async () => {}
+  })
+
+  assert.deepEqual(result, { action: 'update', taskId: 'todo_yuanhang_monthly_meeting_2026_08' })
+  assert.deepEqual(lookups, [
+    { type: 'id', id: 'todo_yuanhang_monthly_meeting_2026_08' },
+    { type: 'meeting', target: cloudMonthlyMeeting.buildMonthlyMeetingTarget('2026-07-31') }
+  ])
+  assert.equal(updated.data.status, undefined)
+  assert.equal(updated.data.time, undefined)
+  assert.equal(updated.data.location, undefined)
+  assert.equal(updated.data.description, undefined)
+})
+
+test('monthly query adapter searches by organization plus deterministic id or compatible date and title', async () => {
+  const { createMonthlyMeetingQueryAdapter } = require('../cloudfunctions/api/monthly-meeting-query')
+  const queries = []
+  const db = {
+    command: { in: values => ({ values }) },
+    collection() {
+      return {
+        where(where) {
+          return {
+            limit(limit) {
+              return {
+                get: async () => {
+                  queries.push({ where, skip: 0, limit })
+                  return { data: [{}] }
+                }
+              }
+            },
+            skip(skip) {
+              return {
+                limit(limit) {
+                  return {
+                    get: async () => {
+                      queries.push({ where, skip, limit })
+                      return { data: skip ? [] : [{}] }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  const adapter = createMonthlyMeetingQueryAdapter({
+    db,
+    collectionName: 'todo',
+    organizationId: 'org_team_yuanhang',
+    pageSize: 1
+  })
+  const target = cloudMonthlyMeeting.buildMonthlyMeetingTarget('2026-07-31')
+
+  await adapter.findTaskById(target.id)
+  await adapter.findMatchingTasks(target)
+
+  assert.deepEqual(queries[0].where, {
+    organizationId: 'org_team_yuanhang',
+    id: target.id
+  })
+  assert.deepEqual(queries[1].where, {
+    organizationId: 'org_team_yuanhang',
+    date: target.date,
+    title: { values: ['远航第二次例会', target.title] }
+  })
 })

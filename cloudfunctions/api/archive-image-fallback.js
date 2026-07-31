@@ -47,7 +47,7 @@ async function loadArchiveImages(records = [], dependencies = {}) {
   let fileRecords = []
 
   try {
-    eventImages = await dependencies.listEventImages()
+    eventImages = await dependencies.listEventImages(records.map(record => record.id))
   } catch (error) {
     warn('event_image list unavailable', error)
   }
@@ -55,7 +55,10 @@ async function loadArchiveImages(records = [], dependencies = {}) {
   const organizationIds = Array.from(new Set(records.map(record => record.organizationId).filter(Boolean)))
   for (const organizationId of organizationIds) {
     try {
-      const rows = await dependencies.listFileRecords(organizationId)
+      const eventIds = records
+        .filter(record => record.organizationId === organizationId)
+        .map(record => record.id)
+      const rows = await dependencies.listFileRecords(organizationId, eventIds)
       fileRecords = fileRecords.concat(rows || [])
     } catch (error) {
       warn('file_records list unavailable', error)

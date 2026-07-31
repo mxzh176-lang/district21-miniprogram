@@ -41,9 +41,8 @@ function needsCorrection(todo, desired) {
 
 async function ensureMonthlyMeetingTodo(dependencies = {}) {
   const target = buildMonthlyMeetingTarget(dependencies.todayText())
-  const tasks = await dependencies.listTasks()
-  const existing = tasks.find(task => task.organizationId === TODO_ORGANIZATION_ID && task.id === target.id) ||
-    tasks.find(task => matchesMonthlyMeetingTodo(task, target))
+  const existing = await dependencies.findTaskById(target.id) ||
+    (await dependencies.findMatchingTasks(target)).find(task => matchesMonthlyMeetingTodo(task, target))
   const desired = {
     id: target.id,
     title: target.title,

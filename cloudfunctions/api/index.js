@@ -3,7 +3,10 @@ const crypto = require('crypto')
 const JSZip = require('jszip')
 const { authenticator } = require('otplib')
 const { loadArchiveImages } = require('./archive-image-fallback')
+const { createArchiveImageQueryAdapter } = require('./archive-image-query')
 const { ensureMonthlyMeetingTodo: reconcileMonthlyMeetingTodo } = require('./monthly-meeting-todo')
+const { createMonthlyMeetingQueryAdapter } = require('./monthly-meeting-query')
+const { runAutomaticTodoReconciliation } = require('./automatic-todo-runner')
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
@@ -2025,22 +2028,10 @@ async function listEventRecords(openid, event = {}) {
       return createdDifference || String(b.eventDate || '').localeCompare(String(a.eventDate || ''))
     })
     .slice(0, limit)
+  const imageQueries = createArchiveImageQueryAdapter({ db, collections: COLLECTIONS })
   const resolvedImageMap = await loadArchiveImages(records, {
-    listEventImages: async () => {
-      const imageResult = await db.collection(COLLECTIONS.eventImage).limit(1000).get()
-      return imageResult.data
-    },
-    listFileRecords: async visibleOrganizationId => {
-      const fileResult = await db.collection(COLLECTIONS.fileRecord)
-        .where({
-          resourceType: 'event_record',
-          organizationId: visibleOrganizationId,
-          status: 'active'
-        })
-        .limit(1000)
-        .get()
-      return fileResult.data
-    },
+    listEventImages: imageQueries.listEventImages,
+    listFileRecords: imageQueries.listFileRecords,
     attachImageUrls,
     warn: (message, error) => console.warn(message, error.message)
   })
@@ -3565,16 +3556,16 @@ async function ensureMemberHolidayTodos() {
 }
 
 async function ensureMonthlyMeetingTodo() {
+  const todoQueries = createMonthlyMeetingQueryAdapter({
+    db,
+    collectionName: COLLECTIONS.tasks,
+    organizationId: TODO_ORGANIZATION_ID
+  })
   return reconcileMonthlyMeetingTodo({
     todayText: chinaDateText,
     timestamp: now,
-    listTasks: async () => {
-      const result = await db.collection(COLLECTIONS.tasks)
-        .where({ organizationId: TODO_ORGANIZATION_ID })
-        .limit(200)
-        .get()
-      return result.data
-    },
+    findTaskById: todoQueries.findTaskById,
+    findMatchingTasks: todoQueries.findMatchingTasks,
     createTask: data => db.collection(COLLECTIONS.tasks).doc(data.id).set({ data }),
     updateTask: (task, data) => db.collection(COLLECTIONS.tasks).doc(task._id).update({ data }),
     writeAudit: (action, taskId, data) => writePlatformLog({
@@ -3587,7 +3578,12 @@ async function ensureMonthlyMeetingTodo() {
 async function ensureAutomaticTodos() {
   await ensureBirthdayTodos()
   await ensureMemberHolidayTodos()
-  await ensureMonthlyMeetingTodo()
+  return runAutomaticTodoReconciliation({
+    existingRemindersReady: true,
+    ensureBirthdayTodos,
+    ensureMemberHolidayTodos,
+    ensureMonthlyMeetingTodo
+  })
 }
 
 async function isTodoAdmin(user) {
