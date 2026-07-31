@@ -66,3 +66,62 @@ test('local fallback builds one visible Yuanhang meeting task', () => {
     monthlyMeeting: true
   })
 })
+
+function memoryTodoDependencies(initialTasks = []) {
+  const tasks = initialTasks.map(item => ({ ...item }))
+  const audits = []
+  return {
+    tasks,
+    audits,
+    dependencies: {
+      todayText: () => '2026-07-31',
+      timestamp: () => '2026-07-31T12:00:00.000Z',
+      listTasks: async () => tasks.map(item => ({ ...item })),
+      createTask: async data => { tasks.push({ ...data, _id: data.id }) },
+      updateTask: async (task, data) => Object.assign(tasks.find(item => item._id === task._id), data),
+      writeAudit: async (action, taskId, data) => { audits.push({ action, taskId, data }) }
+    }
+  }
+}
+
+test('cloud monthly meeting creation is idempotent and audited once', async () => {
+  const memory = memoryTodoDependencies()
+
+  const first = await cloudMonthlyMeeting.ensureMonthlyMeetingTodo(memory.dependencies)
+  const second = await cloudMonthlyMeeting.ensureMonthlyMeetingTodo(memory.dependencies)
+
+  assert.deepEqual(first, { action: 'create', taskId: 'todo_yuanhang_monthly_meeting_2026_08' })
+  assert.deepEqual(second, { action: 'none', taskId: 'todo_yuanhang_monthly_meeting_2026_08' })
+  assert.equal(memory.tasks.length, 1)
+  assert.equal(memory.tasks[0].title, '远航八月例会+联谊')
+  assert.equal(memory.tasks[0].date, '2026-08-05')
+  assert.equal(memory.audits.length, 1)
+  assert.equal(memory.audits[0].action, 'create')
+})
+
+test('cloud monthly meeting adopts the legacy row without overwriting manual fields', async () => {
+  const memory = memoryTodoDependencies([{
+    _id: 'legacy-document-id',
+    id: 'legacy-business-id',
+    organizationId: 'org_team_yuanhang',
+    date: '2026-08-05',
+    title: '远航第二次例会',
+    status: 'completed',
+    time: '18:30',
+    location: '远航会议室',
+    description: '人工填写的会议说明',
+    visible: true
+  }])
+
+  const result = await cloudMonthlyMeeting.ensureMonthlyMeetingTodo(memory.dependencies)
+
+  assert.deepEqual(result, { action: 'update', taskId: 'todo_yuanhang_monthly_meeting_2026_08' })
+  assert.equal(memory.tasks.length, 1)
+  assert.equal(memory.tasks[0].id, 'todo_yuanhang_monthly_meeting_2026_08')
+  assert.equal(memory.tasks[0].title, '远航八月例会+联谊')
+  assert.equal(memory.tasks[0].status, 'completed')
+  assert.equal(memory.tasks[0].time, '18:30')
+  assert.equal(memory.tasks[0].location, '远航会议室')
+  assert.equal(memory.tasks[0].description, '人工填写的会议说明')
+  assert.deepEqual(memory.audits.map(item => item.action), ['update'])
+})
