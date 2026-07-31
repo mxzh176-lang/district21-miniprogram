@@ -11,6 +11,7 @@ const { normalizeEventCategory } = require('./event-category')
 const { buildUpcomingBirthdayTasks } = require('./birthday-reminders')
 const yuanhangBirthdays = require('../data/yuanhang-birthdays')
 const { buildMemberHolidayTasks } = require('./member-holiday-reminders')
+const { buildUpcomingMonthlyMeetingTask } = require('./monthly-meeting-todo')
 
 let importedDataCache = null
 const requestCache = new Map()
@@ -180,6 +181,7 @@ function allTasks() {
   data.tasks.concat(
     buildUpcomingBirthdayTasks(yuanhangBirthdays),
     buildMemberHolidayTasks(data.members),
+    [buildUpcomingMonthlyMeetingTask()],
     getLocalTasks()
   ).forEach(item => {
     tasks[item._id] = item
