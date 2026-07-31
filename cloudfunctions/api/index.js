@@ -528,21 +528,26 @@ const PORT_PERMISSION_ACTIONS = {
 }
 const PORT_DATA_SCOPES = ['district', 'team', 'position', 'self']
 
-async function activeUserPermissions(userId) {
+async function configuredUserPermissions(userId) {
   try {
-    const today = new Date().toISOString().slice(0, 10)
     const result = await db.collection(COLLECTIONS.userPermissions)
       .where({ userId, status: 'active' })
       .limit(100)
       .get()
-    return result.data.filter(item =>
-      (!item.startDate || item.startDate <= today) &&
-      (!item.endDate || item.endDate >= today)
-    )
+    return result.data
   } catch (error) {
     console.warn('user_permissions unavailable', error.message)
     return []
   }
+}
+
+async function activeUserPermissions(userId) {
+  const today = new Date().toISOString().slice(0, 10)
+  const permissions = await configuredUserPermissions(userId)
+  return permissions.filter(item =>
+    (!item.startDate || item.startDate <= today) &&
+    (!item.endDate || item.endDate >= today)
+  )
 }
 
 function portScopeMatches(grant, userId, context = {}) {
@@ -588,6 +593,34 @@ function portPermissionAllowed(grants, userId, module, action, context = {}) {
     ((grant.permissions || {})[module] || []).includes(action) &&
     (grant.dataScope === 'self' && action === 'create' || portScopeMatches(grant, userId, context))
   )
+}
+
+async function historyReadPermissionSnapshot(userId) {
+  const [roles, assignments, configuredGrants] = await Promise.all([
+    platformRoles(userId),
+    activeRoleAssignments(userId),
+    configuredUserPermissions(userId)
+  ])
+  if (roles.some(item => item.role === 'super_admin')) {
+    return { canRead: () => true }
+  }
+  const today = new Date().toISOString().slice(0, 10)
+  const activeGrants = configuredGrants.filter(item =>
+    (!item.startDate || item.startDate <= today) &&
+    (!item.endDate || item.endDate >= today)
+  )
+  return {
+    canRead(context = {}) {
+      const organizationId = canonicalOrganizationId(context.organizationId || context.teamId)
+      const isCurrentTeamOfficer = assignments.some(item =>
+        canonicalOrganizationId(item.organizationId) === organizationId &&
+        ['captain', 'secretary'].some(code => positionIdMatches(item.positionId, code))
+      )
+      if (isCurrentTeamOfficer) return true
+      if (!configuredGrants.length) return true
+      return portPermissionAllowed(activeGrants, userId, 'history', 'read', context)
+    }
+  }
 }
 
 async function requireLegacyPortEditor(openid, module, action, context = {}) {
@@ -2004,7 +2037,8 @@ function normalizeEventType(value, categoryId = '', category = '') {
 }
 
 async function listEventRecords(openid, event = {}) {
-  await requirePlatformUser(openid)
+  const user = await requirePlatformUser(openid)
+  const historyRead = await historyReadPermissionSnapshot(user.id)
   const status = cleanText(event.status, 30) || 'published'
   const organizationId = cleanText(event.organizationId, 80)
   const category = cleanText(event.category, 40)
@@ -2022,6 +2056,7 @@ async function listEventRecords(openid, event = {}) {
     .map(item => ({ ...item, eventType: normalizeEventType(item.eventType, item.categoryId, item.category) }))
     .filter(item => !eventType || item.eventType === eventType)
     .filter(item => !eventMonth || item.eventMonth === eventMonth)
+    .filter(item => historyRead.canRead(item))
     .sort((a, b) => {
       const createdDifference = new Date(b.createdAt || b.updatedAt || b.eventDate || 0).getTime() -
         new Date(a.createdAt || a.updatedAt || a.eventDate || 0).getTime()

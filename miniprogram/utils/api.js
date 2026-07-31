@@ -1144,6 +1144,7 @@ function canFallbackToLocal(action) {
     'getMember',
     'listStructure',
     'listArchiveEntries',
+    'listTasks',
     'listLedgerRecords',
     'getArchiveEntry',
     'listHomeBanners'
