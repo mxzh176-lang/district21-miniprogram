@@ -2,6 +2,7 @@ const cloud = require('wx-server-sdk')
 const crypto = require('crypto')
 const JSZip = require('jszip')
 const { authenticator } = require('otplib')
+const { loadArchiveImages } = require('./archive-image-fallback')
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
@@ -2007,28 +2008,26 @@ async function listEventRecords(openid, event = {}) {
       return createdDifference || String(b.eventDate || '').localeCompare(String(a.eventDate || ''))
     })
     .slice(0, limit)
-  try {
-    const imageResult = await db.collection(COLLECTIONS.eventImage).limit(1000).get()
-    const imageMap = {}
-    imageResult.data
-      .filter(item => item.status === 'active')
-      .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
-      .forEach(item => {
-        if (!imageMap[item.eventId]) imageMap[item.eventId] = []
-        imageMap[item.eventId].push(item)
-      })
-    const imageEntries = Object.values(imageMap).flat()
-    const imageEntriesWithUrls = await attachImageUrls(imageEntries)
-    const resolvedImageMap = {}
-    imageEntriesWithUrls.forEach(item => {
-      if (!resolvedImageMap[item.eventId]) resolvedImageMap[item.eventId] = []
-      resolvedImageMap[item.eventId].push(item)
-    })
-    return records.map(item => ({ ...item, images: resolvedImageMap[item.id] || [] }))
-  } catch (error) {
-    console.warn('event_image list unavailable', error.message)
-    return records
-  }
+  const resolvedImageMap = await loadArchiveImages(records, {
+    listEventImages: async () => {
+      const imageResult = await db.collection(COLLECTIONS.eventImage).limit(1000).get()
+      return imageResult.data
+    },
+    listFileRecords: async visibleOrganizationId => {
+      const fileResult = await db.collection(COLLECTIONS.fileRecord)
+        .where({
+          resourceType: 'event_record',
+          organizationId: visibleOrganizationId,
+          status: 'active'
+        })
+        .limit(1000)
+        .get()
+      return fileResult.data
+    },
+    attachImageUrls,
+    warn: (message, error) => console.warn(message, error.message)
+  })
+  return records.map(item => ({ ...item, images: resolvedImageMap[item.id] || [] }))
 }
 
 async function saveEventRecord(openid, event = {}) {

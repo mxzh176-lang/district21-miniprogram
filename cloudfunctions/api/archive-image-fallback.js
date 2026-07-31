@@ -41,4 +41,35 @@ function selectArchiveImages(records = [], eventImages = [], fileRecords = []) {
   return selected
 }
 
-module.exports = { selectArchiveImages }
+async function loadArchiveImages(records = [], dependencies = {}) {
+  const warn = typeof dependencies.warn === 'function' ? dependencies.warn : () => {}
+  let eventImages = []
+  let fileRecords = []
+
+  try {
+    eventImages = await dependencies.listEventImages()
+  } catch (error) {
+    warn('event_image list unavailable', error)
+  }
+
+  const organizationIds = Array.from(new Set(records.map(record => record.organizationId).filter(Boolean)))
+  for (const organizationId of organizationIds) {
+    try {
+      const rows = await dependencies.listFileRecords(organizationId)
+      fileRecords = fileRecords.concat(rows || [])
+    } catch (error) {
+      warn('file_records list unavailable', error)
+    }
+  }
+
+  const selected = selectArchiveImages(records, eventImages || [], fileRecords)
+  const resolved = await dependencies.attachImageUrls(Object.values(selected).flat())
+  const result = {}
+  records.forEach(record => { result[record.id] = [] })
+  ;(resolved || []).forEach(image => {
+    if (result[image.eventId]) result[image.eventId].push(image)
+  })
+  return result
+}
+
+module.exports = { selectArchiveImages, loadArchiveImages }
