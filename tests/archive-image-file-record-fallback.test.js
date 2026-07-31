@@ -2,7 +2,8 @@ const test = require('node:test')
 const assert = require('node:assert/strict')
 
 const {
-  selectArchiveImages
+  selectArchiveImages,
+  loadArchiveImages
 } = require('../cloudfunctions/api/archive-image-fallback')
 
 const RECORDS = [
@@ -82,4 +83,53 @@ test('fallback excludes records outside the authorized image boundary', () => {
 
   assert.deepEqual(selected.event_fallback, [])
   assert.equal(selected.event_hidden, undefined)
+})
+
+test('loader recovers fallback images when event_image lookup fails', async () => {
+  const requestedOrganizations = []
+  const warnings = []
+  const selected = await loadArchiveImages(RECORDS, {
+    listEventImages: async () => { throw new Error('event_image unavailable') },
+    listFileRecords: async organizationId => {
+      requestedOrganizations.push(organizationId)
+      return [{
+        resourceType: 'event_record',
+        resourceId: 'event_fallback',
+        organizationId,
+        status: 'active',
+        fileType: 'image/jpeg',
+        fileID: 'cloud://fallback'
+      }]
+    },
+    attachImageUrls: async images => images.map(image => ({
+      ...image,
+      imageUrl: `https://temp.example/${image.fileId.slice('cloud://'.length)}`
+    })),
+    warn: (message, error) => warnings.push(`${message}: ${error.message}`)
+  })
+
+  assert.deepEqual(requestedOrganizations, ['org_team_yuanhang'])
+  assert.equal(selected.event_fallback[0].imageUrl, 'https://temp.example/fallback')
+  assert.deepEqual(warnings, ['event_image list unavailable: event_image unavailable'])
+})
+
+test('loader keeps primary images when file_records lookup fails', async () => {
+  const warnings = []
+  const selected = await loadArchiveImages(
+    [{ id: 'event_primary', organizationId: 'org_team_yuanhang' }],
+    {
+      listEventImages: async () => [{
+        eventId: 'event_primary',
+        organizationId: 'org_team_yuanhang',
+        status: 'active',
+        fileId: 'cloud://primary'
+      }],
+      listFileRecords: async () => { throw new Error('file_records unavailable') },
+      attachImageUrls: async images => images.map(image => ({ ...image, imageUrl: 'https://temp.example/primary' })),
+      warn: (message, error) => warnings.push(`${message}: ${error.message}`)
+    }
+  )
+
+  assert.equal(selected.event_primary[0].imageUrl, 'https://temp.example/primary')
+  assert.deepEqual(warnings, ['file_records list unavailable: file_records unavailable'])
 })
