@@ -135,11 +135,16 @@ Page({
         : response && (response.banners || response.items) || []
       const sources = this.bannerSources(banners)
       const values = this.bannerValues(banners)
-      const visibleSources = configured ? sources : (sources.length ? sources : this.data.baseBanners)
+      const effectiveSources = configured
+        ? sources
+        : (sources.length ? sources : this.data.baseBanners)
+      const effectiveValues = configured
+        ? values
+        : effectiveSources.slice()
       this.setData({
-        banners: sources,
-        bannerValues: values,
-        heroSlides: this.buildHeroSlides(visibleSources),
+        banners: effectiveSources,
+        bannerValues: effectiveValues,
+        heroSlides: this.buildHeroSlides(effectiveSources),
         currentHeroIndex: 0,
         bannerSelecting: false
       })
@@ -307,12 +312,11 @@ Page({
   editHomeBanners() {
     if (!this.data.canManageBanners || this.data.bannerSaving) return
     wx.showActionSheet({
-      itemList: ['新增轮播图', '替换当前轮播图', '替换全部轮播图', '清空当前轮播图'],
+      itemList: ['新增轮播图', '替换当前轮播图', '清空全部轮播图'],
       success: result => {
-        if (result.tapIndex === 0) this.chooseHomeBanners('append')
+        if (result.tapIndex === 0) this.chooseHomeBanners()
         if (result.tapIndex === 1) this.enterBannerSelection()
-        if (result.tapIndex === 2) this.chooseHomeBanners('replace')
-        if (result.tapIndex === 3) this.clearHomeBanners()
+        if (result.tapIndex === 2) this.clearHomeBanners()
       }
     })
   },
@@ -332,7 +336,10 @@ Page({
 
   async confirmSelectedHomeBanner() {
     const selectedIndex = this.data.currentHeroIndex - 1
-    if (selectedIndex < 0 || selectedIndex >= this.data.banners.length) {
+    const editableBanners = this.data.bannerValues.length
+      ? this.data.bannerValues
+      : this.data.banners
+    if (selectedIndex < 0 || selectedIndex >= editableBanners.length) {
       wx.showToast({ title: '请滑动选择图片', icon: 'none' })
       return
     }
@@ -355,8 +362,8 @@ Page({
     }
   },
 
-  async chooseHomeBanners(mode = 'replace') {
-    const existingCount = mode === 'append' ? this.data.banners.length : 0
+  async chooseHomeBanners() {
+    const existingCount = this.data.bannerValues.length || this.data.banners.length
     const remainingCount = Math.max(0, 9 - existingCount)
     if (!remainingCount) {
       wx.showToast({ title: '轮播图最多 9 张', icon: 'none' })
@@ -375,7 +382,7 @@ Page({
       })
       const files = media.tempFiles || []
       if (!files.length) return
-      await this.saveSelectedHomeBanners(files, { append: mode === 'append' })
+      await this.saveSelectedHomeBanners(files, { append: true })
     } catch (error) {
       if (error && !String(error.errMsg || '').includes('cancel')) api.showError(error)
     }
@@ -439,7 +446,7 @@ Page({
         banners: []
       })
       await this.loadHomeBannersForScope()
-      wx.showToast({ title: '已清空轮播', icon: 'success' })
+      wx.showToast({ title: '已清空全部轮播', icon: 'success' })
     } catch (error) {
       api.showError(error)
     } finally {

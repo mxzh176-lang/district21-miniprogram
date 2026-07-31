@@ -15,11 +15,28 @@ test('home banner edit button uses exact service-team administrator permission',
 })
 
 test('home banner editor can append multiple images without replacing existing slides', () => {
-  assert.match(homeScript, /itemList: \['新增轮播图', '替换当前轮播图', '替换全部轮播图', '清空当前轮播图'\]/)
+  assert.match(homeScript, /itemList: \['新增轮播图', '替换当前轮播图', '清空全部轮播图'\]/)
+  assert.doesNotMatch(homeScript, /替换全部轮播图/)
+  assert.doesNotMatch(homeScript, /chooseHomeBanners\('replace'\)/)
   assert.match(homeScript, /count: remainingCount/)
   assert.match(homeScript, /uploadedValues = uploaded\.map\(item => item\.fileID\)\.filter\(Boolean\)/)
   assert.match(homeScript, /existingBanners\.concat\(uploadedValues\)/)
   assert.match(homeScript, /\.slice\(0, 9\)/)
+})
+
+test('home banner editor aligns visible fallback images with editable values', () => {
+  assert.match(homeScript, /const effectiveSources = configured\s*\? sources\s*:/)
+  assert.match(homeScript, /const effectiveValues = configured\s*\? values\s*:/)
+  assert.match(homeScript, /banners: effectiveSources/)
+  assert.match(homeScript, /bannerValues: effectiveValues/)
+  assert.match(homeScript, /heroSlides: this\.buildHeroSlides\(effectiveSources\)/)
+  assert.match(homeScript, /selectedIndex >= editableBanners\.length/)
+  assert.doesNotMatch(homeScript, /selectedIndex >= this\.data\.banners\.length/)
+})
+
+test('home banner editor keeps clear-all behavior explicit', () => {
+  assert.match(homeScript, /banners: \[\]/)
+  assert.match(homeScript, /title: '已清空全部轮播'/)
 })
 
 test('home banner editor pauses autoplay while selecting one image slide', () => {
