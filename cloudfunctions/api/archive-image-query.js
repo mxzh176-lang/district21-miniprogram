@@ -21,26 +21,22 @@ async function readAllPages(db, collectionName, where, pageSize) {
 }
 
 function createArchiveImageQueryAdapter({ db, collections, idBatchSize = 20, pageSize = 100 }) {
-  async function readByEventIds(collectionName, idField, eventIds, where = {}) {
+  async function readByEventIds(collectionName, idField, eventIds) {
     const ids = uniqueIds(eventIds)
-    const result = []
-    for (const batch of batches(ids, idBatchSize)) {
-      const rows = await readAllPages(db, collectionName, {
-        ...where,
+    const pages = await Promise.all(batches(ids, idBatchSize).map(batch =>
+      readAllPages(db, collectionName, {
         [idField]: db.command.in(batch)
       }, pageSize)
-      result.push(...rows)
-    }
-    return result
+    ))
+    return pages.flat()
   }
 
   return {
     listEventImages: eventIds => readByEventIds(collections.eventImage, 'eventId', eventIds),
-    listFileRecords: (organizationId, eventIds) => readByEventIds(
+    listFileRecords: (_organizationId, eventIds) => readByEventIds(
       collections.fileRecord,
       'resourceId',
-      eventIds,
-      { resourceType: 'event_record', organizationId, status: 'active' }
+      eventIds
     )
   }
 }

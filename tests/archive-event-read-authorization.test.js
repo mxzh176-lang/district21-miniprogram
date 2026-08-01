@@ -33,7 +33,7 @@ function createDatabase(rows) {
   }
 }
 
-async function runListEventRecords(rows, event = {}) {
+async function runApiAction(rows, action, event = {}) {
   const requestedFiles = []
   const db = createDatabase(rows)
   const cloud = {
@@ -56,12 +56,16 @@ async function runListEventRecords(rows, event = {}) {
   delete require.cache[INDEX_PATH]
   try {
     const api = require(INDEX_PATH)
-    const response = await api.main({ action: 'listEventRecords', ...event })
+    const response = await api.main({ action, ...event })
     return { response, requestedFiles }
   } finally {
     Module._load = originalLoad
     delete require.cache[INDEX_PATH]
   }
+}
+
+async function runListEventRecords(rows, event = {}) {
+  return runApiAction(rows, 'listEventRecords', event)
 }
 
 function baseRows(permission) {
@@ -177,4 +181,35 @@ test('active scoped administrators retain history read access for descendant org
     'cloud://yuanhang-captain',
     'cloud://yuanhang-secretary'
   ])
+})
+
+test('getEventRecord restores same-organization file records after history authorization', async () => {
+  const rows = baseRows()
+  rows.event_image = []
+  rows.file_records = [{
+    resourceType: 'event_record',
+    resourceId: 'event_yuanhang_captain',
+    organizationId: 'org_team_yuanhang',
+    status: 'active',
+    fileType: 'image/jpeg',
+    fileID: 'cloud://yuanhang-fallback'
+  }]
+  const { response, requestedFiles } = await runApiAction(rows, 'getEventRecord', {
+    id: 'event_yuanhang_captain'
+  })
+
+  assert.equal(response.ok, true)
+  assert.equal(response.data.images[0].imageUrl, 'https://temp.example/cloud://yuanhang-fallback')
+  assert.deepEqual(requestedFiles, ['cloud://yuanhang-fallback'])
+})
+
+test('getEventRecord rejects an out-of-scope event before resolving images', async () => {
+  const rows = baseRows()
+  const { response, requestedFiles } = await runApiAction(rows, 'getEventRecord', {
+    id: 'event_jingying'
+  })
+
+  assert.equal(response.ok, false)
+  assert.equal(response.code, 'PERMISSION_DENIED')
+  assert.deepEqual(requestedFiles, [])
 })

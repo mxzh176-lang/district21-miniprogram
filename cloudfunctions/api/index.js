@@ -2165,7 +2165,7 @@ async function saveEventRecord(openid, event = {}) {
 }
 
 async function getEventRecord(openid, event = {}) {
-  await requirePlatformUser(openid)
+  const user = await requirePlatformUser(openid)
   const id = cleanText(event.id, 100)
   if (!id) throw Object.assign(new Error('缺少纪事 ID'), { code: 'EVENT_ID_REQUIRED' })
   const result = await db.collection(COLLECTIONS.eventRecord).where({ id }).limit(1).get()
@@ -2173,15 +2173,21 @@ async function getEventRecord(openid, event = {}) {
   if (!record || record.deletedAt) {
     throw Object.assign(new Error('纪事不存在或已归档'), { code: 'NOT_FOUND' })
   }
-  const images = await db.collection(COLLECTIONS.eventImage)
-    .where({ eventId: record.id, status: 'active' })
-    .orderBy('sortOrder', 'asc')
-    .limit(200)
-    .get()
+  const historyRead = await historyReadPermissionSnapshot(user)
+  if (!historyRead.canRead(record)) {
+    throw Object.assign(new Error('当前账号无权查看该历史事件'), { code: 'PERMISSION_DENIED' })
+  }
+  const imageQueries = createArchiveImageQueryAdapter({ db, collections: COLLECTIONS })
+  const resolvedImageMap = await loadArchiveImages([record], {
+    listEventImages: imageQueries.listEventImages,
+    listFileRecords: imageQueries.listFileRecords,
+    attachImageUrls,
+    warn: (message, error) => console.warn(message, error.message)
+  })
   return {
     ...record,
     eventType: normalizeEventType(record.eventType, record.categoryId, record.category),
-    images: await attachImageUrls(images.data)
+    images: resolvedImageMap[record.id] || []
   }
 }
 

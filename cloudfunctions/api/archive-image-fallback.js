@@ -43,27 +43,29 @@ function selectArchiveImages(records = [], eventImages = [], fileRecords = []) {
 
 async function loadArchiveImages(records = [], dependencies = {}) {
   const warn = typeof dependencies.warn === 'function' ? dependencies.warn : () => {}
+  const organizationIds = Array.from(new Set(records.map(record => record.organizationId).filter(Boolean)))
+  const requests = [{
+    source: 'event_image',
+    promise: Promise.resolve().then(() => dependencies.listEventImages(records.map(record => record.id)))
+  }].concat(organizationIds.map(organizationId => ({
+    source: 'file_records',
+    promise: Promise.resolve().then(() => dependencies.listFileRecords(
+      organizationId,
+      records.filter(record => record.organizationId === organizationId).map(record => record.id)
+    ))
+  })))
+  const settled = await Promise.allSettled(requests.map(request => request.promise))
   let eventImages = []
   let fileRecords = []
-
-  try {
-    eventImages = await dependencies.listEventImages(records.map(record => record.id))
-  } catch (error) {
-    warn('event_image list unavailable', error)
-  }
-
-  const organizationIds = Array.from(new Set(records.map(record => record.organizationId).filter(Boolean)))
-  for (const organizationId of organizationIds) {
-    try {
-      const eventIds = records
-        .filter(record => record.organizationId === organizationId)
-        .map(record => record.id)
-      const rows = await dependencies.listFileRecords(organizationId, eventIds)
-      fileRecords = fileRecords.concat(rows || [])
-    } catch (error) {
-      warn('file_records list unavailable', error)
+  settled.forEach((result, index) => {
+    const request = requests[index]
+    if (result.status === 'rejected') {
+      warn(`${request.source} list unavailable`, result.reason)
+      return
     }
-  }
+    if (request.source === 'event_image') eventImages = result.value || []
+    else fileRecords = fileRecords.concat(result.value || [])
+  })
 
   const selected = selectArchiveImages(records, eventImages || [], fileRecords)
   const resolved = await dependencies.attachImageUrls(Object.values(selected).flat())

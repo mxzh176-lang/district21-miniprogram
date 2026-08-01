@@ -113,6 +113,27 @@ test('loader recovers fallback images when event_image lookup fails', async () =
   assert.deepEqual(warnings, ['event_image list unavailable: event_image unavailable'])
 })
 
+test('archive loader starts primary and fallback reads concurrently', async () => {
+  const started = []
+  let releasePrimary
+  let releaseFallback
+  const primaryGate = new Promise(resolve => { releasePrimary = resolve })
+  const fallbackGate = new Promise(resolve => { releaseFallback = resolve })
+  const pending = loadArchiveImages([
+    { id: 'event_1', organizationId: 'org_team_yuanhang' }
+  ], {
+    listEventImages: async () => { started.push('primary'); await primaryGate; return [] },
+    listFileRecords: async () => { started.push('fallback'); await fallbackGate; return [] },
+    attachImageUrls: async rows => rows
+  })
+
+  await new Promise(resolve => setImmediate(resolve))
+  assert.deepEqual(started.sort(), ['fallback', 'primary'])
+  releasePrimary()
+  releaseFallback()
+  await pending
+})
+
 test('loader keeps primary images when file_records lookup fails', async () => {
   const warnings = []
   const selected = await loadArchiveImages(
@@ -218,12 +239,11 @@ test('archive query adapter paginates only visible event ids for primary and fal
   assert.equal(fallback.length, 73)
   assert.ok(queries.some(query => query.skip > 0))
   queries.filter(query => query.name === 'event_image').forEach(query => {
+    assert.deepEqual(Object.keys(query.where), ['eventId'])
     assert.ok(query.where.eventId.values.every(eventId => eventIds.includes(eventId)))
   })
   queries.filter(query => query.name === 'file_records').forEach(query => {
-    assert.equal(query.where.organizationId, 'org_team_yuanhang')
-    assert.equal(query.where.resourceType, 'event_record')
-    assert.equal(query.where.status, 'active')
+    assert.deepEqual(Object.keys(query.where), ['resourceId'])
     assert.ok(query.where.resourceId.values.every(eventId => eventIds.includes(eventId)))
   })
 })
