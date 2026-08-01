@@ -13,7 +13,7 @@ const RECORDS = [
 
 test('event_image remains primary when both image sources exist', () => {
   const selected = selectArchiveImages(
-    RECORDS,
+    RECORDS.map(record => record.id === 'event_primary' ? { ...record, imageCount: 1 } : record),
     [{
       eventId: 'event_primary',
       organizationId: 'org_team_yuanhang',
@@ -33,6 +33,44 @@ test('event_image remains primary when both image sources exist', () => {
   )
 
   assert.deepEqual(selected.event_primary.map(item => item.fileId), ['cloud://primary'])
+})
+
+test('partial primary images append only missing fallback rows up to imageCount', () => {
+  const selected = selectArchiveImages(
+    [{ id: 'event_partial', organizationId: 'org_team_yuanhang', imageCount: 2 }],
+    [{
+      eventId: 'event_partial',
+      organizationId: 'org_team_yuanhang',
+      status: 'active',
+      fileId: 'cloud://primary',
+      sortOrder: 5
+    }],
+    [
+      {
+        resourceType: 'event_record',
+        resourceId: 'event_partial',
+        organizationId: 'org_team_yuanhang',
+        status: 'active',
+        fileType: 'image/jpeg',
+        fileID: 'cloud://primary',
+        sortOrder: 1
+      },
+      {
+        resourceType: 'event_record',
+        resourceId: 'event_partial',
+        organizationId: 'org_team_yuanhang',
+        status: 'active',
+        fileType: 'image/jpeg',
+        fileID: 'cloud://missing',
+        sortOrder: 2
+      }
+    ]
+  )
+
+  assert.deepEqual(selected.event_partial.map(item => item.fileId), [
+    'cloud://primary',
+    'cloud://missing'
+  ])
 })
 
 test('active image file records restore events without primary images', () => {

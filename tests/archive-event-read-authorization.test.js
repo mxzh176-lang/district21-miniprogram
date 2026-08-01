@@ -12,7 +12,7 @@ function matches(row, where) {
   })
 }
 
-function createDatabase(rows) {
+function createDatabase(rows, queryExecutions) {
   return {
     command: { in: values => ({ values }) },
     collection(name) {
@@ -23,6 +23,7 @@ function createDatabase(rows) {
         skip(value) { state.skip = value || 0; return query },
         limit(value) { state.limit = value; return query },
         async get() {
+          queryExecutions.push({ collection: name, where: { ...state.where } })
           if (rows.__errors && rows.__errors[name]) throw rows.__errors[name]
           const data = (rows[name] || []).filter(row => matches(row, state.where))
           return { data: data.slice(state.skip, state.skip + state.limit) }
@@ -35,7 +36,8 @@ function createDatabase(rows) {
 
 async function runApiAction(rows, action, event = {}) {
   const requestedFiles = []
-  const db = createDatabase(rows)
+  const queryExecutions = []
+  const db = createDatabase(rows, queryExecutions)
   const cloud = {
     DYNAMIC_CURRENT_ENV: 'test',
     init() {},
@@ -57,7 +59,7 @@ async function runApiAction(rows, action, event = {}) {
   try {
     const api = require(INDEX_PATH)
     const response = await api.main({ action, ...event })
-    return { response, requestedFiles }
+    return { response, requestedFiles, queryExecutions }
   } finally {
     Module._load = originalLoad
     delete require.cache[INDEX_PATH]
@@ -203,13 +205,60 @@ test('getEventRecord restores same-organization file records after history autho
   assert.deepEqual(requestedFiles, ['cloud://yuanhang-fallback'])
 })
 
+test('list and detail append a missing fallback image after a partial primary result', async () => {
+  const rows = baseRows()
+  rows.event_record[0].imageCount = 2
+  rows.file_records = [
+    {
+      resourceType: 'event_record',
+      resourceId: 'event_yuanhang_captain',
+      organizationId: 'org_team_yuanhang',
+      status: 'active',
+      fileType: 'image/jpeg',
+      fileID: 'cloud://yuanhang-captain',
+      sortOrder: 1
+    },
+    {
+      resourceType: 'event_record',
+      resourceId: 'event_yuanhang_captain',
+      organizationId: 'org_team_yuanhang',
+      status: 'active',
+      fileType: 'image/jpeg',
+      fileID: 'cloud://yuanhang-missing',
+      sortOrder: 2
+    }
+  ]
+
+  const listResult = await runApiAction(rows, 'listEventRecords', { categoryId: 'captain' })
+  const detailResult = await runApiAction(rows, 'getEventRecord', { id: 'event_yuanhang_captain' })
+
+  assert.deepEqual(listResult.response.data[0].images.map(item => item.fileId), [
+    'cloud://yuanhang-captain',
+    'cloud://yuanhang-missing'
+  ])
+  assert.deepEqual(detailResult.response.data.images.map(item => item.fileId), [
+    'cloud://yuanhang-captain',
+    'cloud://yuanhang-missing'
+  ])
+  assert.deepEqual(listResult.requestedFiles, [
+    'cloud://yuanhang-captain',
+    'cloud://yuanhang-missing'
+  ])
+  assert.deepEqual(detailResult.requestedFiles, [
+    'cloud://yuanhang-captain',
+    'cloud://yuanhang-missing'
+  ])
+})
+
 test('getEventRecord rejects an out-of-scope event before resolving images', async () => {
   const rows = baseRows()
-  const { response, requestedFiles } = await runApiAction(rows, 'getEventRecord', {
+  const { response, requestedFiles, queryExecutions } = await runApiAction(rows, 'getEventRecord', {
     id: 'event_jingying'
   })
 
   assert.equal(response.ok, false)
   assert.equal(response.code, 'PERMISSION_DENIED')
   assert.deepEqual(requestedFiles, [])
+  assert.equal(queryExecutions.filter(item => item.collection === 'event_image').length, 0)
+  assert.equal(queryExecutions.filter(item => item.collection === 'file_records').length, 0)
 })

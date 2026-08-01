@@ -137,10 +137,20 @@ async function attachImageUrls(images = []) {
   return resolveImageDisplayUrls(images, {
     getTempFileURL: payload => cloud.getTempFileURL(payload),
     warn: (message, details) => console.warn(message, {
+      batchIndex: details.batchIndex,
+      batchCount: details.batchCount,
       batchSize: details.batchSize,
+      resolvedCount: details.resolvedCount,
+      unresolvedCount: details.unresolvedCount,
       error: details.error && details.error.message
     })
   })
+}
+
+function avatarFileIdOf(user = {}) {
+  return [user.avatarFileId, user.avatar, user.avatarUrl]
+    .map(value => cleanText(value, 1000))
+    .find(value => value.startsWith('cloud://')) || ''
 }
 
 function monthLabel(month) {
@@ -968,14 +978,18 @@ async function getPlatformSession(openid) {
   const legacyRole = primaryRole === 'super_admin'
     ? 'superadmin'
     : primaryRole === 'member' ? 'member' : 'admin'
-  const avatarRows = user.avatar
-    ? await attachImageUrls([{ fileId: user.avatar }])
+  const avatarFileId = avatarFileIdOf(user)
+  const avatarRows = avatarFileId
+    ? await attachImageUrls([{ fileId: avatarFileId }])
     : []
-  const avatarUrl = avatarRows[0] ? avatarRows[0].imageUrl : ''
+  const avatarUrl = avatarRows[0]
+    ? avatarRows[0].imageUrl
+    : cleanText(user.avatarUrl || user.avatar, 1000)
   return {
     _id: user.id,
     id: user.id,
     nickname: user.name,
+    avatarFileId,
     avatarUrl,
     status: user.status === 'active' ? 'approved' : 'pending',
     role: legacyRole,
@@ -3926,6 +3940,7 @@ function publicDirectoryMember(user, organizations = {}) {
   const organization = organizations[organizationId] || {}
   const sourceName = cleanText(user.name || user.nickname, 40)
   const name = organizationId === 'org_team_yuanhang' && sourceName === '李姗姗' ? '李珊珊' : sourceName
+  const avatarFileId = avatarFileIdOf(user)
   return {
     _id: user.id || user._id,
     id: user.id || user._id,
@@ -3942,7 +3957,8 @@ function publicDirectoryMember(user, organizations = {}) {
     memberCode: cleanText(user.memberCode, 30),
     accountSuffix: String(user.id || user._id || '').slice(-6),
     resource: cleanText(user.resource, 100),
-    avatarUrl: user.avatar || user.avatarUrl || '',
+    avatarFileId,
+    avatarUrl: avatarFileId || cleanText(user.avatar || user.avatarUrl, 1000),
     initial: memberInitial(name),
     letter: cleanText(user.letter, 2) || memberLetter(name),
     avatarTone: cleanText(user.avatarTone, 20) || 'green',
@@ -4000,7 +4016,7 @@ async function directoryMembers() {
   const members = Object.values(directory)
     .sort((a, b) => String(a.letter || '#').localeCompare(String(b.letter || '#')) || a.name.localeCompare(b.name, 'zh-Hans-CN'))
   const avatarRows = await attachImageUrls(members
-    .map(item => ({ fileId: cleanText(item.avatarUrl, 1000) }))
+    .map(item => ({ fileId: item.avatarFileId }))
     .filter(item => item.fileId))
   const avatarUrlMap = avatarRows.reduce((map, item) => {
     map[item.fileId] = item.imageUrl || item.fileId
@@ -4008,7 +4024,7 @@ async function directoryMembers() {
   }, {})
   return members.map(item => ({
     ...item,
-    avatarUrl: avatarUrlMap[item.avatarUrl] || item.avatarUrl
+    avatarUrl: avatarUrlMap[item.avatarFileId] || item.avatarUrl
   }))
 }
 
@@ -4057,11 +4073,20 @@ async function getMember(openid, event = {}) {
   if (!member) {
     throw Object.assign(new Error('未找到成员资料'), { code: 'MEMBER_NOT_FOUND' })
   }
+  const canManage = await canManageDirectoryMember(openid, member, 'update')
+  const canDelete = await canManageDirectoryMember(openid, member, 'delete')
+  const resolvedMembers = await attachImageUrls(member.avatarFileId
+    ? [{ fileId: member.avatarFileId }]
+    : [])
+  const resolvedAvatar = resolvedMembers[0]
   return {
-    member,
+    member: {
+      ...member,
+      avatarUrl: resolvedAvatar ? resolvedAvatar.imageUrl : member.avatarUrl
+    },
     canViewContact: true,
-    canManage: await canManageDirectoryMember(openid, member, 'update'),
-    canDelete: await canManageDirectoryMember(openid, member, 'delete')
+    canManage,
+    canDelete
   }
 }
 
@@ -4088,7 +4113,7 @@ async function saveMember(openid, event = {}) {
     birthday: normalizeBirthday(input.birthday),
     profession: normalizeProfession(input.profession),
     resource: cleanText(input.resource, 100),
-    avatar: cleanText(input.avatarUrl || input.avatar, 1000),
+    avatar: cleanText(input.avatarFileId, 1000) || cleanText(input.avatarUrl || input.avatar, 1000),
     letter: cleanText(input.letter, 2) || memberLetter(name),
     status: cleanText(input.status, 20) || (existing && existing.status) || 'active',
     profileCompleted: true,

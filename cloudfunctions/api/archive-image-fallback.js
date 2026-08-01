@@ -22,12 +22,20 @@ function selectArchiveImages(records = [], eventImages = [], fileRecords = []) {
     selected[eventId].push({ ...image, fileId: image.fileId || image.fileID || '' })
   })
 
-  const primaryEventIds = new Set(Object.keys(selected).filter(eventId => selected[eventId].length))
+  const primaryCounts = Object.keys(selected).reduce((counts, eventId) => {
+    counts[eventId] = selected[eventId].length
+    return counts
+  }, {})
   sortImages(fileRecords).forEach(file => {
     const eventId = String(file && file.resourceId || '')
     const record = recordMap.get(eventId)
     const key = imageKey(file)
-    if (!record || primaryEventIds.has(eventId) || !key) return
+    if (!record || !key) return
+    const intendedCount = Number.isInteger(record.imageCount) && record.imageCount > 0
+      ? record.imageCount
+      : 0
+    const selectedCount = selected[eventId].length
+    if (intendedCount ? selectedCount >= intendedCount : primaryCounts[eventId] > 0) return
     if (file.resourceType !== 'event_record' || file.status !== 'active') return
     if (file.organizationId !== record.organizationId || !String(file.fileType || '').startsWith('image/')) return
     if (selected[eventId].some(item => imageKey(item) === key)) return

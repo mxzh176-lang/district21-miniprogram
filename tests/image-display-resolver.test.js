@@ -64,3 +64,73 @@ test('resolver converts every image beyond the platform batch limit', async () =
   assert.deepEqual(calls.map(call => call.length).sort((a, b) => a - b), [23, 50])
   assert.equal(resolved[72].imageUrl, 'https://temp.example/73')
 })
+
+test('resolver warns once without sensitive values when a successful batch omits a file URL', async () => {
+  const warnings = []
+  const rows = await resolveImageDisplayUrls([
+    { fileId: 'cloud://env/resolved' },
+    { fileId: 'cloud://env/missing' }
+  ], {
+    getTempFileURL: async () => ({
+      fileList: [
+        { fileID: 'cloud://env/resolved', tempFileURL: 'https://temp.example/resolved.jpg' },
+        { fileID: 'cloud://env/missing', tempFileURL: '' }
+      ]
+    }),
+    warn: (message, details) => warnings.push({ message, details })
+  })
+
+  assert.deepEqual(rows.map(row => row.imageUrl), [
+    'https://temp.example/resolved.jpg',
+    'cloud://env/missing'
+  ])
+  assert.deepEqual(warnings, [{
+    message: 'image temp url batch incomplete',
+    details: {
+      batchIndex: 1,
+      batchCount: 1,
+      batchSize: 2,
+      resolvedCount: 1,
+      unresolvedCount: 1
+    }
+  }])
+  const warningText = JSON.stringify(warnings)
+  assert.equal(warningText.includes('cloud://'), false)
+  assert.equal(warningText.includes('https://'), false)
+})
+
+test('invalid local and custom URLs do not mask a stable cloud id', async () => {
+  const rows = await resolveImageDisplayUrls([
+    { fileId: 'cloud://env/image-url', imageUrl: '/tmp/local.jpg' },
+    { fileId: 'cloud://env/src', src: 'wxfile://local.jpg' },
+    { fileId: 'cloud://env/url', url: 'custom://local.jpg' },
+    { fileId: 'cloud://env/external', imageUrl: 'relative.jpg', src: 'https://static.example/external.jpg' }
+  ], {
+    getTempFileURL: async ({ fileList }) => ({
+      fileList: fileList.map(fileID => ({ fileID, tempFileURL: '' }))
+    })
+  })
+
+  assert.deepEqual(rows.map(row => row.imageUrl), [
+    'cloud://env/image-url',
+    'cloud://env/src',
+    'cloud://env/url',
+    'https://static.example/external.jpg'
+  ])
+})
+
+test('resolver retains only HTTP or HTTPS display URLs when no stable id exists', async () => {
+  const rows = await resolveImageDisplayUrls([
+    { imageUrl: '/tmp/local.jpg', src: 'wxfile://local.jpg', url: 'custom://local.jpg' },
+    { imageUrl: 'http://static.example/plain.jpg' },
+    { src: 'https://static.example/secure.jpg' }
+  ], {
+    getTempFileURL: async () => ({ fileList: [] })
+  })
+
+  assert.deepEqual(rows.map(row => row.imageUrl), [
+    '',
+    'http://static.example/plain.jpg',
+    'https://static.example/secure.jpg'
+  ])
+})

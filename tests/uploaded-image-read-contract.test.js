@@ -12,7 +12,7 @@ function matches(row, where) {
   })
 }
 
-function createDatabase(rows) {
+function createDatabase(rows, writes) {
   return {
     command: { in: values => ({ values }) },
     collection(name) {
@@ -27,10 +27,23 @@ function createDatabase(rows) {
         async get() {
           return { data: filteredRows().slice(state.skip, state.skip + state.limit) }
         },
+        async add({ data }) {
+          const stored = { ...data, _id: `${name}-doc-${(rows[name] || []).length + 1}` }
+          if (!rows[name]) rows[name] = []
+          rows[name].push(stored)
+          writes.push({ operation: 'add', name, data: { ...data } })
+          return { _id: stored._id }
+        },
         doc(id) {
           return {
             async get() {
               return { data: (rows[name] || []).find(row => row._id === id || row.id === id) || null }
+            },
+            async update({ data }) {
+              const stored = (rows[name] || []).find(row => row._id === id || row.id === id)
+              if (stored) Object.assign(stored, data)
+              writes.push({ operation: 'update', name, id, data: { ...data } })
+              return { stats: { updated: stored ? 1 : 0 } }
             }
           }
         }
@@ -42,7 +55,8 @@ function createDatabase(rows) {
 
 async function runApiAction(rows, action, payload = {}) {
   const requestedFiles = []
-  const db = createDatabase(rows)
+  const writes = []
+  const db = createDatabase(rows, writes)
   const cloud = {
     DYNAMIC_CURRENT_ENV: 'test',
     init() {},
@@ -68,7 +82,7 @@ async function runApiAction(rows, action, payload = {}) {
   delete require.cache[INDEX_PATH]
   try {
     const api = require(INDEX_PATH)
-    return { response: await api.main({ action, ...payload }), requestedFiles }
+    return { response: await api.main({ action, ...payload }), requestedFiles, writes }
   } finally {
     Module._load = originalLoad
     delete require.cache[INDEX_PATH]
@@ -213,6 +227,7 @@ test('getPlatformSession resolves the current avatar without mutating the stored
   const { response, requestedFiles } = await runApiAction(rows, 'getPlatformSession')
 
   assert.equal(response.ok, true)
+  assert.equal(response.data.avatarFileId, 'cloud://env/avatar/current.jpg')
   assert.equal(response.data.avatarUrl, 'https://temp.example/current.jpg')
   assert.deepEqual(storedUser, before)
   assert.deepEqual(requestedFiles, ['cloud://env/avatar/current.jpg'])
@@ -232,8 +247,72 @@ test('listMembers resolves public member avatars without resolving filtered user
 
   assert.equal(response.ok, true)
   assert.ok(member)
+  assert.equal(member.avatarFileId, 'cloud://env/avatar/member.jpg')
   assert.equal(member.avatarUrl, 'https://temp.example/member.jpg')
   assert.deepEqual(requestedFiles, ['cloud://env/avatar/member.jpg'])
+})
+
+test('getMember preserves the stable avatar id and resolves only the authorized member avatar', async () => {
+  const rows = platformRows({
+    user: [
+      {
+        _id: 'reader-doc',
+        id: 'user-reader',
+        openid: 'reader-openid',
+        name: '读者',
+        status: 'active',
+        defaultOrganizationId: 'org_team_yuanhang'
+      },
+      {
+        _id: 'member-doc',
+        id: 'member-1',
+        name: '张明星',
+        status: 'active',
+        defaultOrganizationId: 'org_team_yuanhang',
+        avatar: 'cloud://env/avatar/member-detail.jpg'
+      },
+      {
+        _id: 'unrelated-doc',
+        id: 'member-unrelated',
+        name: '其他成员',
+        status: 'active',
+        defaultOrganizationId: 'org_team_yuanhang',
+        avatar: 'cloud://env/avatar/unrelated.jpg'
+      }
+    ],
+    user_role: [{ userId: 'user-reader', role: 'super_admin', status: 'active' }],
+    members: [{ _id: 'legacy-reader', _openid: 'reader-openid', status: 'approved', role: 'member' }],
+    organization: [{ id: 'org_team_yuanhang', name: '远航服务队', shortName: '远航', type: 'team', status: 'active' }]
+  })
+
+  const { response, requestedFiles } = await runApiAction(rows, 'getMember', { id: 'member-1' })
+
+  assert.equal(response.ok, true)
+  assert.equal(response.data.member.avatarFileId, 'cloud://env/avatar/member-detail.jpg')
+  assert.equal(response.data.member.avatarUrl, 'https://temp.example/member-detail.jpg')
+  assert.deepEqual(requestedFiles, ['cloud://env/avatar/member-detail.jpg'])
+})
+
+test('saveMember persists avatarFileId instead of a temporary avatarUrl', async () => {
+  const rows = platformRows({
+    user_role: [{ userId: 'user-reader', role: 'super_admin', status: 'active' }],
+    organization: [{ id: 'org_team_yuanhang', name: '远航服务队', shortName: '远航', type: 'team', status: 'active' }]
+  })
+
+  const { response, writes } = await runApiAction(rows, 'saveMember', {
+    member: {
+      name: '稳定头像成员',
+      organizationId: 'org_team_yuanhang',
+      avatarFileId: 'cloud://env/avatar/stable.jpg',
+      avatarUrl: 'https://temp.example/expiring.jpg'
+    }
+  })
+  const userWrite = writes.find(item => item.operation === 'add' && item.name === 'user')
+
+  assert.equal(response.ok, true)
+  assert.ok(userWrite)
+  assert.equal(userWrite.data.avatar, 'cloud://env/avatar/stable.jpg')
+  assert.notEqual(userWrite.data.avatar, 'https://temp.example/expiring.jpg')
 })
 
 test('listActivities resolves only active activity covers', async () => {
