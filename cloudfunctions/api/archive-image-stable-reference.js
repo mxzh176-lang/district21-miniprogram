@@ -37,11 +37,13 @@ function preserveStableArchiveImages(images = [], existingImages = []) {
     }
   })
 
-  return images.map(image => {
+  const normalized = images.map(image => {
     const current = image || {}
     const fileId = String(current.fileId || current.fileID || '').trim()
     if (fileId.startsWith('cloud://')) return current
-    const objectKey = storageObjectKey(current.imageUrl || current.src || current.url)
+    const displayUrl = current.imageUrl || current.src || current.url
+    if (!isCloudBaseSignedTemporaryUrl(displayUrl)) return current
+    const objectKey = storageObjectKey(displayUrl)
     const stable = activeStableByObjectKey.get(objectKey)
     if (!stable) return current
     return {
@@ -51,6 +53,14 @@ function preserveStableArchiveImages(images = [], existingImages = []) {
       objectKey: stable.objectKey
     }
   })
+  const seen = new Set()
+  return normalized.filter(image => {
+    const key = String(image.fileId || image.fileID || image.imageUrl || image.src || image.url || '').trim()
+    if (!key || seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 }
 
 module.exports = { preserveStableArchiveImages, storageObjectKey }
+const { isCloudBaseSignedTemporaryUrl } = require('./image-display-resolver')

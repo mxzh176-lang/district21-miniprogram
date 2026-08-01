@@ -48,3 +48,31 @@ test('deleted stable references are not revived after the storage object was rem
 
   assert.deepEqual(images, [{ imageUrl }])
 })
+
+test('permanent external URLs are never replaced merely because their pathname matches', () => {
+  const objectKey = 'archive/permanent.jpg'
+  const imageUrl = `https://static.example/${objectKey}`
+  const images = preserveStableArchiveImages([{ imageUrl }], [{
+    status: 'active',
+    fileId: `cloud://env.bucket/${objectKey}`,
+    objectKey
+  }])
+
+  assert.deepEqual(images, [{ imageUrl }])
+})
+
+test('canonicalization deduplicates cloud ids and differently signed URLs before image limits apply', () => {
+  const objectKey = 'archive/repeated.jpg'
+  const fileId = `cloud://env.bucket/${objectKey}`
+  const images = preserveStableArchiveImages([
+    { fileId },
+    { imageUrl: `https://bucket.tcb.qcloud.la/${objectKey}?sign=first&t=1785565519` },
+    { imageUrl: `https://bucket.tcb.qcloud.la/${objectKey}?sign=second&t=1785565520` },
+    { imageUrl: 'https://static.example/unique.jpg' }
+  ], [{ status: 'active', fileId, objectKey }])
+
+  assert.deepEqual(images, [
+    { fileId },
+    { imageUrl: 'https://static.example/unique.jpg' }
+  ])
+})
