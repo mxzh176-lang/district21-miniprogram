@@ -193,6 +193,36 @@ test('loader keeps primary images when file_records lookup fails', async () => {
   assert.deepEqual(warnings, ['file_records list unavailable: file_records unavailable'])
 })
 
+test('archive list image budget resolves only the images needed by each card', async () => {
+  const records = [
+    { id: 'event_1', organizationId: 'org_team_yuanhang' },
+    { id: 'event_2', organizationId: 'org_team_yuanhang' }
+  ]
+  const resolvedFileIds = []
+  const selected = await loadArchiveImages(records, {
+    listEventImages: async eventIds => eventIds.flatMap(eventId => [1, 2, 3].map(sortOrder => ({
+      eventId,
+      organizationId: 'org_team_yuanhang',
+      status: 'active',
+      fileId: `cloud://${eventId}/${sortOrder}`,
+      sortOrder
+    }))),
+    listFileRecords: async () => [],
+    maxImagesPerRecord: 1,
+    attachImageUrls: async images => {
+      resolvedFileIds.push(...images.map(image => image.fileId))
+      return images.map(image => ({ ...image, imageUrl: `https://temp.example/${image.fileId}` }))
+    }
+  })
+
+  assert.deepEqual(resolvedFileIds, [
+    'cloud://event_1/1',
+    'cloud://event_2/1'
+  ])
+  assert.equal(selected.event_1.length, 1)
+  assert.equal(selected.event_2.length, 1)
+})
+
 test('loader requests every visible event id so images after legacy query limits remain visible', async () => {
   const records = Array.from({ length: 1001 }, (_, index) => ({
     id: `event_${index + 1}`,

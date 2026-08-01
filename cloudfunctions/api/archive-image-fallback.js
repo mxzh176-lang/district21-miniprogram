@@ -76,7 +76,14 @@ async function loadArchiveImages(records = [], dependencies = {}) {
   })
 
   const selected = selectArchiveImages(records, eventImages || [], fileRecords)
-  const resolved = await dependencies.attachImageUrls(Object.values(selected).flat())
+  const requestedLimit = Number(dependencies.maxImagesPerRecord)
+  const maxImagesPerRecord = Number.isFinite(requestedLimit) && requestedLimit > 0
+    ? Math.floor(requestedLimit)
+    : null
+  const imagesForDisplay = Object.values(selected).flatMap(images =>
+    maxImagesPerRecord ? images.slice(0, maxImagesPerRecord) : images
+  )
+  const resolved = await dependencies.attachImageUrls(imagesForDisplay)
   const result = {}
   records.forEach(record => { result[record.id] = [] })
   ;(resolved || []).forEach(image => {

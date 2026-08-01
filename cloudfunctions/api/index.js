@@ -2082,6 +2082,10 @@ async function listEventRecords(openid, event = {}) {
   const eventType = cleanText(event.eventType, 40)
   const eventMonth = cleanText(event.eventMonth, 7)
   const limit = Math.min(Number(event.limit) || 50, 100)
+  const requestedImageLimit = Number(event.imageLimit)
+  const imageLimit = Number.isFinite(requestedImageLimit) && requestedImageLimit > 0
+    ? Math.min(Math.floor(requestedImageLimit), 5)
+    : null
   const result = await db.collection(COLLECTIONS.eventRecord).limit(200).get()
   const records = result.data
     .filter(item => !item.deletedAt)
@@ -2104,6 +2108,7 @@ async function listEventRecords(openid, event = {}) {
     listEventImages: imageQueries.listEventImages,
     listFileRecords: imageQueries.listFileRecords,
     attachImageUrls,
+    maxImagesPerRecord: imageLimit,
     warn: (message, error) => console.warn(message, error.message)
   })
   return records.map(item => ({ ...item, images: resolvedImageMap[item.id] || [] }))
