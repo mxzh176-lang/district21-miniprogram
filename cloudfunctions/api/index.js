@@ -7,6 +7,7 @@ const { createArchiveImageQueryAdapter } = require('./archive-image-query')
 const { ensureMonthlyMeetingTodo: reconcileMonthlyMeetingTodo } = require('./monthly-meeting-todo')
 const { createMonthlyMeetingQueryAdapter } = require('./monthly-meeting-query')
 const { runAutomaticTodoReconciliation } = require('./automatic-todo-runner')
+const { resolveImageDisplayUrls } = require('./image-display-resolver')
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
@@ -132,26 +133,14 @@ function cleanParticipants(value) {
 }
 
 async function attachImageUrls(images = []) {
-  const normalized = images.map(item => ({ ...item }))
-  const fileIds = Array.from(new Set(normalized
-    .map(item => cleanText(item.fileId, 1000))
-    .filter(fileId => fileId && fileId.startsWith('cloud://'))))
-  if (!fileIds.length || typeof cloud.getTempFileURL !== 'function') return normalized
-  const urlMap = {}
-  for (let index = 0; index < fileIds.length; index += 50) {
-    try {
-      const response = await cloud.getTempFileURL({ fileList: fileIds.slice(index, index + 50) })
-      ;(response.fileList || []).forEach(item => {
-        if (item.fileID && item.tempFileURL) urlMap[item.fileID] = item.tempFileURL
-      })
-    } catch (error) {
-      console.warn('获取图片临时访问链接失败', error.message)
-    }
-  }
-  return normalized.map(item => ({
-    ...item,
-    imageUrl: urlMap[item.fileId] || item.imageUrl || ''
-  }))
+  if (typeof cloud.getTempFileURL !== 'function') return images.map(item => ({ ...item }))
+  return resolveImageDisplayUrls(images, {
+    getTempFileURL: payload => cloud.getTempFileURL(payload),
+    warn: (message, details) => console.warn(message, {
+      batchSize: details.batchSize,
+      error: details.error && details.error.message
+    })
+  })
 }
 
 function monthLabel(month) {
