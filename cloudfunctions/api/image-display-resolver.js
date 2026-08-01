@@ -2,10 +2,21 @@ function fileIdOf(record = {}) {
   return String(record.fileId || record.fileID || '').trim()
 }
 
+function isCloudBaseSignedTemporaryUrl(value = '') {
+  try {
+    const url = new URL(String(value || '').trim())
+    return url.hostname.endsWith('.tcb.qcloud.la') &&
+      url.searchParams.has('sign') && url.searchParams.has('t')
+  } catch (error) {
+    return false
+  }
+}
+
 function externalUrlOf(record = {}) {
   return [record.imageUrl, record.src, record.url]
     .map(value => String(value || '').trim())
-    .find(value => value.startsWith('http://') || value.startsWith('https://')) || ''
+    .find(value => (value.startsWith('http://') || value.startsWith('https://')) &&
+      !isCloudBaseSignedTemporaryUrl(value)) || ''
 }
 
 function batches(values, size) {
@@ -51,4 +62,4 @@ async function resolveImageDisplayUrls(records = [], dependencies = {}) {
   }))
 }
 
-module.exports = { fileIdOf, externalUrlOf, resolveImageDisplayUrls }
+module.exports = { fileIdOf, externalUrlOf, isCloudBaseSignedTemporaryUrl, resolveImageDisplayUrls }
