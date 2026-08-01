@@ -96,6 +96,24 @@ test('resolver keeps successful batches and stable ids when one batch fails', as
   assert.equal(warnings.length, 1)
   assert.equal(warnings[0].details.batchSize, 1)
 })
+
+test('resolver converts every image beyond the platform batch limit', async () => {
+  const rows = Array.from({ length: 73 }, (_, index) => ({ fileID: `cloud://env/${index + 1}` }))
+  const calls = []
+  const resolved = await resolveImageDisplayUrls(rows, {
+    getTempFileURL: async ({ fileList }) => {
+      calls.push(fileList.slice())
+      return {
+        fileList: fileList.map(fileID => ({
+          fileID,
+          tempFileURL: `https://temp.example/${fileID.split('/').pop()}`
+        }))
+      }
+    }
+  })
+  assert.deepEqual(calls.map(call => call.length).sort((a, b) => a - b), [23, 50])
+  assert.equal(resolved[72].imageUrl, 'https://temp.example/73')
+})
 ```
 
 - [ ] **Step 3: Run the focused test and verify RED**
@@ -196,7 +214,7 @@ git commit -m "fix: normalize cloud image display urls"
 **Interfaces:**
 - Consumes: `attachImageUrls(images)` backed by Task 1's resolver.
 - Produces: `createArchiveImageQueryAdapter(...).listEventImages(eventIds)` and `.listFileRecords(organizationId, eventIds)` that query only authorized IDs and leave organization/resource/status validation to `selectArchiveImages`.
-- Produces: both `listEventRecords` and `getEventRecord` use `loadArchiveImages` so list, homepage archive cards, detail and edit-backfill receive the same image result.
+- Produces: both `listEventRecords` and `getEventRecord` use `historyReadPermissionSnapshot(user)` before image resolution and use `loadArchiveImages` so list, homepage archive cards, detail and edit-backfill receive the same authorized image result.
 
 - [ ] **Step 1: Add failing query-shape and concurrency tests**
 
@@ -235,7 +253,38 @@ test('archive loader starts primary and fallback reads concurrently', async () =
 })
 ```
 
-Extend the authorization fixture so `getEventRecord` has no `event_image` row but does have a valid same-organization `file_records` image, and assert the detail response includes it while a wrong-organization row remains excluded.
+Extend the authorization test harness to call arbitrary actions, then add two behavioral cases:
+
+```js
+test('getEventRecord restores same-organization file records after history authorization', async () => {
+  const rows = baseRows()
+  rows.event_image = []
+  rows.file_records = [{
+    resourceType: 'event_record',
+    resourceId: 'event_yuanhang_captain',
+    organizationId: 'org_team_yuanhang',
+    status: 'active',
+    fileType: 'image/jpeg',
+    fileID: 'cloud://yuanhang-fallback'
+  }]
+  const { response, requestedFiles } = await runApiAction(rows, 'getEventRecord', {
+    id: 'event_yuanhang_captain'
+  })
+  assert.equal(response.ok, true)
+  assert.equal(response.data.images[0].imageUrl, 'https://temp.example/cloud://yuanhang-fallback')
+  assert.deepEqual(requestedFiles, ['cloud://yuanhang-fallback'])
+})
+
+test('getEventRecord rejects an out-of-scope event before resolving images', async () => {
+  const rows = baseRows()
+  const { response, requestedFiles } = await runApiAction(rows, 'getEventRecord', {
+    id: 'event_jingying'
+  })
+  assert.equal(response.ok, false)
+  assert.equal(response.error.code, 'PERMISSION_DENIED')
+  assert.deepEqual(requestedFiles, [])
+})
+```
 
 - [ ] **Step 2: Run the focused tests and verify RED**
 
@@ -245,7 +294,7 @@ Run:
 node --test tests/archive-image-file-record-fallback.test.js tests/archive-event-read-authorization.test.js
 ```
 
-Expected: FAIL because the adapter still adds compound filters, loader reads sequentially, and detail reads only `event_image`.
+Expected: FAIL because the adapter still adds compound filters, loader reads sequentially, detail reads only `event_image`, and detail does not yet enforce the list's history scope.
 
 - [ ] **Step 3: Make ID queries index-independent and keep fail-closed filtering**
 
@@ -264,9 +313,15 @@ In `archive-image-fallback.js`, start the primary query and all per-organization
 
 - [ ] **Step 4: Route event detail through the same fallback**
 
-In `getEventRecord`, keep the existing record lookup and authorization behavior, then replace the direct `event_image` query with the same adapter and loader used by `listEventRecords`:
+In `getEventRecord`, retain the platform-user lookup, enforce the same history scope as the list before any image query, then replace the direct `event_image` query with the same adapter and loader used by `listEventRecords`:
 
 ```js
+const user = await requirePlatformUser(openid)
+// existing record lookup remains here
+const historyRead = await historyReadPermissionSnapshot(user)
+if (!historyRead.canRead(record)) {
+  throw Object.assign(new Error('当前账号无权查看该历史事件'), { code: 'PERMISSION_DENIED' })
+}
 const imageQueries = createArchiveImageQueryAdapter({ db, collections: COLLECTIONS })
 const resolvedImageMap = await loadArchiveImages([record], {
   listEventImages: imageQueries.listEventImages,
@@ -317,47 +372,66 @@ git commit -m "fix: restore authorized archive images reliably"
 - Consumes: Task 1 `attachImageUrls(records)` with normalized `fileId` and `imageUrl`.
 - Produces: home banners retain `{ fileId, imageUrl, src }`; media files retain original `fileID` plus `url`; member/profile models retain `avatarUrl`; legacy activities retain `coverUrl` and each photo gains `url` without changing endpoint names.
 
-- [ ] **Step 1: Add failing read-contract tests**
+- [ ] **Step 1: Add failing behavioral read-contract tests**
 
-Create `tests/uploaded-image-read-contract.test.js`. Use pure fixtures through `resolveImageDisplayUrls` for field compatibility and source-level contract assertions for endpoint wiring:
+Create `tests/uploaded-image-read-contract.test.js`. Load the real `cloudfunctions/api/index.js` with `Module._load` replacing only `wx-server-sdk`, `jszip` and `otplib`, following the existing integration-test boundary in `tests/archive-event-read-authorization.test.js`. The fake database must implement the query methods actually used by these actions (`where`, `orderBy`, `skip`, `limit`, `count`, `doc().get`) and match `db.command.in` values against literal fixture rows.
+
+Use this action runner shape so assertions exercise endpoint outputs rather than source text:
 
 ```js
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const fs = require('node:fs')
+const Module = require('node:module')
 const path = require('node:path')
-const { resolveImageDisplayUrls } = require('../cloudfunctions/api/image-display-resolver')
 
-const apiSource = fs.readFileSync(path.join(__dirname, '../cloudfunctions/api/index.js'), 'utf8')
+const INDEX_PATH = path.resolve(__dirname, '../cloudfunctions/api/index.js')
 
-test('every upload-backed read model uses the shared image resolver', () => {
-  const body = (name, nextName) => apiSource.slice(
-    apiSource.indexOf(`async function ${name}`),
-    apiSource.indexOf(`async function ${nextName}`)
-  )
-  assert.match(body('mediaAlbumCoverMap', 'listMediaAlbums'), /attachImageUrls/)
-  assert.match(body('getMediaAlbum', 'saveMediaAlbum'), /attachImageUrls/)
-  assert.match(body('getPlatformSession', 'saveUserMemberCode'), /attachImageUrls/)
-  assert.match(body('directoryMembers', 'listDirectoryMembers'), /attachImageUrls/)
-  assert.match(body('listActivities', 'getActivity'), /attachImageUrls/)
-  assert.match(body('getActivity', 'saveActivity'), /attachImageUrls/)
-})
-
-test('more than fifty album covers are all resolved', async () => {
-  const records = Array.from({ length: 73 }, (_, index) => ({ fileID: `cloud://env/${index + 1}` }))
-  const calls = []
-  const result = await resolveImageDisplayUrls(records, {
-    getTempFileURL: async ({ fileList }) => {
-      calls.push(fileList)
-      return { fileList: fileList.map(fileID => ({ fileID, tempFileURL: `https://temp.example/${fileID.split('/').pop()}` })) }
+async function runApiAction(rows, action, payload = {}) {
+  const requestedFiles = []
+  const db = createDatabase(rows)
+  const cloud = {
+    DYNAMIC_CURRENT_ENV: 'test',
+    init() {},
+    database: () => db,
+    getWXContext: () => ({ OPENID: 'reader-openid' }),
+    async getTempFileURL({ fileList }) {
+      requestedFiles.push(...fileList)
+      return {
+        fileList: fileList.map(fileID => ({
+          fileID,
+          tempFileURL: `https://temp.example/${fileID.split('/').pop()}`
+        }))
+      }
     }
-  })
-  assert.equal(calls.length, 2)
-  assert.equal(result[72].imageUrl, 'https://temp.example/73')
-})
+  }
+  const originalLoad = Module._load
+  Module._load = function (request, parent, isMain) {
+    if (request === 'wx-server-sdk') return cloud
+    if (request === 'jszip') return class JSZip {}
+    if (request === 'otplib') return { authenticator: {} }
+    return originalLoad.call(this, request, parent, isMain)
+  }
+  delete require.cache[INDEX_PATH]
+  try {
+    const api = require(INDEX_PATH)
+    return { response: await api.main({ action, ...payload }), requestedFiles }
+  } finally {
+    Module._load = originalLoad
+    delete require.cache[INDEX_PATH]
+  }
+}
 ```
 
-Also assert existing page-facing field names remain present so this server change cannot silently break frontend renderers.
+Add separate behavior tests with literal rows and literal expected URLs for:
+
+- `listHomeBanners`: returned banner keeps `fileId` and returns its temporary URL in both `imageUrl` and `src`.
+- `listMediaAlbums`: an authorized active album with `coverFileID` returns the temporary URL in `coverUrl`.
+- `getMediaAlbum`: an authorized active `file_records` image keeps `fileID` and returns the temporary URL in `url`.
+- `getPlatformSession`: the current user's cloud avatar returns a temporary `avatarUrl` while the database fixture remains unchanged.
+- `listMembers`: directory members with cloud avatars return temporary `avatarUrl` values.
+- `listActivities` and `getActivity`: legacy `photos.fileID` values return temporary `coverUrl`, and detail photos return a `url` field.
+
+Each test must also assert `requestedFiles` contains only the files belonging to the authorized result for that action. These tests fail if an endpoint leaves a raw cloud identifier in its page-facing display field, drops a legacy `fileID`, or resolves an unrelated record.
 
 - [ ] **Step 2: Run the contract tests and verify RED**
 
@@ -367,7 +441,7 @@ Run:
 node --test tests/uploaded-image-read-contract.test.js
 ```
 
-Expected: FAIL because media covers/files, avatars and legacy activity photos do not all use the shared resolver.
+Expected: FAIL because media covers/files, avatars and legacy activity photos do not all return resolved page-facing URLs.
 
 - [ ] **Step 3: Replace duplicate media URL conversion**
 
