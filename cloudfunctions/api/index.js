@@ -2501,7 +2501,7 @@ async function saveEventImages(openid, event = {}) {
     if (!key || imageKeys.has(key)) return false
     imageKeys.add(key)
     return true
-  }).slice(0, 50)
+  })
   const eventResult = await db.collection(COLLECTIONS.eventRecord).where({ id: eventId }).limit(1).get()
   const record = eventResult.data[0]
   if (!record || record.deletedAt) {
