@@ -968,11 +968,15 @@ async function getPlatformSession(openid) {
   const legacyRole = primaryRole === 'super_admin'
     ? 'superadmin'
     : primaryRole === 'member' ? 'member' : 'admin'
+  const avatarRows = user.avatar
+    ? await attachImageUrls([{ fileId: user.avatar }])
+    : []
+  const avatarUrl = avatarRows[0] ? avatarRows[0].imageUrl : ''
   return {
     _id: user.id,
     id: user.id,
     nickname: user.name,
-    avatarUrl: user.avatar || '',
+    avatarUrl,
     status: user.status === 'active' ? 'approved' : 'pending',
     role: legacyRole,
     platformRole: primaryRole,
@@ -2651,19 +2655,13 @@ function mediaAlbumBreadcrumbs(album, albums = []) {
 }
 
 async function mediaAlbumCoverMap(albums = []) {
-  const coverIds = albums.map(item => cleanText(item.coverFileID, 1000)).filter(Boolean)
-  const coverMap = {}
-  if (coverIds.length && typeof cloud.getTempFileURL === 'function') {
-    try {
-      const response = await cloud.getTempFileURL({ fileList: Array.from(new Set(coverIds)).slice(0, 50) })
-      ;(response.fileList || []).forEach(item => {
-        if (item.fileID && item.tempFileURL) coverMap[item.fileID] = item.tempFileURL
-      })
-    } catch (error) {
-      console.warn('获取云盘封面失败', error.message)
-    }
-  }
-  return coverMap
+  const resolved = await attachImageUrls(albums
+    .map(item => ({ fileId: cleanText(item.coverFileID, 1000) }))
+    .filter(item => item.fileId))
+  return resolved.reduce((map, item) => {
+    map[item.fileId] = item.imageUrl || item.fileId
+    return map
+  }, {})
 }
 
 function mediaAlbumView(item, coverMap = {}) {
@@ -2742,23 +2740,15 @@ async function getMediaAlbum(openid, event = {}) {
   const files = result.data
   const childFolders = allAlbums.filter(item => (item.parentId || '') === album.id)
   const childCoverMap = await mediaAlbumCoverMap(childFolders)
-  const fileIds = Array.from(new Set(files.map(item => cleanText(item.fileID, 1000)).filter(Boolean)))
-  const urlMap = {}
-  for (let index = 0; index < fileIds.length; index += 50) {
-    try {
-      const response = await cloud.getTempFileURL({ fileList: fileIds.slice(index, index + 50) })
-      ;(response.fileList || []).forEach(item => {
-        if (item.fileID && item.tempFileURL) urlMap[item.fileID] = item.tempFileURL
-      })
-    } catch (error) {
-      console.warn('获取云盘文件链接失败', error.message)
-    }
-  }
+  const resolvedFiles = await attachImageUrls(files)
   return {
     album: mediaAlbumView(album),
     breadcrumbs: mediaAlbumBreadcrumbs(album, allAlbums),
     childFolders: childFolders.map(item => mediaAlbumView(item, childCoverMap)),
-    files: files.map(item => ({ ...item, url: urlMap[item.fileID] || item.fileID })),
+    files: resolvedFiles.map(item => ({
+      ...item,
+      url: item.imageUrl || item.fileID || item.fileId || ''
+    })),
     permissions: await mediaPermissionSummary(user, album.organizationId),
     page,
     pageSize,
@@ -4007,8 +3997,19 @@ async function directoryMembers() {
       if (item.status === 'disabled') delete directory[key]
       else directory[key] = member
     })
-  return Object.values(directory)
+  const members = Object.values(directory)
     .sort((a, b) => String(a.letter || '#').localeCompare(String(b.letter || '#')) || a.name.localeCompare(b.name, 'zh-Hans-CN'))
+  const avatarRows = await attachImageUrls(members
+    .map(item => ({ fileId: cleanText(item.avatarUrl, 1000) }))
+    .filter(item => item.fileId))
+  const avatarUrlMap = avatarRows.reduce((map, item) => {
+    map[item.fileId] = item.imageUrl || item.fileId
+    return map
+  }, {})
+  return members.map(item => ({
+    ...item,
+    avatarUrl: avatarUrlMap[item.avatarUrl] || item.avatarUrl
+  }))
 }
 
 async function listDirectoryMembers(openid) {
@@ -4196,16 +4197,29 @@ async function listActivities(openid) {
     db.collection(COLLECTIONS.photos).limit(1000).get()
   ])
   const photos = activeItems(photoResult.data)
-  return activeItems(activityResult.data)
+  const activities = activeItems(activityResult.data)
     .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
+  const coverRows = activities
+    .map(item => {
+      const related = photos.filter(photo => photo.activityId === item._id)
+      return related.find(photo => photo.isCover) || related[0]
+    })
+    .filter(Boolean)
+  const resolvedCovers = await attachImageUrls(coverRows)
+  const coverUrlMap = resolvedCovers.reduce((map, item) => {
+    map[item.fileId] = item.imageUrl || item.fileId
+    return map
+  }, {})
+  return activities
     .map(item => {
       const related = photos.filter(photo => photo.activityId === item._id)
       const cover = related.find(photo => photo.isCover) || related[0]
+      const coverFileId = cleanText(cover && (cover.fileID || cover.fileId), 1000)
       return {
         ...item,
         dateLabel: item.date || '',
         photoCount: related.length,
-        coverUrl: cover ? cover.fileID : ''
+        coverUrl: coverUrlMap[coverFileId] || coverFileId
       }
     })
 }
@@ -4220,10 +4234,14 @@ async function getActivity(openid, event) {
   const activity = activityResult.data
   if (activity.deletedAt) throw Object.assign(new Error('活动不存在或已归档'), { code: 'NOT_FOUND' })
   const photos = activeItems(photoResult.data).sort((a, b) => (a.order || 0) - (b.order || 0))
-  const cover = photos.find(item => item.isCover) || photos[0]
+  const resolvedPhotos = await attachImageUrls(photos)
+  const cover = resolvedPhotos.find(item => item.isCover) || resolvedPhotos[0]
   return {
-    activity: { ...activity, dateLabel: activity.date || '', coverUrl: cover ? cover.fileID : '' },
-    photos
+    activity: { ...activity, dateLabel: activity.date || '', coverUrl: cover ? cover.imageUrl : '' },
+    photos: resolvedPhotos.map(item => ({
+      ...item,
+      url: item.imageUrl || item.fileID || item.fileId || ''
+    }))
   }
 }
 
