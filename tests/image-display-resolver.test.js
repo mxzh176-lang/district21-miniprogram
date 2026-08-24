@@ -134,3 +134,21 @@ test('resolver retains only HTTP or HTTPS display URLs when no stable id exists'
     'https://static.example/secure.jpg'
   ])
 })
+
+test('resolver rejects persisted CloudBase signed URLs when no stable file id exists', async () => {
+  const rows = await resolveImageDisplayUrls([
+    {
+      imageUrl: 'https://bucket.tcb.qcloud.la/archive/photo.jpg?sign=expired&t=1785565519'
+    },
+    {
+      imageUrl: 'https://static.example/permanent.jpg'
+    }
+  ], {
+    getTempFileURL: async () => ({ fileList: [] })
+  })
+
+  assert.deepEqual(rows.map(row => row.imageUrl), [
+    '',
+    'https://static.example/permanent.jpg'
+  ])
+})

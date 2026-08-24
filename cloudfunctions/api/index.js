@@ -8,6 +8,7 @@ const { ensureMonthlyMeetingTodo: reconcileMonthlyMeetingTodo } = require('./mon
 const { createMonthlyMeetingQueryAdapter } = require('./monthly-meeting-query')
 const { runAutomaticTodoReconciliation } = require('./automatic-todo-runner')
 const { resolveImageDisplayUrls } = require('./image-display-resolver')
+const { preserveStableArchiveImages } = require('./archive-image-stable-reference')
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
@@ -2492,7 +2493,7 @@ async function listEventImages(openid, event = {}) {
 async function saveEventImages(openid, event = {}) {
   const eventId = cleanText(event.eventId, 100)
   const imageKeys = new Set()
-  const images = (Array.isArray(event.images) ? event.images : []).filter(image => {
+  const submittedImages = (Array.isArray(event.images) ? event.images : []).filter(image => {
     image = image || {}
     const fileId = cleanText(image.fileId, 500)
     const imageUrl = cleanText(image.imageUrl, 1000)
@@ -2500,7 +2501,7 @@ async function saveEventImages(openid, event = {}) {
     if (!key || imageKeys.has(key)) return false
     imageKeys.add(key)
     return true
-  }).slice(0, 9)
+  })
   const eventResult = await db.collection(COLLECTIONS.eventRecord).where({ id: eventId }).limit(1).get()
   const record = eventResult.data[0]
   if (!record || record.deletedAt) {
@@ -2511,6 +2512,7 @@ async function saveEventImages(openid, event = {}) {
     .where({ eventId })
     .limit(100)
     .get()
+  const images = preserveStableArchiveImages(submittedImages, existing.data).slice(0, 9)
   const retainedFileIds = new Set(images.map(image => cleanText(image.fileId, 500)).filter(Boolean))
   const imageOrder = new Map(images.map((image, index) => [
     cleanText(image.fileId, 500) || cleanText(image.imageUrl, 1000),

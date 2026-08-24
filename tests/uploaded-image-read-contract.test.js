@@ -315,6 +315,84 @@ test('saveMember persists avatarFileId instead of a temporary avatarUrl', async 
   assert.notEqual(userWrite.data.avatar, 'https://temp.example/expiring.jpg')
 })
 
+test('saveEventImages preserves the active cloud file id received by older clients as a temporary URL', async () => {
+  const objectKey = '中国狮子联会/远航服务队/例会_1.jpg'
+  const fileId = `cloud://env.bucket/${objectKey}`
+  const storedImage = {
+    _id: 'event-image-doc',
+    eventId: 'event-1',
+    organizationId: 'org_team_yuanhang',
+    fileId,
+    imageUrl: '',
+    objectKey,
+    sortOrder: 0,
+    status: 'active'
+  }
+  const rows = platformRows({
+    user_role: [{ userId: 'user-reader', role: 'super_admin', status: 'active' }],
+    event_record: [{
+      _id: 'event-doc',
+      id: 'event-1',
+      organizationId: 'org_team_yuanhang',
+      status: 'published'
+    }],
+    event_image: [storedImage],
+    file_records: []
+  })
+
+  const { response, writes } = await runApiAction(rows, 'saveEventImages', {
+    eventId: 'event-1',
+    images: [{
+      imageUrl: `https://bucket.tcb.qcloud.la/${encodeURI(objectKey)}?sign=temporary&t=1785565519`
+    }]
+  })
+
+  assert.equal(response.ok, true)
+  assert.equal(response.data.removedFileCount, 0)
+  assert.equal(storedImage.status, 'active')
+  assert.equal(storedImage.fileId, fileId)
+  assert.equal(writes.some(item => item.operation === 'add' && item.name === 'event_image'), false)
+})
+
+test('saveEventImages applies the nine-image limit after temporary URL canonicalization', async () => {
+  const objectKey = 'archive/repeated.jpg'
+  const fileId = `cloud://env.bucket/${objectKey}`
+  const rows = platformRows({
+    user_role: [{ userId: 'user-reader', role: 'super_admin', status: 'active' }],
+    event_record: [{
+      _id: 'event-doc',
+      id: 'event-1',
+      organizationId: 'org_team_yuanhang',
+      status: 'published'
+    }],
+    event_image: [{
+      _id: 'event-image-doc',
+      eventId: 'event-1',
+      organizationId: 'org_team_yuanhang',
+      fileId,
+      imageUrl: '',
+      objectKey,
+      sortOrder: 0,
+      status: 'active'
+    }],
+    file_records: []
+  })
+  const duplicateSignedUrls = Array.from({ length: 50 }, (_, index) => ({
+    imageUrl: `https://bucket.tcb.qcloud.la/${objectKey}?sign=temporary-${index}&t=${1785565519 + index}`
+  }))
+
+  const { response, writes } = await runApiAction(rows, 'saveEventImages', {
+    eventId: 'event-1',
+    images: duplicateSignedUrls.concat({ imageUrl: 'https://static.example/unique.jpg' })
+  })
+
+  assert.equal(response.ok, true)
+  assert.equal(response.data.imageCount, 2)
+  const addedImages = writes.filter(item => item.operation === 'add' && item.name === 'event_image')
+  assert.equal(addedImages.length, 1)
+  assert.equal(addedImages[0].data.imageUrl, 'https://static.example/unique.jpg')
+})
+
 test('listActivities resolves only active activity covers', async () => {
   const rows = legacyRows({
     activities: [
