@@ -14,13 +14,6 @@ const BANNER_ORGANIZATION_IDS = {
   yuanhang: 'org_team_yuanhang',
   jingying: 'org_team_jingying'
 }
-const TEAM_BANNER_ORGANIZATIONS = [
-  'org_team_linghang',
-  'org_team_ailinghang',
-  'org_team_yuanhang',
-  'org_team_jingying'
-]
-
 function archiveOrganizationId(scope = {}) {
   return scope.dataId || scope.orgId || 'district'
 }
@@ -28,15 +21,6 @@ function archiveOrganizationId(scope = {}) {
 function bannerOrganizationId(scope = {}) {
   const rawId = scope.cloudId || scope.organizationId || scope.orgId || scope.dataId || 'district'
   return BANNER_ORGANIZATION_IDS[rawId] || rawId || 'org_region_21_suihua'
-}
-
-function bannerOrganizationContext(scope = {}) {
-  const id = bannerOrganizationId(scope)
-  return {
-    id,
-    cloudId: id,
-    ancestorIds: TEAM_BANNER_ORGANIZATIONS.includes(id) ? ['org_region_21_suihua'] : []
-  }
 }
 
 function formatArchiveDate(value) {
@@ -57,7 +41,9 @@ Page({
     activities: [],
     teams: [],
     banners: [],
+    bannerValues: [],
     heroSlides: [],
+    currentHeroIndex: 0,
     currentOrg: ORG_OPTIONS[0],
     orgOptions: ORG_OPTIONS,
     historyTitle: '最近服务足迹',
@@ -74,7 +60,8 @@ Page({
     session: null,
     canCreateTask: false,
     canManageBanners: false,
-    bannerSaving: false
+    bannerSaving: false,
+    bannerSelecting: false
   },
 
   onLoad() {
@@ -92,10 +79,12 @@ Page({
   },
 
   onHide() {
+    this.exitBannerSelection()
     this.stopTodoSync()
   },
 
   onUnload() {
+    this.exitBannerSelection()
     this.stopTodoSync()
   },
 
@@ -122,10 +111,14 @@ Page({
       .filter(Boolean)
   },
 
+  bannerValues(items = []) {
+    return items
+      .map(item => typeof item === 'string' ? item : item.fileId || item.fileID || item.imageUrl || item.src || '')
+      .filter(Boolean)
+  },
+
   refreshBannerPermission(session = this.data.session, currentOrg = this.data.currentOrg) {
-    const context = bannerOrganizationContext(currentOrg)
-    const canManageBanners = permission.canAccessOrganization(session, context) ||
-      ['create', 'update', 'delete', 'upload'].some(action => permission.hasPortPermission(session, 'home', action, context))
+    const canManageBanners = permission.canManageTeamHomeBanner(session, bannerOrganizationId(currentOrg))
     this.setData({ canManageBanners })
   },
 
@@ -141,16 +134,28 @@ Page({
         ? response
         : response && (response.banners || response.items) || []
       const sources = this.bannerSources(banners)
-      const visibleSources = configured ? sources : (sources.length ? sources : this.data.baseBanners)
+      const values = this.bannerValues(banners)
+      const effectiveSources = configured
+        ? sources
+        : (sources.length ? sources : this.data.baseBanners)
+      const effectiveValues = configured
+        ? values
+        : effectiveSources.slice()
       this.setData({
-        banners: sources,
-        heroSlides: this.buildHeroSlides(visibleSources)
+        banners: effectiveSources,
+        bannerValues: effectiveValues,
+        heroSlides: this.buildHeroSlides(effectiveSources),
+        currentHeroIndex: 0,
+        bannerSelecting: false
       })
     } catch (error) {
       const fallback = this.data.baseBanners || []
       this.setData({
         banners: fallback,
-        heroSlides: this.buildHeroSlides(fallback)
+        bannerValues: fallback,
+        heroSlides: this.buildHeroSlides(fallback),
+        currentHeroIndex: 0,
+        bannerSelecting: false
       })
     }
   },
@@ -294,6 +299,7 @@ Page({
     wx.showActionSheet({
       itemList: ORG_OPTIONS.map(item => item.orgName),
       success: result => {
+        this.exitBannerSelection()
         const currentOrg = orgScope.setCurrentScope(ORG_OPTIONS[result.tapIndex])
         this.setData({ currentOrg })
         this.refreshBannerPermission()
@@ -306,19 +312,41 @@ Page({
   editHomeBanners() {
     if (!this.data.canManageBanners || this.data.bannerSaving) return
     wx.showActionSheet({
-      itemList: ['替换当前轮播图', '清空当前轮播图'],
+      itemList: ['新增轮播图', '替换当前轮播图', '清空全部轮播图'],
       success: result => {
         if (result.tapIndex === 0) this.chooseHomeBanners()
-        if (result.tapIndex === 1) this.clearHomeBanners()
+        if (result.tapIndex === 1) this.enterBannerSelection()
+        if (result.tapIndex === 2) this.clearHomeBanners()
       }
     })
   },
 
-  async chooseHomeBanners() {
+  enterBannerSelection() {
+    this.setData({ bannerSelecting: true })
+  },
+
+  exitBannerSelection() {
+    if (!this.data.bannerSelecting) return
+    this.setData({ bannerSelecting: false })
+  },
+
+  changeHeroSlide(event) {
+    this.setData({ currentHeroIndex: Number(event.detail.current) || 0 })
+  },
+
+  async confirmSelectedHomeBanner() {
+    const selectedIndex = this.data.currentHeroIndex - 1
+    const editableBanners = this.data.bannerValues.length
+      ? this.data.bannerValues
+      : this.data.banners
+    if (selectedIndex < 0 || selectedIndex >= editableBanners.length) {
+      wx.showToast({ title: '请滑动选择图片', icon: 'none' })
+      return
+    }
     try {
       const media = await new Promise((resolve, reject) => {
         wx.chooseMedia({
-          count: 9,
+          count: 1,
           mediaType: ['image'],
           sourceType: ['album', 'camera'],
           sizeType: ['compressed'],
@@ -328,15 +356,46 @@ Page({
       })
       const files = media.tempFiles || []
       if (!files.length) return
-      await this.saveSelectedHomeBanners(files)
+      await this.saveSelectedHomeBanners(files.slice(0, 1), { replaceIndex: selectedIndex })
     } catch (error) {
       if (error && !String(error.errMsg || '').includes('cancel')) api.showError(error)
     }
   },
 
-  async saveSelectedHomeBanners(files = []) {
+  async chooseHomeBanners() {
+    const existingCount = this.data.bannerValues.length || this.data.banners.length
+    const remainingCount = Math.max(0, 9 - existingCount)
+    if (!remainingCount) {
+      wx.showToast({ title: '轮播图最多 9 张', icon: 'none' })
+      return
+    }
+    try {
+      const media = await new Promise((resolve, reject) => {
+        wx.chooseMedia({
+          count: remainingCount,
+          mediaType: ['image'],
+          sourceType: ['album', 'camera'],
+          sizeType: ['compressed'],
+          success: resolve,
+          fail: reject
+        })
+      })
+      const files = media.tempFiles || []
+      if (!files.length) return
+      await this.saveSelectedHomeBanners(files, { append: true })
+    } catch (error) {
+      if (error && !String(error.errMsg || '').includes('cancel')) api.showError(error)
+    }
+  },
+
+  async saveSelectedHomeBanners(files = [], options = {}) {
     const currentOrg = this.data.currentOrg || ORG_OPTIONS[0]
     const organizationId = bannerOrganizationId(currentOrg)
+    const replaceIndex = Number.isInteger(options.replaceIndex) ? options.replaceIndex : -1
+    const keepExisting = options.append || replaceIndex >= 0
+    const existingBanners = keepExisting
+      ? (this.data.bannerValues.length ? this.data.bannerValues : this.data.banners).slice(0, 9)
+      : []
     this.setData({ bannerSaving: true })
     wx.showLoading({ title: '上传轮播图' })
     try {
@@ -346,18 +405,27 @@ Page({
         leaderRole: '首页轮播',
         departmentName: '',
         eventName: `${currentOrg.orgName || '当前范围'}首页轮播`,
-        sequence: index,
+        sequence: replaceIndex >= 0 ? replaceIndex : existingBanners.length + index,
         resourceType: 'home_banner',
         resourceId: organizationId,
         module: 'photos'
       })))
-      const banners = uploaded.map(item => item.fileID).filter(Boolean)
+      const uploadedValues = uploaded.map(item => item.fileID).filter(Boolean)
+      let banners
+      if (replaceIndex >= 0) {
+        banners = existingBanners.slice()
+        const replacement = uploadedValues[0]
+        banners[replaceIndex] = replacement
+      } else {
+        banners = existingBanners.concat(uploadedValues).slice(0, 9)
+      }
       await api.call('saveHomeBanners', {
         organizationId,
         scopeName: currentOrg.orgName,
         banners
       })
       await this.loadHomeBannersForScope()
+      this.exitBannerSelection()
       wx.showToast({ title: '轮播已更新', icon: 'success' })
     } catch (error) {
       api.showError(error)
@@ -378,7 +446,7 @@ Page({
         banners: []
       })
       await this.loadHomeBannersForScope()
-      wx.showToast({ title: '已清空轮播', icon: 'success' })
+      wx.showToast({ title: '已清空全部轮播', icon: 'success' })
     } catch (error) {
       api.showError(error)
     } finally {

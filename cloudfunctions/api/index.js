@@ -2,6 +2,12 @@ const cloud = require('wx-server-sdk')
 const crypto = require('crypto')
 const JSZip = require('jszip')
 const { authenticator } = require('otplib')
+const { loadArchiveImages } = require('./archive-image-fallback')
+const { createArchiveImageQueryAdapter } = require('./archive-image-query')
+const { ensureMonthlyMeetingTodo: reconcileMonthlyMeetingTodo } = require('./monthly-meeting-todo')
+const { createMonthlyMeetingQueryAdapter } = require('./monthly-meeting-query')
+const { runAutomaticTodoReconciliation } = require('./automatic-todo-runner')
+const { resolveImageDisplayUrls } = require('./image-display-resolver')
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
@@ -127,26 +133,24 @@ function cleanParticipants(value) {
 }
 
 async function attachImageUrls(images = []) {
-  const normalized = images.map(item => ({ ...item }))
-  const fileIds = Array.from(new Set(normalized
-    .map(item => cleanText(item.fileId, 1000))
-    .filter(fileId => fileId && fileId.startsWith('cloud://'))))
-  if (!fileIds.length || typeof cloud.getTempFileURL !== 'function') return normalized
-  const urlMap = {}
-  for (let index = 0; index < fileIds.length; index += 50) {
-    try {
-      const response = await cloud.getTempFileURL({ fileList: fileIds.slice(index, index + 50) })
-      ;(response.fileList || []).forEach(item => {
-        if (item.fileID && item.tempFileURL) urlMap[item.fileID] = item.tempFileURL
-      })
-    } catch (error) {
-      console.warn('获取图片临时访问链接失败', error.message)
-    }
-  }
-  return normalized.map(item => ({
-    ...item,
-    imageUrl: urlMap[item.fileId] || item.imageUrl || ''
-  }))
+  if (typeof cloud.getTempFileURL !== 'function') return images.map(item => ({ ...item }))
+  return resolveImageDisplayUrls(images, {
+    getTempFileURL: payload => cloud.getTempFileURL(payload),
+    warn: (message, details) => console.warn(message, {
+      batchIndex: details.batchIndex,
+      batchCount: details.batchCount,
+      batchSize: details.batchSize,
+      resolvedCount: details.resolvedCount,
+      unresolvedCount: details.unresolvedCount,
+      error: details.error && details.error.message
+    })
+  })
+}
+
+function avatarFileIdOf(user = {}) {
+  return [user.avatarFileId, user.avatar, user.avatarUrl]
+    .map(value => cleanText(value, 1000))
+    .find(value => value.startsWith('cloud://')) || ''
 }
 
 function monthLabel(month) {
@@ -360,6 +364,22 @@ async function canAdministerOrganization(userId, organizationId) {
   )
 }
 
+async function canManageTeamHomeBanner(userId, organizationId, actions = ['create', 'update', 'delete', 'upload']) {
+  organizationId = canonicalOrganizationId(organizationId)
+  if (!HOME_BANNER_ALLOWED_ORGANIZATIONS.includes(organizationId)) return false
+  const roles = await platformRoles(userId)
+  if (organizationId === 'org_region_21_suihua') {
+    return roles.some(item => item.status === 'active' && item.role === 'super_admin')
+  }
+  if (roles.some(item =>
+    item.status === 'active' &&
+    item.role === 'team_admin' &&
+    canonicalOrganizationId(item.organizationId) === organizationId
+  )) return true
+  const portGrants = await enforcingPortPermissions(userId)
+  return actions.every(action => portPermissionAllowed(portGrants, userId, 'home', action, { organizationId }))
+}
+
 async function canEditServiceTeamPositions(userId, organizationId) {
   return canAdministerOrganization(userId, organizationId)
 }
@@ -507,21 +527,30 @@ const PORT_PERMISSION_ACTIONS = {
 }
 const PORT_DATA_SCOPES = ['district', 'team', 'position', 'self']
 
-async function activeUserPermissions(userId) {
+async function loadConfiguredUserPermissions(userId) {
+  const result = await db.collection(COLLECTIONS.userPermissions)
+    .where({ userId, status: 'active' })
+    .limit(100)
+    .get()
+  return result.data
+}
+
+async function configuredUserPermissions(userId) {
   try {
-    const today = new Date().toISOString().slice(0, 10)
-    const result = await db.collection(COLLECTIONS.userPermissions)
-      .where({ userId, status: 'active' })
-      .limit(100)
-      .get()
-    return result.data.filter(item =>
-      (!item.startDate || item.startDate <= today) &&
-      (!item.endDate || item.endDate >= today)
-    )
+    return await loadConfiguredUserPermissions(userId)
   } catch (error) {
     console.warn('user_permissions unavailable', error.message)
     return []
   }
+}
+
+async function activeUserPermissions(userId) {
+  const today = new Date().toISOString().slice(0, 10)
+  const permissions = await configuredUserPermissions(userId)
+  return permissions.filter(item =>
+    (!item.startDate || item.startDate <= today) &&
+    (!item.endDate || item.endDate >= today)
+  )
 }
 
 function portScopeMatches(grant, userId, context = {}) {
@@ -567,6 +596,59 @@ function portPermissionAllowed(grants, userId, module, action, context = {}) {
     ((grant.permissions || {})[module] || []).includes(action) &&
     (grant.dataScope === 'self' && action === 'create' || portScopeMatches(grant, userId, context))
   )
+}
+
+async function historyReadPermissionSnapshot(user) {
+  const [roles, assignmentResult, configuredGrants, organizationResult] = await Promise.all([
+    platformRoles(user.id),
+    db.collection(COLLECTIONS.roleAssignment)
+      .where({ userId: user.id, status: 'active' })
+      .limit(100)
+      .get(),
+    loadConfiguredUserPermissions(user.id),
+    db.collection(COLLECTIONS.organization)
+      .where({ status: 'active' })
+      .limit(500)
+      .get()
+  ])
+  if (roles.some(item => item.role === 'super_admin')) {
+    return { canRead: () => true }
+  }
+  const today = new Date().toISOString().slice(0, 10)
+  const assignments = assignmentResult.data.filter(item =>
+    (!item.startDate || item.startDate <= today) &&
+    (!item.endDate || item.endDate >= today)
+  )
+  const activeGrants = configuredGrants.filter(item =>
+    (!item.startDate || item.startDate <= today) &&
+    (!item.endDate || item.endDate >= today)
+  )
+  const historyPermissionConfigured = configuredGrants.some(item =>
+    ((item.permissions || {}).history || []).length > 0
+  )
+  const organizations = new Map(organizationResult.data.map(item => [canonicalOrganizationId(item.id), item]))
+  const scopedAdminRoles = roles.filter(item =>
+    ['federation_admin', 'office_admin', 'region_admin', 'area_admin', 'team_admin'].includes(item.role)
+  )
+  const defaultOrganizationId = canonicalOrganizationId(user.defaultOrganizationId)
+  return {
+    canRead(context = {}) {
+      const organizationId = canonicalOrganizationId(context.organizationId || context.teamId)
+      const organization = organizations.get(organizationId)
+      const scopeIds = organization ? [organizationId].concat(organization.ancestorIds || []).map(canonicalOrganizationId) : []
+      const isScopedAdmin = scopedAdminRoles.some(item =>
+        scopeIds.includes(canonicalOrganizationId(item.organizationId))
+      )
+      if (isScopedAdmin) return true
+      const isCurrentTeamOfficer = assignments.some(item =>
+        canonicalOrganizationId(item.organizationId) === organizationId &&
+        ['captain', 'secretary'].some(code => positionIdMatches(item.positionId, code))
+      )
+      if (isCurrentTeamOfficer) return true
+      if (!historyPermissionConfigured && organization && organizationId === defaultOrganizationId) return true
+      return portPermissionAllowed(activeGrants, user.id, 'history', 'read', context)
+    }
+  }
 }
 
 async function requireLegacyPortEditor(openid, module, action, context = {}) {
@@ -896,11 +978,19 @@ async function getPlatformSession(openid) {
   const legacyRole = primaryRole === 'super_admin'
     ? 'superadmin'
     : primaryRole === 'member' ? 'member' : 'admin'
+  const avatarFileId = avatarFileIdOf(user)
+  const avatarRows = avatarFileId
+    ? await attachImageUrls([{ fileId: avatarFileId }])
+    : []
+  const avatarUrl = avatarRows[0]
+    ? avatarRows[0].imageUrl
+    : cleanText(user.avatarUrl || user.avatar, 1000)
   return {
     _id: user.id,
     id: user.id,
     nickname: user.name,
-    avatarUrl: user.avatar || '',
+    avatarFileId,
+    avatarUrl,
     status: user.status === 'active' ? 'approved' : 'pending',
     role: legacyRole,
     platformRole: primaryRole,
@@ -1966,7 +2056,7 @@ async function listOrganizations(openid, event = {}) {
   return result.data
 }
 
-const EVENT_TYPES = ['例会事件', '联谊事件', '关爱事件', '纠察事件', '培训事件', '会员发展']
+const EVENT_TYPES = ['例会事件', '联谊事件', '关爱事件', '纠察事件', '培训事件', '会员发展', '服务事件']
 
 function inferEventType(categoryId = '', category = '') {
   const value = `${categoryId} ${category}`.toLowerCase()
@@ -1983,7 +2073,8 @@ function normalizeEventType(value, categoryId = '', category = '') {
 }
 
 async function listEventRecords(openid, event = {}) {
-  await requirePlatformUser(openid)
+  const user = await requirePlatformUser(openid)
+  const historyRead = await historyReadPermissionSnapshot(user)
   const status = cleanText(event.status, 30) || 'published'
   const organizationId = cleanText(event.organizationId, 80)
   const category = cleanText(event.category, 40)
@@ -1991,6 +2082,10 @@ async function listEventRecords(openid, event = {}) {
   const eventType = cleanText(event.eventType, 40)
   const eventMonth = cleanText(event.eventMonth, 7)
   const limit = Math.min(Number(event.limit) || 50, 100)
+  const requestedImageLimit = Number(event.imageLimit)
+  const imageLimit = Number.isFinite(requestedImageLimit) && requestedImageLimit > 0
+    ? Math.min(Math.floor(requestedImageLimit), 5)
+    : null
   const result = await db.collection(COLLECTIONS.eventRecord).limit(200).get()
   const records = result.data
     .filter(item => !item.deletedAt)
@@ -2001,34 +2096,22 @@ async function listEventRecords(openid, event = {}) {
     .map(item => ({ ...item, eventType: normalizeEventType(item.eventType, item.categoryId, item.category) }))
     .filter(item => !eventType || item.eventType === eventType)
     .filter(item => !eventMonth || item.eventMonth === eventMonth)
+    .filter(item => historyRead.canRead(item))
     .sort((a, b) => {
       const createdDifference = new Date(b.createdAt || b.updatedAt || b.eventDate || 0).getTime() -
         new Date(a.createdAt || a.updatedAt || a.eventDate || 0).getTime()
       return createdDifference || String(b.eventDate || '').localeCompare(String(a.eventDate || ''))
     })
     .slice(0, limit)
-  try {
-    const imageResult = await db.collection(COLLECTIONS.eventImage).limit(1000).get()
-    const imageMap = {}
-    imageResult.data
-      .filter(item => item.status === 'active')
-      .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
-      .forEach(item => {
-        if (!imageMap[item.eventId]) imageMap[item.eventId] = []
-        imageMap[item.eventId].push(item)
-      })
-    const imageEntries = Object.values(imageMap).flat()
-    const imageEntriesWithUrls = await attachImageUrls(imageEntries)
-    const resolvedImageMap = {}
-    imageEntriesWithUrls.forEach(item => {
-      if (!resolvedImageMap[item.eventId]) resolvedImageMap[item.eventId] = []
-      resolvedImageMap[item.eventId].push(item)
-    })
-    return records.map(item => ({ ...item, images: resolvedImageMap[item.id] || [] }))
-  } catch (error) {
-    console.warn('event_image list unavailable', error.message)
-    return records
-  }
+  const imageQueries = createArchiveImageQueryAdapter({ db, collections: COLLECTIONS })
+  const resolvedImageMap = await loadArchiveImages(records, {
+    listEventImages: imageQueries.listEventImages,
+    listFileRecords: imageQueries.listFileRecords,
+    attachImageUrls,
+    maxImagesPerRecord: imageLimit,
+    warn: (message, error) => console.warn(message, error.message)
+  })
+  return records.map(item => ({ ...item, images: resolvedImageMap[item.id] || [] }))
 }
 
 async function saveEventRecord(openid, event = {}) {
@@ -2105,7 +2188,7 @@ async function saveEventRecord(openid, event = {}) {
 }
 
 async function getEventRecord(openid, event = {}) {
-  await requirePlatformUser(openid)
+  const user = await requirePlatformUser(openid)
   const id = cleanText(event.id, 100)
   if (!id) throw Object.assign(new Error('缺少纪事 ID'), { code: 'EVENT_ID_REQUIRED' })
   const result = await db.collection(COLLECTIONS.eventRecord).where({ id }).limit(1).get()
@@ -2113,15 +2196,21 @@ async function getEventRecord(openid, event = {}) {
   if (!record || record.deletedAt) {
     throw Object.assign(new Error('纪事不存在或已归档'), { code: 'NOT_FOUND' })
   }
-  const images = await db.collection(COLLECTIONS.eventImage)
-    .where({ eventId: record.id, status: 'active' })
-    .orderBy('sortOrder', 'asc')
-    .limit(200)
-    .get()
+  const historyRead = await historyReadPermissionSnapshot(user)
+  if (!historyRead.canRead(record)) {
+    throw Object.assign(new Error('当前账号无权查看该历史事件'), { code: 'PERMISSION_DENIED' })
+  }
+  const imageQueries = createArchiveImageQueryAdapter({ db, collections: COLLECTIONS })
+  const resolvedImageMap = await loadArchiveImages([record], {
+    listEventImages: imageQueries.listEventImages,
+    listFileRecords: imageQueries.listFileRecords,
+    attachImageUrls,
+    warn: (message, error) => console.warn(message, error.message)
+  })
   return {
     ...record,
     eventType: normalizeEventType(record.eventType, record.categoryId, record.category),
-    images: await attachImageUrls(images.data)
+    images: resolvedImageMap[record.id] || []
   }
 }
 
@@ -2585,19 +2674,13 @@ function mediaAlbumBreadcrumbs(album, albums = []) {
 }
 
 async function mediaAlbumCoverMap(albums = []) {
-  const coverIds = albums.map(item => cleanText(item.coverFileID, 1000)).filter(Boolean)
-  const coverMap = {}
-  if (coverIds.length && typeof cloud.getTempFileURL === 'function') {
-    try {
-      const response = await cloud.getTempFileURL({ fileList: Array.from(new Set(coverIds)).slice(0, 50) })
-      ;(response.fileList || []).forEach(item => {
-        if (item.fileID && item.tempFileURL) coverMap[item.fileID] = item.tempFileURL
-      })
-    } catch (error) {
-      console.warn('获取云盘封面失败', error.message)
-    }
-  }
-  return coverMap
+  const resolved = await attachImageUrls(albums
+    .map(item => ({ fileId: cleanText(item.coverFileID, 1000) }))
+    .filter(item => item.fileId))
+  return resolved.reduce((map, item) => {
+    map[item.fileId] = item.imageUrl || item.fileId
+    return map
+  }, {})
 }
 
 function mediaAlbumView(item, coverMap = {}) {
@@ -2676,23 +2759,15 @@ async function getMediaAlbum(openid, event = {}) {
   const files = result.data
   const childFolders = allAlbums.filter(item => (item.parentId || '') === album.id)
   const childCoverMap = await mediaAlbumCoverMap(childFolders)
-  const fileIds = Array.from(new Set(files.map(item => cleanText(item.fileID, 1000)).filter(Boolean)))
-  const urlMap = {}
-  for (let index = 0; index < fileIds.length; index += 50) {
-    try {
-      const response = await cloud.getTempFileURL({ fileList: fileIds.slice(index, index + 50) })
-      ;(response.fileList || []).forEach(item => {
-        if (item.fileID && item.tempFileURL) urlMap[item.fileID] = item.tempFileURL
-      })
-    } catch (error) {
-      console.warn('获取云盘文件链接失败', error.message)
-    }
-  }
+  const resolvedFiles = await attachImageUrls(files)
   return {
     album: mediaAlbumView(album),
     breadcrumbs: mediaAlbumBreadcrumbs(album, allAlbums),
     childFolders: childFolders.map(item => mediaAlbumView(item, childCoverMap)),
-    files: files.map(item => ({ ...item, url: urlMap[item.fileID] || item.fileID })),
+    files: resolvedFiles.map(item => ({
+      ...item,
+      url: item.imageUrl || item.fileID || item.fileId || ''
+    })),
     permissions: await mediaPermissionSummary(user, album.organizationId),
     page,
     pageSize,
@@ -3091,8 +3166,8 @@ async function saveFileRecord(openid, event = {}) {
     }
     await requireEventEditor(openid, record, 'upload')
   } else if (resourceType === 'home_banner') {
-    if (!await canAdministerOrganization(user.id, organizationId)) {
-      throw Object.assign(new Error('仅超管、协作区管理员或当前服务队管理员可上传首页轮播'), { code: 'PERMISSION_DENIED' })
+    if (!await canManageTeamHomeBanner(user.id, organizationId, ['upload'])) {
+      throw Object.assign(new Error('仅当前服务队轮播管理员可上传首页轮播'), { code: 'PERMISSION_DENIED' })
     }
   } else if (resourceType === 'user_avatar') {
     if (resourceId !== user.id || module !== 'contacts' || !inputFileType.startsWith('image/')) {
@@ -3332,7 +3407,7 @@ async function ensureHomeBannerCollection() {
 }
 
 async function listHomeBanners(openid, event = {}) {
-  await requireApproved(openid)
+  await requirePlatformUser(openid)
   const organizationId = normalizeHomeBannerOrganizationId(event.organizationId)
   try {
     const result = await db.collection(COLLECTIONS.homeBanner)
@@ -3379,25 +3454,13 @@ async function saveHomeBanners(openid, event = {}) {
     .where({ organizationId, status: 'active' })
     .limit(100)
     .get()
-  const currentValues = existing.data
-    .map(item => item.fileId || item.imageUrl || '')
-    .filter(Boolean)
-  const added = banners.filter(value => !currentValues.includes(value))
-  const removed = currentValues.filter(value => !banners.includes(value))
-  const commonOrderChanged = !added.length && !removed.length && banners.some((value, index) => currentValues[index] !== value)
-  const requiredActions = new Set()
-  if (added.length) { requiredActions.add('create'); requiredActions.add('upload') }
-  if (removed.length) requiredActions.add('delete')
-  if (commonOrderChanged) requiredActions.add('update')
-  if (!requiredActions.size) requiredActions.add('update')
-  const portGrants = await enforcingPortPermissions(user.id)
-  if (portGrants.length) {
-    const deniedAction = Array.from(requiredActions).find(action => !portPermissionAllowed(portGrants, user.id, 'home', action, { organizationId }))
-    if (deniedAction) {
-      throw Object.assign(new Error('当前账号缺少对应的轮播图操作权限'), { code: 'PERMISSION_DENIED' })
-    }
-  } else if (!await canAdministerOrganization(user.id, organizationId)) {
-    throw Object.assign(new Error('无权限编辑当前组织轮播图'), { code: 'PERMISSION_DENIED' })
+  const currentValues = existing.data.map(item => item.fileId || item.imageUrl || '').filter(Boolean)
+  const requiredActions = []
+  if (banners.some(value => !currentValues.includes(value))) requiredActions.push('create', 'upload')
+  if (currentValues.some(value => !banners.includes(value))) requiredActions.push('delete')
+  if (!requiredActions.length || banners.some((value, index) => currentValues[index] !== value)) requiredActions.push('update')
+  if (!await canManageTeamHomeBanner(user.id, organizationId, Array.from(new Set(requiredActions)))) {
+    throw Object.assign(new Error('当前账号无权编辑该服务队轮播图'), { code: 'PERMISSION_DENIED' })
   }
   await Promise.all(existing.data.map(item => db.collection(COLLECTIONS.homeBanner).doc(item._id).update({
     data: { status: 'deleted', deletedAt: now(), updatedAt: now(), deletedBy: user.id }
@@ -3560,9 +3623,35 @@ async function ensureMemberHolidayTodos() {
   }))
 }
 
+async function ensureMonthlyMeetingTodo() {
+  const todoQueries = createMonthlyMeetingQueryAdapter({
+    db,
+    collectionName: COLLECTIONS.tasks,
+    organizationId: TODO_ORGANIZATION_ID
+  })
+  return reconcileMonthlyMeetingTodo({
+    todayText: chinaDateText,
+    timestamp: now,
+    findTaskById: todoQueries.findTaskById,
+    findMatchingTasks: todoQueries.findMatchingTasks,
+    createTask: data => db.collection(COLLECTIONS.tasks).doc(data.id).set({ data }),
+    updateTask: (task, data) => db.collection(COLLECTIONS.tasks).doc(task._id).update({ data }),
+    writeAudit: (action, taskId, data) => writePlatformLog({
+      id: 'system_monthly_meeting',
+      defaultOrganizationId: TODO_ORGANIZATION_ID
+    }, action, 'todo', taskId, data)
+  })
+}
+
 async function ensureAutomaticTodos() {
   await ensureBirthdayTodos()
   await ensureMemberHolidayTodos()
+  return runAutomaticTodoReconciliation({
+    existingRemindersReady: true,
+    ensureBirthdayTodos,
+    ensureMemberHolidayTodos,
+    ensureMonthlyMeetingTodo
+  })
 }
 
 async function isTodoAdmin(user) {
@@ -3856,6 +3945,7 @@ function publicDirectoryMember(user, organizations = {}) {
   const organization = organizations[organizationId] || {}
   const sourceName = cleanText(user.name || user.nickname, 40)
   const name = organizationId === 'org_team_yuanhang' && sourceName === '李姗姗' ? '李珊珊' : sourceName
+  const avatarFileId = avatarFileIdOf(user)
   return {
     _id: user.id || user._id,
     id: user.id || user._id,
@@ -3872,7 +3962,8 @@ function publicDirectoryMember(user, organizations = {}) {
     memberCode: cleanText(user.memberCode, 30),
     accountSuffix: String(user.id || user._id || '').slice(-6),
     resource: cleanText(user.resource, 100),
-    avatarUrl: user.avatar || user.avatarUrl || '',
+    avatarFileId,
+    avatarUrl: avatarFileId || cleanText(user.avatar || user.avatarUrl, 1000),
     initial: memberInitial(name),
     letter: cleanText(user.letter, 2) || memberLetter(name),
     avatarTone: cleanText(user.avatarTone, 20) || 'green',
@@ -3927,8 +4018,19 @@ async function directoryMembers() {
       if (item.status === 'disabled') delete directory[key]
       else directory[key] = member
     })
-  return Object.values(directory)
+  const members = Object.values(directory)
     .sort((a, b) => String(a.letter || '#').localeCompare(String(b.letter || '#')) || a.name.localeCompare(b.name, 'zh-Hans-CN'))
+  const avatarRows = await attachImageUrls(members
+    .map(item => ({ fileId: item.avatarFileId }))
+    .filter(item => item.fileId))
+  const avatarUrlMap = avatarRows.reduce((map, item) => {
+    map[item.fileId] = item.imageUrl || item.fileId
+    return map
+  }, {})
+  return members.map(item => ({
+    ...item,
+    avatarUrl: avatarUrlMap[item.avatarFileId] || item.avatarUrl
+  }))
 }
 
 async function listDirectoryMembers(openid) {
@@ -3976,11 +4078,20 @@ async function getMember(openid, event = {}) {
   if (!member) {
     throw Object.assign(new Error('未找到成员资料'), { code: 'MEMBER_NOT_FOUND' })
   }
+  const canManage = await canManageDirectoryMember(openid, member, 'update')
+  const canDelete = await canManageDirectoryMember(openid, member, 'delete')
+  const resolvedMembers = await attachImageUrls(member.avatarFileId
+    ? [{ fileId: member.avatarFileId }]
+    : [])
+  const resolvedAvatar = resolvedMembers[0]
   return {
-    member,
+    member: {
+      ...member,
+      avatarUrl: resolvedAvatar ? resolvedAvatar.imageUrl : member.avatarUrl
+    },
     canViewContact: true,
-    canManage: await canManageDirectoryMember(openid, member, 'update'),
-    canDelete: await canManageDirectoryMember(openid, member, 'delete')
+    canManage,
+    canDelete
   }
 }
 
@@ -4007,7 +4118,7 @@ async function saveMember(openid, event = {}) {
     birthday: normalizeBirthday(input.birthday),
     profession: normalizeProfession(input.profession),
     resource: cleanText(input.resource, 100),
-    avatar: cleanText(input.avatarUrl || input.avatar, 1000),
+    avatar: cleanText(input.avatarFileId, 1000) || cleanText(input.avatarUrl || input.avatar, 1000),
     letter: cleanText(input.letter, 2) || memberLetter(name),
     status: cleanText(input.status, 20) || (existing && existing.status) || 'active',
     profileCompleted: true,
@@ -4116,16 +4227,29 @@ async function listActivities(openid) {
     db.collection(COLLECTIONS.photos).limit(1000).get()
   ])
   const photos = activeItems(photoResult.data)
-  return activeItems(activityResult.data)
+  const activities = activeItems(activityResult.data)
     .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
+  const coverRows = activities
+    .map(item => {
+      const related = photos.filter(photo => photo.activityId === item._id)
+      return related.find(photo => photo.isCover) || related[0]
+    })
+    .filter(Boolean)
+  const resolvedCovers = await attachImageUrls(coverRows)
+  const coverUrlMap = resolvedCovers.reduce((map, item) => {
+    map[item.fileId] = item.imageUrl || item.fileId
+    return map
+  }, {})
+  return activities
     .map(item => {
       const related = photos.filter(photo => photo.activityId === item._id)
       const cover = related.find(photo => photo.isCover) || related[0]
+      const coverFileId = cleanText(cover && (cover.fileID || cover.fileId), 1000)
       return {
         ...item,
         dateLabel: item.date || '',
         photoCount: related.length,
-        coverUrl: cover ? cover.fileID : ''
+        coverUrl: coverUrlMap[coverFileId] || coverFileId
       }
     })
 }
@@ -4140,10 +4264,14 @@ async function getActivity(openid, event) {
   const activity = activityResult.data
   if (activity.deletedAt) throw Object.assign(new Error('活动不存在或已归档'), { code: 'NOT_FOUND' })
   const photos = activeItems(photoResult.data).sort((a, b) => (a.order || 0) - (b.order || 0))
-  const cover = photos.find(item => item.isCover) || photos[0]
+  const resolvedPhotos = await attachImageUrls(photos)
+  const cover = resolvedPhotos.find(item => item.isCover) || resolvedPhotos[0]
   return {
-    activity: { ...activity, dateLabel: activity.date || '', coverUrl: cover ? cover.fileID : '' },
-    photos
+    activity: { ...activity, dateLabel: activity.date || '', coverUrl: cover ? cover.imageUrl : '' },
+    photos: resolvedPhotos.map(item => ({
+      ...item,
+      url: item.imageUrl || item.fileID || item.fileId || ''
+    }))
   }
 }
 

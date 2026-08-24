@@ -157,6 +157,20 @@ function uniquePhotos(photos) {
   })
 }
 
+function archiveListRequest(payload = {}) {
+  const requestedLimit = Number(payload.limit)
+  const requestedImageLimit = Number(payload.imageLimit)
+  return {
+    organizationId: toCloudOrganizationId(payload.organizationId),
+    categoryId: payload.categoryId,
+    eventType: payload.eventCategory,
+    eventMonth: payload.eventMonth,
+    status: payload.status || 'published',
+    limit: Math.min(Math.max(requestedLimit || 100, 1), 100),
+    imageLimit: Math.min(Math.max(requestedImageLimit || 1, 1), 5)
+  }
+}
+
 async function execute(action, payload, localFallback) {
   if (action === 'listLedgerRecords') {
     return cloudbase.invoke('listLedgerRecords', {
@@ -177,14 +191,7 @@ async function execute(action, payload, localFallback) {
   }
   if (action === 'deleteLedgerRecord') return cloudbase.invoke('deleteLedgerRecord', payload)
   if (action === 'listArchiveEntries') {
-    const records = await cloudbase.invoke('listEventRecords', {
-      organizationId: toCloudOrganizationId(payload.organizationId),
-      categoryId: payload.categoryId,
-      eventType: payload.eventCategory,
-      eventMonth: payload.eventMonth,
-      status: payload.status || 'published',
-      limit: 100
-    })
+    const records = await cloudbase.invoke('listEventRecords', archiveListRequest(payload))
     const localEntries = await localFallback(action, payload)
     const merged = {}
     localEntries.concat(records.map(recordToArchiveEntry)).forEach(item => { merged[item._id] = item })
@@ -271,6 +278,7 @@ async function execute(action, payload, localFallback) {
 module.exports = {
   handles,
   execute,
+  archiveListRequest,
   toCloudOrganizationId,
   toLocalOrganizationId
 }

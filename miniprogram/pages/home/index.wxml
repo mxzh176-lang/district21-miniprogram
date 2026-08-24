@@ -8,7 +8,7 @@
   </view>
 
   <view class="hero-wrap">
-    <swiper class="hero-swiper" autoplay circular indicator-dots interval="3500">
+    <swiper class="hero-swiper" autoplay="{{!bannerSelecting}}" circular="{{!bannerSelecting}}" indicator-dots interval="3500" current="{{currentHeroIndex}}" bindchange="changeHeroSlide">
       <swiper-item wx:for="{{heroSlides}}" wx:key="key">
         <view wx:if="{{item.type === 'intro'}}" class="hero">
           <view class="hero-top">
@@ -27,8 +27,17 @@
         <image wx:else src="{{item.src}}" mode="aspectFill" />
       </swiper-item>
     </swiper>
-    <view wx:if="{{canManageBanners}}" class="banner-edit" catchtap="editHomeBanners">
+    <view wx:if="{{canManageBanners && !bannerSelecting}}" class="banner-edit" catchtap="editHomeBanners">
       {{bannerSaving ? '保存中' : '编辑轮播'}}
+    </view>
+    <view wx:if="{{bannerSelecting}}" class="banner-select-panel">
+      <view class="banner-select-copy">
+        {{currentHeroIndex > 0 ? '已选中当前图片' : '请左右滑动选择图片'}}
+      </view>
+      <view class="banner-select-actions">
+        <view class="banner-select-cancel" catchtap="exitBannerSelection">取消选择</view>
+        <view wx:if="{{currentHeroIndex > 0}}" class="banner-select-confirm" catchtap="confirmSelectedHomeBanner">替换这张</view>
+      </view>
     </view>
   </view>
 

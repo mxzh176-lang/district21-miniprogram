@@ -6,8 +6,13 @@ const { EVENT_CATEGORIES, inferEventCategory } = require('../miniprogram/utils/e
 
 const ROOT = path.resolve(__dirname, '..')
 
-test('event categories contain the six selectable archive types', () => {
-  assert.deepEqual(EVENT_CATEGORIES, ['例会事件', '联谊事件', '关爱事件', '纠察事件', '培训事件', '会员发展'])
+test('event categories contain the seven selectable archive types', () => {
+  assert.deepEqual(EVENT_CATEGORIES, ['服务事件', '例会事件', '联谊事件', '关爱事件', '纠察事件', '培训事件', '会员发展'])
+})
+
+test('cloud API accepts the service event category', () => {
+  const cloud = fs.readFileSync(path.join(ROOT, 'cloudfunctions/api/index.js'), 'utf8')
+  assert.match(cloud, /const EVENT_TYPES = \[[^\]]*'服务事件'[^\]]*\]/)
 })
 
 test('legacy archive positions automatically receive an event category', () => {

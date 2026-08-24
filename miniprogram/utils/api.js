@@ -11,6 +11,7 @@ const { normalizeEventCategory } = require('./event-category')
 const { buildUpcomingBirthdayTasks } = require('./birthday-reminders')
 const yuanhangBirthdays = require('../data/yuanhang-birthdays')
 const { buildMemberHolidayTasks } = require('./member-holiday-reminders')
+const { buildUpcomingMonthlyMeetingTask } = require('./monthly-meeting-todo')
 
 let importedDataCache = null
 const requestCache = new Map()
@@ -180,6 +181,7 @@ function allTasks() {
   data.tasks.concat(
     buildUpcomingBirthdayTasks(yuanhangBirthdays),
     buildMemberHolidayTasks(data.members),
+    [buildUpcomingMonthlyMeetingTask()],
     getLocalTasks()
   ).forEach(item => {
     tasks[item._id] = item
@@ -1142,6 +1144,7 @@ function canFallbackToLocal(action) {
     'getMember',
     'listStructure',
     'listArchiveEntries',
+    'listTasks',
     'listLedgerRecords',
     'getArchiveEntry',
     'listHomeBanners'
@@ -1195,4 +1198,4 @@ function showError(error) {
   wx.showToast({ title: error && error.message ? error.message : '数据加载失败', icon: 'none' })
 }
 
-module.exports = { initialize, call, showError }
+module.exports = { initialize, call, showError, __test: { localCall } }

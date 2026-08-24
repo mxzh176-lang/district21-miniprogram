@@ -153,12 +153,16 @@ Page({
   async loadRecentEntries() {
     try {
       let entries = await api.call('listArchiveEntries', {
-        organizationId: this.data.selectedId
+        organizationId: this.data.selectedId,
+        limit: 30,
+        imageLimit: 5
       })
       if (!entries || !entries.length) {
         entries = await api.call('listArchiveEntries', {
           organizationId: this.data.selectedId,
-          status: 'archived'
+          status: 'archived',
+          limit: 30,
+          imageLimit: 5
         })
       }
       const categoryMap = categoryNameMap(this.data.selectedOrganization)

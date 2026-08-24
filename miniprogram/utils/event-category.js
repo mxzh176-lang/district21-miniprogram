@@ -1,4 +1,4 @@
-const EVENT_CATEGORIES = ['例会事件', '联谊事件', '关爱事件', '纠察事件', '培训事件', '会员发展']
+const EVENT_CATEGORIES = ['服务事件', '例会事件', '联谊事件', '关爱事件', '纠察事件', '培训事件', '会员发展']
 
 function inferEventCategory(categoryId = '', categoryName = '') {
   const value = `${categoryId} ${categoryName}`.toLowerCase()
